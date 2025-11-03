@@ -1,9 +1,10 @@
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 
 import { AppModule } from '@/app.module';
-import { ConfigService } from '@nestjs/config';
 import { AppLogger } from '@/logger/services/logger.service';
-import { Logger } from '@nestjs/common';
+import { GlobalExceptionFilter } from '@/errors/global-exception.filter';
+import { SystemLifecycle } from '@/system/lifecycle';
 
 async function bootstrap(): Promise<void> {
   const context = bootstrap.name;
@@ -14,7 +15,11 @@ async function bootstrap(): Promise<void> {
   const port = config.get<number>('PORT') ?? 3000;
 
   app.useLogger(log);
+  app.useGlobalFilters(new GlobalExceptionFilter(log));
+
   await app.listen(port);
+
+  SystemLifecycle.register(app, log);
 
   log.log(`🚀 Server running on http://localhost:${port}`, { context });
 }
@@ -35,11 +40,7 @@ bootstrap().catch((err: unknown) => {
     );
   } catch {
     // fallback if the import fails
-    Logger.error(
-      '[Bootstrap] Fatal error during startup',
-      (err as Error)?.stack,
-      { context },
-    );
+    process.stderr.write('Fatal error during application bootstrap');
   }
 
   process.exit(1);
