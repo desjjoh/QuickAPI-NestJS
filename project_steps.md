@@ -42,9 +42,10 @@ Add a `docker-compose.yml` for API + DB (+ monitoring if needed).
 Include `.dockerignore`, `.env.example`, and CI/CD scripts.
 
 **Step 10 — Documentation**  
-Once the system is stable, write clear documentation:  
-- Setup & run instructions  
-- Environment schema reference  
-- API routes overview  
-- Logging and error conventions  
-- Deployment notes  
+Once the system is stable, write clear documentation:
+
+- Setup & run instructions
+- Environment schema reference
+- API routes overview
+- Logging and error conventions
+- Deployment notes
