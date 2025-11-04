@@ -2,9 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 
 import { AppModule } from '@/app.module';
-import { AppLogger } from '@/logger/services/logger.service';
-import { GlobalExceptionFilter } from '@/errors/global-exception.filter';
-import { SystemLifecycle } from '@/system/lifecycle';
+import { AppLogger } from '@/modules/logger/services/logger.service';
+import { GlobalExceptionFilter } from '@/core/errors/global-exception.filter';
+import { SystemLifecycle } from '@/core/system/lifecycle';
 
 async function bootstrap(): Promise<void> {
   const context = bootstrap.name;

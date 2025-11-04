@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 
-import { AppConfigModule } from '@/config/config.module';
-import { AppLoggerModule } from '@/logger/logger.module';
+import { AppConfigModule } from '@/modules/config/config.module';
+import { AppLoggerModule } from '@/modules/logger/logger.module';
 
-import { AppController } from '@/controllers/app.controller';
+import { AppController } from '@/modules/app/controllers/app.controller';
 
-import { AppService } from '@/services/app.service';
+import { AppService } from '@/modules/app/services/app.service';
 
 @Module({
   imports: [AppConfigModule, AppLoggerModule],

@@ -1,7 +1,7 @@
 import { INestApplication } from '@nestjs/common';
 import { performance } from 'node:perf_hooks';
 import os from 'os';
-import { AppLogger } from '@/logger/services/logger.service';
+import { AppLogger } from '@/modules/logger/services/logger.service';
 
 /**
  * @fileoverview Application lifecycle manager for graceful startup and shutdown.

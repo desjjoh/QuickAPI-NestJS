@@ -6,7 +6,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { AppLogger } from '@/logger/services/logger.service';
+import { AppLogger } from '@/modules/logger/services/logger.service';
 import os from 'os';
 
 /**

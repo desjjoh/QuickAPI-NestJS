@@ -4,7 +4,7 @@ import z from 'zod';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
-import { AppLogger } from '@/logger/services/logger.service';
+import { AppLogger } from '@/modules/logger/services/logger.service';
 
 import { envSchema } from './env.config';
 
