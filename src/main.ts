@@ -1,10 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from '@/app.module';
 import { AppLogger } from '@/modules/logger/services/logger.service';
-import { GlobalExceptionFilter } from '@/core/errors/global-exception.filter';
-import { SystemLifecycle } from '@/core/system/lifecycle';
+import { GlobalExceptionFilter } from '@/core/filters/global-exception.filter';
+import { SystemLifecycle } from '@/core/utils/lifecycle.util';
+import { Swagger } from '@/core/utils/swagger.util';
+import { HttpLoggingInterceptor } from '@/core/interceptors/http.interceptor';
 
 async function bootstrap(): Promise<void> {
   const context = bootstrap.name;
@@ -14,14 +17,42 @@ async function bootstrap(): Promise<void> {
   const log = app.get(AppLogger);
   const port = config.get<number>('PORT') ?? 3000;
 
+  const prefix = 'api';
+  const swagger_prefix = 'docs';
+
+  app.setGlobalPrefix(prefix);
   app.useLogger(log);
+
+  app.useGlobalInterceptors(new HttpLoggingInterceptor(log));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      exceptionFactory: (errors) => new BadRequestException(errors),
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
   app.useGlobalFilters(new GlobalExceptionFilter(log));
+
+  Swagger.init(app, swagger_prefix);
 
   await app.listen(port);
 
   SystemLifecycle.register(app, log);
 
-  log.log(`🚀 Server running on http://localhost:${port}`, { context });
+  log.log(`🚀 Server running on http://localhost:${port}/${prefix}`, {
+    context,
+    path: `/${prefix}`,
+  });
+
+  log.log(
+    `📚 API documentation available at http://localhost:${port}/${swagger_prefix}`,
+    {
+      context,
+      path: `/${swagger_prefix}`,
+    },
+  );
 }
 
 /**

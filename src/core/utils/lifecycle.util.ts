@@ -62,7 +62,7 @@ export class SystemLifecycle {
       const initiated = performance.now();
       const uptime = (initiated - start).toFixed(2);
 
-      logger.warn(`[exit] ${signal} received — initiating graceful shutdown`, {
+      logger.warn(`${signal} received — initiating graceful shutdown`, {
         context,
         signal,
         uptime,
@@ -73,11 +73,11 @@ export class SystemLifecycle {
       try {
         // Step 1 — Stop accepting new connections and close Nest HTTP server
         await app.close();
-        logger.log('[exit] Nest application closed', { context });
+        logger.log('Nest application closed', { context });
 
         // Step 2 — Finalize shutdown duration
         const duration = (performance.now() - initiated).toFixed(2);
-        logger.log(`[exit] Shutdown complete in ${duration}ms`, {
+        logger.log(`Shutdown complete in ${duration}ms`, {
           context,
           duration,
         });
@@ -86,7 +86,7 @@ export class SystemLifecycle {
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
 
-        logger.error('[exit] Error during shutdown — forcing exit', undefined, {
+        logger.error('Error during shutdown — forcing exit', undefined, {
           context,
           reason,
         });
@@ -103,7 +103,7 @@ export class SystemLifecycle {
     // Hook into Node’s lifecycle for consistent exit logging
     process.once('beforeExit', (code) => {
       const duration = (performance.now() - start).toFixed(2);
-      logger.log(`[exit] Process exiting after ${duration}ms`, {
+      logger.log(`Process exiting after ${duration}ms`, {
         context,
         code,
         duration,
