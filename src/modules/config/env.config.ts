@@ -64,6 +64,44 @@ export const envSchema = z.object({
    * @enum {('debug' | 'info' | 'warn' | 'error')}
    */
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
+  /**
+   * Hostname or IP address of the MySQL database.
+   *
+   * @example "127.0.0.1"
+   */
+  DB_HOST: z.string().default('localhost'),
+
+  /**
+   * TCP port of the MySQL database.
+   *
+   * @example 3306
+   * @minimum 1
+   * @maximum 65535
+   */
+  DB_PORT: z.coerce.number().int().min(1).max(65535).default(3306),
+
+  /**
+   * Username for authenticating with the MySQL database.
+   *
+   * @example "root"
+   */
+  DB_USER: z.string().default('root'),
+
+  /**
+   * Password for authenticating with the MySQL database.
+   *
+   * @example "root"
+   * @note Use a strong password in production environments.
+   */
+  DB_PASSWORD: z.string().default('root'),
+
+  /**
+   * Name of the database schema to connect to.
+   *
+   * @example "quickapi"
+   */
+  DB_NAME: z.string().default('dev'),
 });
 
 /**

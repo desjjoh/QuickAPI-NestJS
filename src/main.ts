@@ -18,7 +18,6 @@ async function bootstrap(): Promise<void> {
   const port = config.get<number>('PORT') ?? 3000;
 
   const prefix = 'api';
-  const swagger_prefix = 'docs';
 
   app.setGlobalPrefix(prefix);
   app.useLogger(log);
@@ -35,7 +34,7 @@ async function bootstrap(): Promise<void> {
 
   app.useGlobalFilters(new GlobalExceptionFilter(log));
 
-  Swagger.init(app, swagger_prefix);
+  Swagger.init(app, prefix);
 
   await app.listen(port);
 
@@ -45,14 +44,6 @@ async function bootstrap(): Promise<void> {
     context,
     path: `/${prefix}`,
   });
-
-  log.log(
-    `📚 API documentation available at http://localhost:${port}/${swagger_prefix}`,
-    {
-      context,
-      path: `/${swagger_prefix}`,
-    },
-  );
 }
 
 /**

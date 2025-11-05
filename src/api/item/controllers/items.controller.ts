@@ -2,10 +2,12 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Param,
   Body,
   ParseIntPipe,
-  Patch,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,36 +15,54 @@ import {
   ApiOkResponse,
   ApiCreatedResponse,
   ApiNotFoundResponse,
-  ApiBadRequestResponse,
-  ApiParam,
+  ApiNoContentResponse,
+  ApiBody,
 } from '@nestjs/swagger';
 
 import { ItemsService } from '../services/items.service';
 import { CreateItemDto, UpdateItemDto } from '../dto';
-import { ItemEntity } from '../entities/item.entity';
+import { ItemEntity } from '@/modules/database/entities';
 
 /**
  * @fileoverview
- * Controller managing CRUD operations for `Item` resources.
+ * REST controller exposing CRUD endpoints for {@link ItemEntity}.
  *
- * Demonstrates validation via DTOs, transformation via `class-transformer`,
- * and structured API documentation via `@nestjs/swagger`.
- *
- * ---
- * ### Responsibilities
- * - Handle HTTP requests for `/items`
- * - Validate incoming payloads using `class-validator`
- * - Delegate business logic to {@link ItemsService}
- * - Return standardized response objects (`ItemEntity`)
+ * This controller demonstrates a full NestJS CRUD pattern — integrating
+ * data validation, transformation, and automatic OpenAPI (Swagger)
+ * documentation through decorators.
  *
  * ---
- * ### Endpoints
- * | Method  | Route        | Description               |
- * |---------|--------------|---------------------------|
- * | GET     | `/items`     | Retrieve all items        |
- * | GET     | `/items/:id` | Retrieve one item by ID   |
- * | POST    | `/items`     | Create a new item         |
- * | PATCH   | `/items/:id` | Update an existing item   |
+ * ### Purpose
+ * - Serve as a model feature module demonstrating DTO validation,
+ *   request transformation, and clean service abstraction.
+ * - Provide REST-ful routes backed by TypeORM persistence.
+ * - Showcase automatic Swagger documentation generation.
+ *
+ * ---
+ * ### Routes
+ * | Method | Path         | Description               |
+ * |:-------|:-------------|:--------------------------|
+ * | GET    | `/items`     | Retrieve all items        |
+ * | GET    | `/items/:id` | Retrieve a single item    |
+ * | POST   | `/items`     | Create a new item         |
+ * | PUT    | `/items/:id` | Update an existing item   |
+ * | DELETE | `/items/:id` | Delete an existing item   |
+ *
+ * ---
+ * ### Example Swagger Request
+ * ```json
+ * POST /items
+ * {
+ *   "name": "Wireless Mouse",
+ *   "price": 49.99,
+ *   "description": "Compact ergonomic design"
+ * }
+ * ```
+ *
+ * ---
+ * @see {@link ItemsService} for business logic
+ * @see {@link ItemEntity} for persistence model
+ * @see {@link CreateItemDto} and {@link UpdateItemDto} for validation rules
  */
 @ApiTags('items')
 @Controller('items')
@@ -50,78 +70,45 @@ export class ItemsController {
   constructor(private readonly service: ItemsService) {}
 
   /**
-   * Retrieve all existing items.
+   * Retrieves all persisted items.
    *
-   * ---
-   * ### Example Response
-   * ```json
-   * [
-   *   { "id": 1, "name": "Mechanical Keyboard", "price": 149.99 },
-   *   { "id": 2, "name": "Gaming Mouse", "price": 59.99 }
-   * ]
-   * ```
+   * @returns A list of all {@link ItemEntity} records.
    */
   @Get()
   @ApiOperation({ summary: 'Retrieve all items' })
   @ApiOkResponse({
-    description: 'List of all items.',
-    type: [ItemEntity],
+    description: 'Returns a list of all items in the database.',
+    type: ItemEntity,
+    isArray: true,
   })
-  findAll(): ItemEntity[] {
+  async findAll(): Promise<ItemEntity[]> {
     return this.service.findAll();
   }
 
   /**
-   * Retrieve a specific item by its ID.
+   * Retrieves a specific item by its unique identifier.
    *
-   * @param id - Numeric identifier of the item.
-   *
-   * ---
-   * ### Example Response
-   * ```json
-   * { "id": 1, "name": "Mechanical Keyboard", "price": 149.99 }
-   * ```
+   * @param id - Numeric item ID parsed from the route parameter.
+   * @returns The matching {@link ItemEntity}.
+   * @throws 404 Not Found — if the item does not exist.
    */
   @Get(':id')
-  @ApiOperation({ summary: 'Retrieve an item by ID' })
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    description: 'Unique identifier of the item',
-    example: 1,
-  })
+  @ApiOperation({ summary: 'Retrieve a specific item by ID' })
   @ApiOkResponse({
-    description: 'Item found and returned successfully.',
+    description: 'Returns the item if found.',
     type: ItemEntity,
   })
   @ApiNotFoundResponse({ description: 'Item not found.' })
-  findOne(@Param('id', ParseIntPipe) id: number): ItemEntity | undefined {
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<ItemEntity> {
     return this.service.findOne(id);
   }
 
   /**
-   * Create a new item.
+   * Creates a new item using the provided request body.
    *
-   * Validates the request body using {@link CreateItemDto}.
-   *
-   * ---
-   * ### Example Request
-   * ```json
-   * {
-   *   "name": "Ergonomic Chair",
-   *   "price": 299.99,
-   *   "description": "Mesh back support and adjustable armrests"
-   * }
-   * ```
-   *
-   * ### Example Response
-   * ```json
-   * {
-   *   "id": 3,
-   *   "name": "Ergonomic Chair",
-   *   "price": 299.99
-   * }
-   * ```
+   * @param dto - Validated creation payload.
+   * @returns The newly created {@link ItemEntity}.
+   * @throws 400 Bad Request — if validation fails.
    */
   @Post()
   @ApiOperation({ summary: 'Create a new item' })
@@ -129,56 +116,47 @@ export class ItemsController {
     description: 'Item successfully created.',
     type: ItemEntity,
   })
-  @ApiBadRequestResponse({
-    description: 'Validation failed for provided input.',
-  })
-  create(@Body() dto: CreateItemDto): ItemEntity {
+  @ApiBody({ type: CreateItemDto })
+  async create(@Body() dto: CreateItemDto): Promise<ItemEntity> {
     return this.service.create(dto);
   }
 
   /**
-   * Update an existing item by ID.
+   * Updates an existing item with new data.
    *
-   * Validates the request body using {@link UpdateItemDto}.
-   *
-   * @param id - Numeric identifier of the item to update.
-   * @param dto - Updated item data (any subset of `CreateItemDto` fields).
-   *
-   * ---
-   * ### Example Request
-   * ```json
-   * {
-   *   "price": 139.99
-   * }
-   * ```
-   *
-   * ### Example Response
-   * ```json
-   * {
-   *   "id": 1,
-   *   "name": "Mechanical Keyboard",
-   *   "price": 139.99
-   * }
-   * ```
+   * @param id - Numeric ID of the item to update.
+   * @param dto - Partial update payload.
+   * @returns The updated {@link ItemEntity}.
+   * @throws 404 Not Found — if the item does not exist.
    */
-  @Patch(':id')
-  @ApiOperation({ summary: 'Update an existing item by ID' })
-  @ApiParam({
-    name: 'id',
-    type: Number,
-    description: 'Unique identifier of the item to update',
-    example: 1,
-  })
+  @Put(':id')
+  @ApiOperation({ summary: 'Update an existing item' })
   @ApiOkResponse({
     description: 'Item successfully updated.',
     type: ItemEntity,
   })
   @ApiNotFoundResponse({ description: 'Item not found.' })
-  @ApiBadRequestResponse({ description: 'Invalid request body.' })
-  update(
+  @ApiBody({ type: UpdateItemDto })
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateItemDto,
-  ): ItemEntity | undefined {
+  ): Promise<ItemEntity> {
     return this.service.update(id, dto);
+  }
+
+  /**
+   * Deletes an item by ID.
+   *
+   * @param id - Numeric ID of the item to remove.
+   * @returns No content (204) on success.
+   * @throws 404 Not Found — if the item does not exist.
+   */
+  @Delete(':id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Delete an existing item' })
+  @ApiNoContentResponse({ description: 'Item successfully deleted.' })
+  @ApiNotFoundResponse({ description: 'Item not found.' })
+  async remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.service.remove(id);
   }
 }
