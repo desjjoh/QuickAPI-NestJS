@@ -37,12 +37,12 @@ import { ItemEntity } from '../entities/item.entity';
  *
  * ---
  * ### Endpoints
- * | Method | Route        | Description               |
+ * | Method  | Route        | Description               |
  * |---------|--------------|---------------------------|
  * | GET     | `/items`     | Retrieve all items        |
  * | GET     | `/items/:id` | Retrieve one item by ID   |
  * | POST    | `/items`     | Create a new item         |
- * | PUT     | `/items/:id` | Update an existing item   |
+ * | PATCH   | `/items/:id` | Update an existing item   |
  */
 @ApiTags('items')
 @Controller('items')
