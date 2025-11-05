@@ -2,10 +2,10 @@ import {
   Controller,
   Get,
   Post,
-  Put,
   Param,
   Body,
   ParseIntPipe,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -161,7 +161,7 @@ export class ItemsController {
    * }
    * ```
    */
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Update an existing item by ID' })
   @ApiParam({
     name: 'id',
