@@ -3,10 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from '@/app.module';
-import { AppLogger } from '@/modules/logger/services/logger.service';
+import { AppLogger } from '@/modules/system/logger/services/logger.service';
 import { GlobalExceptionFilter } from '@/core/filters/global-exception.filter';
-import { SystemLifecycle } from '@/core/utils/lifecycle.util';
-import { Swagger } from '@/core/utils/swagger.util';
+import { SystemLifecycle } from '@/helpers/lifecycle.util';
+import { Swagger } from '@/helpers/swagger.util';
 import { HttpLoggingInterceptor } from '@/core/interceptors/http.interceptor';
 
 async function bootstrap(): Promise<void> {

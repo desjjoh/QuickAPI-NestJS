@@ -1,11 +1,11 @@
 import { INestApplication } from '@nestjs/common';
 import { performance } from 'node:perf_hooks';
 import os from 'os';
-import { AppLogger } from '@/modules/logger/services/logger.service';
+import { AppLogger } from '@/modules/system/logger/services/logger.service';
 
 /**
  * @fileoverview Application lifecycle manager for graceful startup and shutdown.
- * @module system/lifecycle
+ * @module core/utils/lifecycle
  * @description
  * Provides structured shutdown handling for NestJS applications.
  * Ensures that open HTTP connections, Prisma sessions, and background tasks

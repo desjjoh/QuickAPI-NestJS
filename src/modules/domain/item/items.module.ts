@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ItemsController } from './controllers/items.controller';
 import { ItemsService } from './services/items.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ItemEntity } from '@/modules/database/entities';
+import { ItemEntity } from '@/modules/system/database/entities';
 
 /**
  * @fileoverview

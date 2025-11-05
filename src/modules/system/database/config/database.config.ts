@@ -1,6 +1,6 @@
 import { MysqlConnectionOptions } from 'typeorm/driver/mysql/MysqlConnectionOptions.js';
 import type { ConfigService } from '@nestjs/config';
-import type { EnvSchema } from '@/modules/config/env.config';
+import type { EnvSchema } from '@/modules/system/config/env.config';
 
 import entities from '../entities';
 
