@@ -5,7 +5,7 @@
 The **QuickAPI Suite** is not a collection of templates — it’s a **progressive learning ecosystem**.  
 Each project teaches a different stage of backend development maturity, showing how the same design principles translate across frameworks and languages.
 
-You can think of it as a _curriculum in three acts_:
+You can think of it as a _curriculum_:
 
 | Project              | Stack                          | Purpose                                                                                  |
 | -------------------- | ------------------------------ | ---------------------------------------------------------------------------------------- |
