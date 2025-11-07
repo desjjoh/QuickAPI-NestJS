@@ -42,6 +42,7 @@ async function bootstrap(): Promise<void> {
 
   log.log(`🚀 Server running on http://localhost:${port}/${prefix}`, {
     context,
+    url: `http://localhost:${port}`,
     path: `/${prefix}`,
   });
 }
