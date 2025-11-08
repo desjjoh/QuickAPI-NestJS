@@ -4,13 +4,6 @@ import { ItemsService } from './services/items.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ItemEntity } from '@/modules/system/database/entities';
 
-/**
- * @fileoverview
- * Feature module providing CRUD operations for items.
- *
- * Encapsulates all item-related logic, including persistence,
- * validation, and request handling.
- */
 @Module({
   imports: [TypeOrmModule.forFeature([ItemEntity])],
   controllers: [ItemsController],

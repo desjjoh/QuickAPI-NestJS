@@ -21,59 +21,13 @@ import {
 
 import { ItemsService } from '../services/items.service';
 import { CreateItemDto, UpdateItemDto } from '../dto';
-import { ItemEntity } from '@/modules/database/entities';
+import { ItemEntity } from '@/modules/system/database/entities';
 
-/**
- * @fileoverview
- * REST controller exposing CRUD endpoints for {@link ItemEntity}.
- *
- * This controller demonstrates a full NestJS CRUD pattern — integrating
- * data validation, transformation, and automatic OpenAPI (Swagger)
- * documentation through decorators.
- *
- * ---
- * ### Purpose
- * - Serve as a model feature module demonstrating DTO validation,
- *   request transformation, and clean service abstraction.
- * - Provide REST-ful routes backed by TypeORM persistence.
- * - Showcase automatic Swagger documentation generation.
- *
- * ---
- * ### Routes
- * | Method | Path         | Description               |
- * |:-------|:-------------|:--------------------------|
- * | GET    | `/items`     | Retrieve all items        |
- * | GET    | `/items/:id` | Retrieve a single item    |
- * | POST   | `/items`     | Create a new item         |
- * | PUT    | `/items/:id` | Update an existing item   |
- * | DELETE | `/items/:id` | Delete an existing item   |
- *
- * ---
- * ### Example Swagger Request
- * ```json
- * POST /items
- * {
- *   "name": "Wireless Mouse",
- *   "price": 49.99,
- *   "description": "Compact ergonomic design"
- * }
- * ```
- *
- * ---
- * @see {@link ItemsService} for business logic
- * @see {@link ItemEntity} for persistence model
- * @see {@link CreateItemDto} and {@link UpdateItemDto} for validation rules
- */
 @ApiTags('items')
 @Controller('items')
 export class ItemsController {
   constructor(private readonly service: ItemsService) {}
 
-  /**
-   * Retrieves all persisted items.
-   *
-   * @returns A list of all {@link ItemEntity} records.
-   */
   @Get()
   @ApiOperation({ summary: 'Retrieve all items' })
   @ApiOkResponse({
@@ -85,13 +39,6 @@ export class ItemsController {
     return this.service.findAll();
   }
 
-  /**
-   * Retrieves a specific item by its unique identifier.
-   *
-   * @param id - Numeric item ID parsed from the route parameter.
-   * @returns The matching {@link ItemEntity}.
-   * @throws 404 Not Found — if the item does not exist.
-   */
   @Get(':id')
   @ApiOperation({ summary: 'Retrieve a specific item by ID' })
   @ApiOkResponse({
@@ -103,13 +50,6 @@ export class ItemsController {
     return this.service.findOne(id);
   }
 
-  /**
-   * Creates a new item using the provided request body.
-   *
-   * @param dto - Validated creation payload.
-   * @returns The newly created {@link ItemEntity}.
-   * @throws 400 Bad Request — if validation fails.
-   */
   @Post()
   @ApiOperation({ summary: 'Create a new item' })
   @ApiCreatedResponse({
@@ -121,14 +61,6 @@ export class ItemsController {
     return this.service.create(dto);
   }
 
-  /**
-   * Updates an existing item with new data.
-   *
-   * @param id - Numeric ID of the item to update.
-   * @param dto - Partial update payload.
-   * @returns The updated {@link ItemEntity}.
-   * @throws 404 Not Found — if the item does not exist.
-   */
   @Put(':id')
   @ApiOperation({ summary: 'Update an existing item' })
   @ApiOkResponse({
@@ -144,13 +76,6 @@ export class ItemsController {
     return this.service.update(id, dto);
   }
 
-  /**
-   * Deletes an item by ID.
-   *
-   * @param id - Numeric ID of the item to remove.
-   * @returns No content (204) on success.
-   * @throws 404 Not Found — if the item does not exist.
-   */
   @Delete(':id')
   @HttpCode(204)
   @ApiOperation({ summary: 'Delete an existing item' })

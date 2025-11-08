@@ -47,10 +47,6 @@ async function bootstrap(): Promise<void> {
   });
 }
 
-/**
- * Global bootstrap call wrapped in fail-fast handling.
- * Any uncaught startup error will be logged and terminate the process gracefully.
- */
 bootstrap().catch((err: unknown) => {
   const context = bootstrap.name;
   try {
@@ -62,7 +58,6 @@ bootstrap().catch((err: unknown) => {
       { context },
     );
   } catch {
-    // fallback if the import fails
     process.stderr.write('Fatal error during application bootstrap');
   }
 

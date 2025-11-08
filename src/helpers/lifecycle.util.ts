@@ -3,47 +3,9 @@ import { performance } from 'node:perf_hooks';
 import os from 'os';
 import { AppLogger } from '@/modules/system/logger/services/logger.service';
 
-/**
- * @fileoverview Application lifecycle manager for graceful startup and shutdown.
- * @module core/utils/lifecycle
- * @description
- * Provides structured shutdown handling for NestJS applications.
- * Ensures that open HTTP connections, Prisma sessions, and background tasks
- * are closed gracefully upon receiving termination signals.
- *
- * ---
- * ### Features
- * - Handles SIGINT, SIGTERM, and process `beforeExit` events.
- * - Prevents duplicate shutdown via static guard.
- * - Logs uptime and total shutdown duration.
- * - Ensures exit code 1 on failure.
- *
- * ---
- * ### Example
- * ```ts
- * // main.ts
- * import { SystemLifecycle } from '@/system/lifecycle';
- *
- * const app = await NestFactory.create(AppModule, { bufferLogs: true });
- * const log = app.get(AppLogger);
- * const prisma = app.get(PrismaService);
- * await app.listen(3000);
- *
- * SystemLifecycle.register(app, log, prisma);
- * ```
- */
 export class SystemLifecycle {
-  /** Prevents multiple shutdown executions. */
   private static shuttingDown = false;
 
-  /**
-   * Registers system signal handlers and orchestrates graceful shutdown.
-   *
-   * @param app - The active NestJS application instance.
-   * @param logger - Centralized application logger.
-   * @param prisma - PrismaService (optional) for DB disconnection.
-   * @param start - Timestamp (ms) when the app was initialized.
-   */
   static register(
     app: INestApplication,
     logger: AppLogger,
@@ -51,10 +13,6 @@ export class SystemLifecycle {
   ): void {
     const context = 'SystemLifecycle';
 
-    /**
-     * Handles termination signals (SIGINT, SIGTERM)
-     * and executes cleanup routines.
-     */
     const shutdown = async (signal: string): Promise<void> => {
       if (this.shuttingDown) return;
       this.shuttingDown = true;
@@ -71,11 +29,9 @@ export class SystemLifecycle {
       });
 
       try {
-        // Step 1 — Stop accepting new connections and close Nest HTTP server
         await app.close();
         logger.log('Nest application closed', { context });
 
-        // Step 2 — Finalize shutdown duration
         const duration = (performance.now() - initiated).toFixed(2);
         logger.log(`Shutdown complete in ${duration}ms`, {
           context,
@@ -95,12 +51,10 @@ export class SystemLifecycle {
       }
     };
 
-    // Bind OS signals for graceful termination
     ['SIGINT', 'SIGTERM'].forEach((sig) => {
       process.once(sig, () => void shutdown(sig));
     });
 
-    // Hook into Node’s lifecycle for consistent exit logging
     process.once('beforeExit', (code) => {
       const duration = (performance.now() - start).toFixed(2);
       logger.log(`Process exiting after ${duration}ms`, {
