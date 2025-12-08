@@ -1,65 +1,37 @@
-import { NestFactory } from '@nestjs/core';
-import { ConfigService } from '@nestjs/config';
-import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { checkNest, startNest, stopNest } from '@/config/nest.config';
+import { LifecycleHandler } from './handlers/lifecycle.handler';
 
-import { AppModule } from '@/app.module';
-import { AppLogger } from '@/modules/system/logger/services/logger.service';
-import { GlobalExceptionFilter } from '@/core/filters/global-exception.filter';
-import { SystemLifecycle } from '@/helpers/lifecycle.util';
-import { Swagger } from '@/helpers/swagger.util';
-import { HttpLoggingInterceptor } from '@/core/interceptors/http.interceptor';
+import { logger } from '@/config/logger.config';
+import { env } from '@/config/environment.config';
 
 async function bootstrap(): Promise<void> {
-  const context = bootstrap.name;
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const { register, startup } = LifecycleHandler;
 
-  const config = app.get(ConfigService);
-  const log = app.get(AppLogger);
-  const port = config.get<number>('PORT') ?? 3000;
+  const mode = env.NODE_ENV;
+  const pro_v = process.version;
 
-  const prefix = 'api';
-
-  app.setGlobalPrefix(prefix);
-  app.useLogger(log);
-
-  app.useGlobalInterceptors(new HttpLoggingInterceptor(log));
-  app.useGlobalPipes(
-    new ValidationPipe({
-      exceptionFactory: (errors) => new BadRequestException(errors),
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-    }),
+  logger.info(
+    `Booting ${env.APP_NAME} v${env.APP_VERSION} (${mode}) — Node.js ${pro_v}`,
   );
 
-  app.useGlobalFilters(new GlobalExceptionFilter(log));
+  register([
+    {
+      name: 'http server (nest)',
+      start: startNest,
+      stop: stopNest,
+      check: checkNest,
+    },
+  ]);
 
-  Swagger.init(app, prefix);
+  await startup();
 
-  await app.listen(port);
-
-  SystemLifecycle.register(app, log);
-
-  log.log(`🚀 Server running on http://localhost:${port}/${prefix}`, {
-    context,
-    url: `http://localhost:${port}`,
-    path: `/${prefix}`,
-  });
+  logger.info(`HTTP server running on port 4000 — http://localhost:4000/docs`);
 }
 
 bootstrap().catch((err: unknown) => {
-  const context = bootstrap.name;
-  try {
-    const log = new AppLogger();
+  const error: Error = err instanceof Error ? err : new Error(String(err));
+  logger.error({ stack: error.stack }, `Error — ${error.message}`);
 
-    log.error(
-      'Fatal error during application bootstrap',
-      (err as Error)?.stack,
-      { context },
-    );
-  } catch {
-    process.stderr.write('Fatal error during application bootstrap');
-  }
-
+  logger.fatal('Fatal error during application bootstrap — forcing exit');
   process.exit(1);
 });
