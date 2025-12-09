@@ -1,7 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger/dist/decorators';
 
-import { LifecycleHandler } from '@/handlers/lifecycle.handler';
+import { LC } from '@/handlers/lifecycle.handler';
 
 import { RootResponseDto, HealthResponseDto } from '../models';
 
@@ -32,7 +32,7 @@ export class AppController {
     type: HealthResponseDto,
   })
   get_health(): HealthResponseDto {
-    const alive: boolean = LifecycleHandler.isAlive();
+    const alive: boolean = LC.isAlive();
     const uptime: number = Number(process.uptime().toFixed(3));
     const timestamp: string = new Date().toISOString();
 

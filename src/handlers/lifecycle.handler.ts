@@ -7,7 +7,7 @@ type LifecycleService = {
   stop?: () => Promise<void> | void;
 };
 
-export class LifecycleHandler {
+class LifecycleHandler {
   private static startupServices: LifecycleService[] = [];
   private static shutdownServices: LifecycleService[] = [];
 
@@ -140,3 +140,5 @@ export class LifecycleHandler {
     process.exit(0);
   };
 }
+
+export const LC = LifecycleHandler;

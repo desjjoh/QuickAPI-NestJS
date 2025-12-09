@@ -14,11 +14,18 @@ import { env } from './environment.config';
 import { HttpLoggingInterceptor } from '@/common/interceptors/http.interceptor';
 import { ValidationException } from '@/common/exceptions/validation.exception';
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
+import {
+  attachRequestContext,
+  RequestContext,
+} from '@/common/store/request-context.store';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
 
 function createApp(app: INestApplication): void {
+  const requestContext = app.get(RequestContext);
+  attachRequestContext(requestContext);
+
   // INTERCEPTORS
   app.useGlobalInterceptors(new HttpLoggingInterceptor());
 

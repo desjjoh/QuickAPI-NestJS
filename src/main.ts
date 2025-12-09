@@ -1,12 +1,10 @@
 import { checkNest, startNest, stopNest } from '@/config/nest.config';
-import { LifecycleHandler } from './handlers/lifecycle.handler';
+import { LC } from './handlers/lifecycle.handler';
 
 import { logger } from '@/config/logger.config';
 import { env } from '@/config/environment.config';
 
 async function bootstrap(): Promise<void> {
-  const { register, startup } = LifecycleHandler;
-
   const mode: 'development' | 'test' | 'production' = env.NODE_ENV;
   const pro_v: string = process.version;
 
@@ -14,7 +12,7 @@ async function bootstrap(): Promise<void> {
     `Booting ${env.APP_NAME} v${env.APP_VERSION} (${mode}) — Node.js ${pro_v}`,
   );
 
-  register([
+  LC.register([
     {
       name: 'http server (nest)',
       start: startNest,
@@ -23,7 +21,7 @@ async function bootstrap(): Promise<void> {
     },
   ]);
 
-  await startup();
+  await LC.startup();
 
   logger.info(
     `HTTP server running on port ${env.PORT} — http://localhost:${env.PORT}/docs`,

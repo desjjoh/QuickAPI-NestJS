@@ -4,6 +4,7 @@ import { gray, cyan, yellow, red, green, magenta, dim } from 'colorette';
 
 import { env } from '@/config/environment.config';
 import { log_level } from '@/library/types/env.types';
+import { requestContextRef } from '@/common/store/request-context.store';
 
 const isDev: boolean = env.NODE_ENV !== 'production';
 const defaultLevel: log_level = env.LOG_LEVEL;
@@ -27,18 +28,29 @@ function colorLevel(level: string): string {
   return color(`[${level.padEnd(5, ' ')}]`);
 }
 
-function formatLog(level: string, msg: string): string {
+function formatLog(
+  level: string,
+  msg: string,
+  context: Record<string, unknown>,
+): string {
   const ts: string = dim(green(formatTimestamp()));
   const lvl: string = colorLevel(level);
+  const rid = context.requestId ? magenta(`[${context.requestId}]`) + ' ' : '';
 
-  return `${ts} ${lvl} ${msg}`;
+  const meta = { ...context };
+
+  delete meta.msg;
+  delete meta.level;
+  delete meta.levelLabel;
+
+  return `${ts} ${lvl} ${rid}${msg}`;
 }
 
 const devStream = {
   write(raw: string) {
     try {
       const log = JSON.parse(raw);
-      const msg: string = formatLog(log.levelLabel || log.level, log.msg);
+      const msg: string = formatLog(log.levelLabel || log.level, log.msg, log);
 
       process.stdout.write(msg + '\n');
     } catch {
@@ -51,10 +63,22 @@ export const logger: Logger = pino(
   {
     level: defaultLevel,
     timestamp: false,
+    base: {},
     formatters: {
       level(label) {
         return { levelLabel: label };
       },
+    },
+    mixin() {
+      const ctx = requestContextRef?.getStore();
+      if (!ctx) return {};
+
+      return {
+        requestId: ctx.requestId,
+        method: ctx.method,
+        path: ctx.path,
+        ip: ctx.ip,
+      };
     },
     serializers: {
       error: pino.stdSerializers.err,
