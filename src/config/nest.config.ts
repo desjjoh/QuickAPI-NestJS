@@ -1,4 +1,3 @@
-// import { json } from 'express';
 import { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
@@ -6,6 +5,8 @@ import { AppModule } from '@/modules/system/application/app.module';
 
 import { AppLogger } from '@/common/loggers/pino.logger';
 import { SwaggerConfig } from './docs.config';
+
+import { env } from './environment.config';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
@@ -15,12 +16,12 @@ function createApp(app: INestApplication): void {
 }
 
 export async function startNest(): Promise<void> {
-  const appLogger = new AppLogger();
+  const appLogger: AppLogger = new AppLogger();
   app = await NestFactory.create(AppModule, { logger: appLogger });
 
   createApp(app);
 
-  await app.listen(4000);
+  await app.listen(env.PORT);
   ready = true;
 }
 

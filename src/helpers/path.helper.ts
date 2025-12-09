@@ -1,3 +1,3 @@
 import path from 'path';
 
-export const rootPath = path.resolve(process.cwd());
+export const rootPath: string = path.resolve(process.cwd());

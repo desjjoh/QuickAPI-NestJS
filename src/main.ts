@@ -7,8 +7,8 @@ import { env } from '@/config/environment.config';
 async function bootstrap(): Promise<void> {
   const { register, startup } = LifecycleHandler;
 
-  const mode = env.NODE_ENV;
-  const pro_v = process.version;
+  const mode: 'development' | 'test' | 'production' = env.NODE_ENV;
+  const pro_v: string = process.version;
 
   logger.info(
     `Booting ${env.APP_NAME} v${env.APP_VERSION} (${mode}) — Node.js ${pro_v}`,
@@ -25,7 +25,9 @@ async function bootstrap(): Promise<void> {
 
   await startup();
 
-  logger.info(`HTTP server running on port 4000 — http://localhost:4000/docs`);
+  logger.info(
+    `HTTP server running on port ${env.PORT} — http://localhost:${env.PORT}/docs`,
+  );
 }
 
 bootstrap().catch((err: unknown) => {
