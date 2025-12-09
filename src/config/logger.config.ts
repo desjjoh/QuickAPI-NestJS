@@ -3,9 +3,10 @@ import pino, { type Logger } from 'pino';
 import { gray, cyan, yellow, red, green, magenta, dim } from 'colorette';
 
 import { env } from '@/config/environment.config';
+import { log_level } from '@/library/types/env.types';
 
-const isDev = env.NODE_ENV !== 'production';
-const defaultLevel = env.LOG_LEVEL || 'info';
+const isDev: boolean = env.NODE_ENV !== 'production';
+const defaultLevel: log_level = env.LOG_LEVEL;
 
 function formatTimestamp(): string {
   return moment().format('YYYY-MM-DD HH:mm:ss.SSS');

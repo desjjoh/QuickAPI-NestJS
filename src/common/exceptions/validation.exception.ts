@@ -30,7 +30,7 @@ export class ValidationException extends HttpException {
     errors: ValidationError[],
     status: HttpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
   ) {
-    const message = formatClassValidatorIssues(errors);
+    const message: string = formatClassValidatorIssues(errors);
 
     super({ message }, status);
 

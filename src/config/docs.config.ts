@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule, DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
 import { env } from '@/config/environment.config';
 
 export class SwaggerConfig {
@@ -15,7 +15,7 @@ export class SwaggerConfig {
       })
       .build();
 
-    const document = SwaggerModule.createDocument(app, config, {
+    const document: OpenAPIObject = SwaggerModule.createDocument(app, config, {
       deepScanRoutes: true,
     });
 

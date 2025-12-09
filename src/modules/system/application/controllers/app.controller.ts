@@ -3,8 +3,7 @@ import { ApiOkResponse, ApiOperation } from '@nestjs/swagger/dist/decorators';
 
 import { LifecycleHandler } from '@/handlers/lifecycle.handler';
 
-import { RootResponseDto } from '../dtos/root.dto';
-import { HealthResponseDto } from '../dtos/health.dto';
+import { RootResponseDto, HealthResponseDto } from '../models';
 
 @Controller()
 export class AppController {
