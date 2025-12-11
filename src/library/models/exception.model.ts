@@ -14,7 +14,7 @@ export class ErrorResponseDto {
   public readonly message!: string;
 
   @ApiProperty({
-    example: 1755172800000,
+    example: 175_517_280_000,
     description:
       'Unix timestamp (milliseconds since epoch) indicating when the error occurred.',
   })

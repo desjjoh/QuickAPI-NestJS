@@ -1,5 +1,4 @@
-import type { ValidationError } from 'class-validator';
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { ValidationError } from 'class-validator';
 
 export function formatClassValidatorIssues(errors: ValidationError[]): string {
   const messages: string[] = [];
@@ -21,19 +20,4 @@ export function formatClassValidatorIssues(errors: ValidationError[]): string {
   errors.forEach(walk);
 
   return `Validation failed: ${messages.join('; ')}.`;
-}
-
-export class ValidationException extends HttpException {
-  readonly timestamp: string;
-
-  constructor(
-    errors: ValidationError[],
-    status: HttpStatus = HttpStatus.INTERNAL_SERVER_ERROR,
-  ) {
-    const message: string = formatClassValidatorIssues(errors);
-
-    super({ message }, status);
-
-    this.timestamp = new Date().toISOString();
-  }
 }

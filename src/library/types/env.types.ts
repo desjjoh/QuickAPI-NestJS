@@ -6,3 +6,5 @@ export type log_level =
   | 'debug'
   | 'trace'
   | 'silent';
+
+export type mode = 'development' | 'test' | 'production';

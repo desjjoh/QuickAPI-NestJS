@@ -3,14 +3,18 @@ import { LC } from './handlers/lifecycle.handler';
 
 import { logger } from '@/config/logger.config';
 import { env } from '@/config/environment.config';
+import { mode } from '@/library/types/env.types';
 
 async function bootstrap(): Promise<void> {
-  const mode: 'development' | 'test' | 'production' = env.NODE_ENV;
-  const pro_v: string = process.version;
+  const env_mode: mode = env.NODE_ENV;
 
-  logger.info(
-    `Booting ${env.APP_NAME} v${env.APP_VERSION} (${mode}) — Node.js ${pro_v}`,
-  );
+  const name: string = env.APP_NAME;
+  const version: string = env.APP_VERSION;
+  const node_v: string = process.version;
+
+  const port: number = env.PORT;
+
+  logger.info(`Booting ${name} v${version} (${env_mode}) — Node.js ${node_v}`);
 
   LC.register([
     {
@@ -24,7 +28,7 @@ async function bootstrap(): Promise<void> {
   await LC.startup();
 
   logger.info(
-    `HTTP server running on port ${env.PORT} — http://localhost:${env.PORT}/docs`,
+    `HTTP server running on port ${port} — http://localhost:${port}/docs`,
   );
 }
 
