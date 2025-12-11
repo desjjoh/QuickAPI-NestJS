@@ -10,6 +10,13 @@ export class BadRequestError extends AppException {
   }
 }
 
+// 403 Forbidden
+export class ForbiddenError extends AppException {
+  constructor(message: string = 'Forbidden') {
+    super(403, message);
+  }
+}
+
 // 405 Method Not Allowed
 export class MethodNotAllowedError extends AppException {
   constructor(message: string = 'Method Not Allowed') {
@@ -43,6 +50,13 @@ export class ValidationErrorException extends AppException {
   constructor(errors: ValidationError[]) {
     const message: string = formatClassValidatorIssues(errors);
     super(422, message);
+  }
+}
+
+// 429 Too Many Requests
+export class TooManyRequestsError extends AppException {
+  constructor(message: string = 'Too many requests') {
+    super(429, message);
   }
 }
 

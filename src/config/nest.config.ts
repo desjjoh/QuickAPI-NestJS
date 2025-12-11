@@ -5,21 +5,19 @@ import {
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
-import { AppModule } from '@/modules/app.module';
-
-import { AppLogger } from '@/common/loggers/pino.logger';
 import { SwaggerConfig } from './docs.config';
-
 import { env } from './environment.config';
-import { HttpLoggingInterceptor } from '@/common/interceptors/http.interceptor';
 
+import { AppModule } from '@/modules/app.module';
 import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
 import {
   attachRequestContext,
   RequestContext,
 } from '@/common/store/request-context.store';
+import { AppLogger } from '@/common/loggers/nest.logger';
 import { ValidationErrorException } from '@/common/exceptions/http.exception';
 import { TimeoutInterceptor } from '@/common/interceptors/timeout.interceptor';
+import { outgoingLogger } from '@/common/middleware/logger.middleware';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
@@ -28,13 +26,20 @@ function createApp(app: INestApplication): void {
   const requestContext = app.get(RequestContext);
   attachRequestContext(requestContext);
 
+  app.use(outgoingLogger());
+
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 
+  app.enableCors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: false,
+    maxAge: 86_400,
+  });
+
   // INTERCEPTORS
-  app.useGlobalInterceptors(
-    new HttpLoggingInterceptor(),
-    new TimeoutInterceptor(5_000),
-  );
+  app.useGlobalInterceptors(new TimeoutInterceptor(5_000));
 
   // PIPES
   app.useGlobalPipes(

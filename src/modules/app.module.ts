@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 
 import { AppConfigModule } from '@/modules/system/configuration/config.module';
+import { DatabaseModule } from '@/modules/system/database/database.module';
 
 import { AppController } from '@/modules/system/application/controllers/app.controller';
 
@@ -29,12 +30,21 @@ import {
   BodyLimitMiddleware,
   BodyLimitOptions,
 } from '@/common/middleware/request-size-limit.middleware';
+import {
+  RATE_LIMIT_OPTIONS,
+  RateLimitMiddleware,
+  RateLimitOptions,
+} from '@/common/middleware/rate-limit.middleware';
+import {
+  CORS_OPTIONS,
+  CorsMiddleware,
+  CorsOptions,
+} from '@/common/middleware/cors.middleware';
 
 @Module({
-  imports: [AppConfigModule],
+  imports: [AppConfigModule, DatabaseModule],
   controllers: [AppController],
   providers: [
-    RequestContext,
     {
       provide: HEADER_LIMITS_TOKEN,
       useValue: <HeaderLimits>{
@@ -64,11 +74,33 @@ import {
         routeOverrides: [],
       },
     },
+    {
+      provide: RATE_LIMIT_OPTIONS,
+      useValue: <RateLimitOptions>{
+        windowMs: 60_000,
+        max: 200,
+        keyGenerator: (req) => req.ip,
+      },
+    },
+    {
+      provide: CORS_OPTIONS,
+      useValue: <CorsOptions>{
+        origin: ['*'],
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+        exposedHeaders: ['Authorization', 'Set-Cookie'],
+        credentials: true,
+        maxAge: 86_400,
+      },
+    },
 
+    RequestContext,
+    RateLimitMiddleware,
     ContentTypeMiddleware,
     HeaderLimitsMiddleware,
     MethodWhitelistMiddleware,
     BodyLimitMiddleware,
+    CorsMiddleware,
   ],
 })
 export class AppModule {
@@ -76,11 +108,13 @@ export class AppModule {
     consumer
       .apply(
         RequestContextMiddleware,
+        RateLimitMiddleware,
         SanitizeHeadersMiddleware,
         HeaderLimitsMiddleware,
         ContentTypeMiddleware,
         MethodWhitelistMiddleware,
         BodyLimitMiddleware,
+        CorsMiddleware,
         SecurityHeadersMiddleware,
       )
       .forRoutes('*');

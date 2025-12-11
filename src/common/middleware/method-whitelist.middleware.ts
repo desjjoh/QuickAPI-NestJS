@@ -9,6 +9,8 @@ export interface MethodWhitelistOptions {
   allowedMethods: string[];
 }
 
+const ALWAYS_ALLOWED: Set<string> = new Set(['HEAD', 'OPTIONS']);
+
 @Injectable()
 export class MethodWhitelistMiddleware implements NestMiddleware {
   private readonly allowed: Set<string>;
@@ -28,7 +30,7 @@ export class MethodWhitelistMiddleware implements NestMiddleware {
       ? Array.from(this.allowed).join(', ')
       : null;
 
-    if (!this.allowed.has(method)) {
+    if (!this.allowed.has(method) && !ALWAYS_ALLOWED.has(method)) {
       throw new MethodNotAllowedError(
         `HTTP method '${method}' is not allowed. Allowed methods: ${allowedList}.`,
       );
