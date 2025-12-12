@@ -31,14 +31,6 @@ function createApp(app: INestApplication): void {
 
   app.getHttpAdapter().getInstance().disable('x-powered-by');
 
-  app.enableCors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: false,
-    maxAge: 86_400,
-  });
-
   // INTERCEPTORS
   app.useGlobalInterceptors(new TimeoutInterceptor(5_000));
 
