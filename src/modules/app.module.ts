@@ -4,9 +4,9 @@ import { AppConfigModule } from '@/modules/system/configuration/config.module';
 import { DatabaseModule } from '@/modules/system/database/database.module';
 import { AppController } from '@/modules/system/application/controllers/app.controller';
 
-import { RequestContext } from '@/common/store/request-context.store';
+// import { RequestContext } from '@/common/store/request-context.store';
 
-import { RequestContextMiddleware } from '@/common/middleware/request-context.middleware';
+// import { RequestContextMiddleware } from '@/common/middleware/request-context.middleware';
 import { SecurityHeadersMiddleware } from '@/common/middleware/secuirty-headers.middleware';
 import {
   HEADER_LIMITS_TOKEN,
@@ -39,6 +39,7 @@ import {
   CorsMiddleware,
   CorsOptions,
 } from '@/common/middleware/cors.middleware';
+import { RequestContext } from '@/common/store/request-context.store';
 
 @Module({
   imports: [AppConfigModule, DatabaseModule],
@@ -106,7 +107,6 @@ export class AppModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(
-        RequestContextMiddleware,
         RateLimitMiddleware,
         SanitizeHeadersMiddleware,
         HeaderLimitsMiddleware,

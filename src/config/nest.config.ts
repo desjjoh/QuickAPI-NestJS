@@ -19,6 +19,7 @@ import { ValidationErrorException } from '@/common/exceptions/http.exception';
 import { TimeoutInterceptor } from '@/common/interceptors/timeout.interceptor';
 import { outgoingLogger } from '@/common/middleware/logger.middleware';
 import { NotFoundFilter } from '@/common/filters/not-found.filter';
+import { requestContextMiddleware } from '@/common/middleware/request-context.middleware';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
@@ -28,8 +29,7 @@ function createApp(app: INestApplication): void {
   attachRequestContext(requestContext);
 
   app.use(outgoingLogger());
-
-  app.getHttpAdapter().getInstance().disable('x-powered-by');
+  app.use(requestContextMiddleware);
 
   // INTERCEPTORS
   app.useGlobalInterceptors(new TimeoutInterceptor(5_000));
@@ -48,6 +48,8 @@ function createApp(app: INestApplication): void {
   // FILTERS
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalFilters(new NotFoundFilter());
+
+  app.getHttpAdapter().getInstance().disable('x-powered-by');
 
   SwaggerConfig.setup(app);
 }
