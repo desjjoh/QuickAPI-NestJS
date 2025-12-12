@@ -9,7 +9,7 @@ import { SwaggerConfig } from './docs.config';
 import { env } from './environment.config';
 
 import { AppModule } from '@/modules/app.module';
-import { GlobalExceptionFilter } from '@/common/filters/global-exception.filter';
+import { GlobalExceptionFilter } from '@/common/filters/global.filter';
 import {
   attachRequestContext,
   RequestContext,
@@ -18,6 +18,7 @@ import { AppLogger } from '@/common/loggers/nest.logger';
 import { ValidationErrorException } from '@/common/exceptions/http.exception';
 import { TimeoutInterceptor } from '@/common/interceptors/timeout.interceptor';
 import { outgoingLogger } from '@/common/middleware/logger.middleware';
+import { NotFoundFilter } from '@/common/filters/not-found.filter';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
@@ -54,6 +55,7 @@ function createApp(app: INestApplication): void {
 
   // FILTERS
   app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new NotFoundFilter());
 
   SwaggerConfig.setup(app);
 }
