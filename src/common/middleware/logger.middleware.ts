@@ -1,7 +1,7 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { logger } from '@/config/logger.config';
 
-export function outgoingLogger() {
+export function outgoingLogger(): RequestHandler {
   return function (req: Request, res: Response, next: NextFunction): void {
     const start: number = performance.now();
 

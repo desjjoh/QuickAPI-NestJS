@@ -1,9 +1,14 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-@Injectable()
-export class SecurityHeadersMiddleware implements NestMiddleware {
-  use(_req: Request, res: Response, next: NextFunction): void {
+export function securityHeadersMiddleware(): RequestHandler {
+  return function securityHeaders(
+    _req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void {
+    // Remove framework-identifying header
+    res.removeHeader('X-Powered-By');
+
     // Core security headers
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -27,7 +32,7 @@ export class SecurityHeadersMiddleware implements NestMiddleware {
       'geolocation=(), microphone=(), camera=()',
     );
 
-    // CSP (matches your FastAPI policy exactly)
+    // Content Security Policy (matches FastAPI exactly)
     res.setHeader(
       'Content-Security-Policy',
       [
@@ -40,5 +45,5 @@ export class SecurityHeadersMiddleware implements NestMiddleware {
     );
 
     next();
-  }
+  };
 }

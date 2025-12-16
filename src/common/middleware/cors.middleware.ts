@@ -1,9 +1,6 @@
-import { Injectable, Inject, NestMiddleware } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { ForbiddenError } from '@/common/exceptions/http.exception';
-
-export const CORS_OPTIONS = Symbol('CORS_OPTIONS');
 
 export interface CorsOptions {
   origin: string | string[];
@@ -14,69 +11,65 @@ export interface CorsOptions {
   maxAge?: number;
 }
 
-@Injectable()
-export class CorsMiddleware implements NestMiddleware {
-  constructor(
-    @Inject(CORS_OPTIONS)
-    private readonly opts: CorsOptions,
-  ) {}
+export function corsMiddleware(opts: CorsOptions): RequestHandler {
+  function isAllowedOrigin(origin: string | null): boolean {
+    const allowed = opts.origin;
 
-  use(req: Request, res: Response, next: NextFunction): void {
-    const origin = req.headers.origin ?? null;
+    if (!origin) return true;
 
-    // Determine whether origin is allowed
-    const allowed = this.isAllowedOrigin(origin);
+    if (allowed === '*' || (Array.isArray(allowed) && allowed.includes('*'))) {
+      return true;
+    }
 
-    if (!allowed) {
+    if (Array.isArray(allowed)) {
+      return allowed.includes(origin);
+    }
+
+    return allowed === origin;
+  }
+
+  return function cors(req: Request, res: Response, next: NextFunction): void {
+    const origin = (req.headers.origin as string | undefined) ?? null;
+
+    // --- Validate origin
+    if (!isAllowedOrigin(origin)) {
       throw new ForbiddenError(`CORS origin '${origin}' not allowed.`);
     }
 
-    // Set CORS headers
+    // --- Set CORS headers
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
-    } else if (this.opts.origin === '*' || this.opts.origin.includes('*')) {
+    } else if (
+      opts.origin === '*' ||
+      (Array.isArray(opts.origin) && opts.origin.includes('*'))
+    ) {
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
-    res.setHeader('Access-Control-Allow-Methods', this.opts.methods.join(', '));
+    res.setHeader('Access-Control-Allow-Methods', opts.methods.join(', '));
     res.setHeader(
       'Access-Control-Allow-Headers',
-      this.opts.allowedHeaders.join(', '),
+      opts.allowedHeaders.join(', '),
     );
-
     res.setHeader(
       'Access-Control-Expose-Headers',
-      this.opts.exposedHeaders.join(', '),
+      opts.exposedHeaders.join(', '),
     );
 
-    res.setHeader('Access-Control-Max-Age', String(this.opts.maxAge));
+    if (opts.maxAge !== undefined) {
+      res.setHeader('Access-Control-Max-Age', String(opts.maxAge));
+    }
 
-    if (this.opts.credentials) {
+    if (opts.credentials) {
       res.setHeader('Access-Control-Allow-Credentials', 'true');
     }
 
-    // Preflight handling
+    // --- Preflight handling
     if (req.method === 'OPTIONS') {
       res.status(204).send();
       return;
     }
 
     next();
-  }
-
-  private isAllowedOrigin(origin: string | null): boolean {
-    const opts = this.opts.origin;
-
-    if (!origin) return true;
-
-    if (opts === '*' || (Array.isArray(opts) && opts.includes('*'))) {
-      return true;
-    }
-
-    if (Array.isArray(opts)) {
-      return opts.includes(origin);
-    }
-
-    return opts === origin;
-  }
+  };
 }

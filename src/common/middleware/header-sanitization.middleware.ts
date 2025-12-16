@@ -1,5 +1,4 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { BadRequestError } from '@/common/exceptions/http.exception';
 
@@ -48,19 +47,24 @@ const ALLOWLIST = new Set([
 const VALID_NAME_RE: RegExp = /^[A-Za-z0-9-]+$/;
 const INVALID_VALUE_CHARS: Set<string> = new Set(['\r', '\n']);
 
-@Injectable()
-export class SanitizeHeadersMiddleware implements NestMiddleware {
-  use(req: Request, _res: Response, next: NextFunction): void {
+export function sanitizeHeadersMiddleware(): RequestHandler {
+  return function sanitizeHeaders(
+    req: Request,
+    _res: Response,
+    next: NextFunction,
+  ): void {
     const seen: Set<string> = new Set<string>();
     const cleaned: Record<string, string | string[]> = {};
 
     for (const [name, rawValue] of Object.entries(req.headers)) {
       const lower: string = name.toLowerCase();
 
+      // Reject explicitly blocked headers
       if (BLOCKLIST.has(lower)) {
         throw new BadRequestError(`Header '${lower}' is not allowed.`);
       }
 
+      // Reject duplicate headers after normalization
       if (seen.has(lower)) {
         throw new BadRequestError(
           `Duplicate header '${lower}' is not permitted.`,
@@ -69,6 +73,7 @@ export class SanitizeHeadersMiddleware implements NestMiddleware {
 
       seen.add(lower);
 
+      // Reject headers with invalid characters in the name
       if (!VALID_NAME_RE.test(lower)) {
         throw new BadRequestError(
           `Header name '${lower}' contains invalid characters.`,
@@ -79,6 +84,7 @@ export class SanitizeHeadersMiddleware implements NestMiddleware {
         ? rawValue
         : [rawValue ?? ''];
 
+      // Reject header values containing prohibited control characters
       for (const v of values) {
         if ([...INVALID_VALUE_CHARS].some((char) => v.includes(char))) {
           throw new BadRequestError(
@@ -87,12 +93,14 @@ export class SanitizeHeadersMiddleware implements NestMiddleware {
         }
       }
 
+      // Only allow headers explicitly present in the allowlist
       if (ALLOWLIST.has(lower)) {
         cleaned[lower] = rawValue ?? '';
       }
     }
 
     req.headers = cleaned;
+
     return next();
-  }
+  };
 }

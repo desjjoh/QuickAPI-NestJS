@@ -1,8 +1,6 @@
-import { Injectable, NestMiddleware, Inject } from '@nestjs/common';
-import type { Request, Response, NextFunction } from 'express';
-import { TooManyRequestsError } from '@/common/exceptions/http.exception';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
-export const RATE_LIMIT_OPTIONS = Symbol('RATE_LIMIT_OPTIONS');
+import { TooManyRequestsError } from '@/common/exceptions/http.exception';
 
 export interface RateLimitOptions {
   windowMs: number;
@@ -10,35 +8,36 @@ export interface RateLimitOptions {
   keyGenerator?: (req: Request) => string;
 }
 
-@Injectable()
-export class RateLimitMiddleware implements NestMiddleware {
-  private readonly store: Map<string, number[]> = new Map<string, number[]>();
+export function rateLimitMiddleware(options: RateLimitOptions): RequestHandler {
+  const store: Map<string, number[]> = new Map<string, number[]>();
 
-  constructor(
-    @Inject(RATE_LIMIT_OPTIONS)
-    private readonly options: RateLimitOptions,
-  ) {}
-
-  use(req: Request, res: Response, next: NextFunction): void {
+  return function rateLimit(
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): void {
     const now: number = Date.now();
-    const key: string = this.options.keyGenerator?.(req) ?? req.ip ?? 'unknown';
 
-    const windowStart: number = now - this.options.windowMs;
-    const timestamps: number[] = this.store.get(key) ?? [];
+    const key: string = options.keyGenerator?.(req) ?? req.ip ?? 'unknown';
 
+    const windowStart: number = now - options.windowMs;
+    const timestamps: number[] = store.get(key) ?? [];
+
+    // Keep only timestamps inside the window
     const recent: number[] = timestamps.filter((ts) => ts > windowStart);
 
     recent.push(now);
-    this.store.set(key, recent);
+    store.set(key, recent);
 
-    if (recent.length > this.options.max) {
-      res.setHeader('Retry-After', String(this.options.windowMs / 1000));
+    // Enforce limit
+    if (recent.length > options.max) {
+      res.setHeader('Retry-After', String(options.windowMs / 1000));
 
       throw new TooManyRequestsError(
-        `Too many requests — limit is ${this.options.max} per ${this.options.windowMs / 1000}s.`,
+        `Too many requests — limit is ${options.max} per ${options.windowMs / 1000}s.`,
       );
     }
 
     next();
-  }
+  };
 }

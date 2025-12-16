@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Post } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger/dist/decorators';
 
 import { LC } from '@/handlers/lifecycle.handler';
@@ -19,6 +19,11 @@ export class AppController {
   })
   get_root(): RootResponseDto {
     return new RootResponseDto('Hello World! Welcome to NestJS');
+  }
+
+  @Post('')
+  post_root() {
+    return;
   }
 
   // GET /health

@@ -1,4 +1,6 @@
-export const CONTENT_TYPE_OPTIONS = Symbol('CONTENT_TYPE_OPTIONS');
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
+
+import { UnsupportedMediaTypeError } from '@/common/exceptions/http.exception';
 
 export interface RouteOverride {
   prefix: string;
@@ -10,43 +12,40 @@ export interface ContentTypeOptions {
   routeOverrides?: RouteOverride[];
 }
 
-import { Injectable, Inject, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+const NO_BODY_METHODS: Set<string> = new Set([
+  'GET',
+  'DELETE',
+  'HEAD',
+  'OPTIONS',
+]);
 
-import { UnsupportedMediaTypeError } from '@/common/exceptions/http.exception';
+export function contentTypeMiddleware(
+  opts: ContentTypeOptions,
+): RequestHandler {
+  const routeOverrides: RouteOverride[] = opts.routeOverrides ?? [];
+  const defaultAllowed: Set<string> = new Set(
+    (opts.defaultAllowed ?? ['application/json']).map((t) => t.toLowerCase()),
+  );
 
-const NO_BODY_METHODS = new Set(['GET', 'DELETE', 'HEAD', 'OPTIONS']);
-
-@Injectable()
-export class ContentTypeMiddleware implements NestMiddleware {
-  private readonly routeOverrides: RouteOverride[];
-  private readonly defaultAllowed: Set<string>;
-
-  constructor(
-    @Inject(CONTENT_TYPE_OPTIONS)
-    private readonly opts: ContentTypeOptions,
-  ) {
-    this.routeOverrides = this.opts.routeOverrides ?? [];
-    this.defaultAllowed = new Set(
-      this.opts.defaultAllowed ?? ['application/json'],
-    );
-  }
-
-  private getAllowedFor(path: string): Set<string> {
-    for (const { prefix, allowed } of this.routeOverrides) {
+  function getAllowedFor(path: string): Set<string> {
+    for (const { prefix, allowed } of routeOverrides) {
       if (path.startsWith(prefix)) {
         return new Set(allowed.map((t) => t.toLowerCase()));
       }
     }
 
-    return new Set([...this.defaultAllowed].map((t) => t.toLowerCase()));
+    return new Set(defaultAllowed);
   }
 
-  use(req: Request, _res: Response, next: NextFunction): void {
-    const method = req.method.toUpperCase();
+  return function contentType(
+    req: Request,
+    _res: Response,
+    next: NextFunction,
+  ): void {
+    const method: string = req.method.toUpperCase();
     const contentType = req.headers['content-type'];
 
-    // -- Methods that must NOT send a body
+    // Methods that must NOT send a body
     if (NO_BODY_METHODS.has(method)) {
       if (contentType !== undefined) {
         throw new UnsupportedMediaTypeError(
@@ -57,24 +56,27 @@ export class ContentTypeMiddleware implements NestMiddleware {
       return next();
     }
 
-    // -- Methods that MUST validate content-type
-    if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      const allowed = this.getAllowedFor(req.path);
+    // Methods that MUST validate content-type
+    if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
+      const allowed: Set<string> = getAllowedFor(req.path);
 
+      // No Content-Type header found
       if (!contentType) {
         throw new UnsupportedMediaTypeError('Missing Content-Type header.');
       }
 
-      const normalized = contentType.split(';')[0].trim().toLowerCase();
+      const normalized: string = contentType.split(';')[0].trim().toLowerCase();
 
+      // Content-Type not allowed
       if (!allowed.has(normalized)) {
-        const expected = Array.from(allowed).sort();
+        const expected: string[] = Array.from(allowed).sort();
+
         throw new UnsupportedMediaTypeError(
-          `Content-Type '${contentType}' is not allowed on this endpoint. Expected one of: ${expected}.`,
+          `Content-Type '${contentType}' is not allowed. Expected one of: ${expected.join(', ')}.`,
         );
       }
     }
 
     next();
-  }
+  };
 }

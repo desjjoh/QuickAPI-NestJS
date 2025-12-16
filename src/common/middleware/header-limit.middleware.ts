@@ -1,13 +1,9 @@
-import type { Request, Response, NextFunction } from 'express';
-
-import { Inject, Injectable, NestMiddleware } from '@nestjs/common';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import {
   RequestHeaderFieldsTooLargeError,
   UnsupportedTransferEncodingError,
 } from '@/common/exceptions/http.exception';
-
-export const HEADER_LIMITS_TOKEN = Symbol('HEADER_LIMITS_TOKEN');
 
 export interface HeaderLimits {
   maxHeaderCount: number;
@@ -23,27 +19,27 @@ const defaultLimits: HeaderLimits = {
   allowChunked: false,
 };
 
-@Injectable()
-export class HeaderLimitsMiddleware implements NestMiddleware {
-  constructor(
-    @Inject(HEADER_LIMITS_TOKEN)
-    private readonly limits: HeaderLimits = defaultLimits,
-  ) {}
-
-  use(req: Request, _res: Response, next: NextFunction): void {
+export function headerLimitsMiddleware(
+  limits: HeaderLimits = defaultLimits,
+): RequestHandler {
+  return function headerLimits(
+    req: Request,
+    _res: Response,
+    next: NextFunction,
+  ): void {
     const headers = req.headers;
     const headerEntries = Object.entries(headers);
 
-    // --- Too many header fields ---
-    if (headerEntries.length > this.limits.maxHeaderCount) {
+    // Too many header fields
+    if (headerEntries.length > limits.maxHeaderCount) {
       throw new RequestHeaderFieldsTooLargeError(
-        `Too many headers (limit = ${this.limits.maxHeaderCount}).`,
+        `Too many headers (limit = ${limits.maxHeaderCount}).`,
       );
     }
 
     let totalBytes = 0;
 
-    // --- Per-header and total size enforcement ---
+    // Per-header and total size enforcement
     for (const [key, value] of headerEntries) {
       const keyBytes = Buffer.byteLength(key);
       const values: string[] = Array.isArray(value) ? value : [value ?? ''];
@@ -54,24 +50,24 @@ export class HeaderLimitsMiddleware implements NestMiddleware {
 
         totalBytes += size;
 
-        if (size > this.limits.maxSingleHeaderBytes) {
+        if (size > limits.maxSingleHeaderBytes) {
           throw new RequestHeaderFieldsTooLargeError(
-            `Header exceeds per-header size limit (${this.limits.maxSingleHeaderBytes} bytes).`,
+            `Header exceeds per-header size limit (${limits.maxSingleHeaderBytes} bytes).`,
           );
         }
       }
     }
 
-    if (totalBytes > this.limits.maxTotalHeaderBytes) {
+    if (totalBytes > limits.maxTotalHeaderBytes) {
       throw new RequestHeaderFieldsTooLargeError(
-        `Total header size exceeds limit (${this.limits.maxTotalHeaderBytes} bytes).`,
+        `Total header size exceeds limit (${limits.maxTotalHeaderBytes} bytes).`,
       );
     }
 
-    // --- Prevent chunked transfer encoding ---
+    // Prevent chunked transfer encoding
     const transferEncoding = req.headers['transfer-encoding'];
 
-    if (!this.limits.allowChunked && typeof transferEncoding === 'string') {
+    if (!limits.allowChunked && typeof transferEncoding === 'string') {
       if (transferEncoding.toLowerCase().includes('chunked')) {
         throw new UnsupportedTransferEncodingError(
           'Chunked request bodies are not allowed.',
@@ -80,5 +76,5 @@ export class HeaderLimitsMiddleware implements NestMiddleware {
     }
 
     next();
-  }
+  };
 }
