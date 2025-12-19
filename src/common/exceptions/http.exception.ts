@@ -17,6 +17,13 @@ export class ForbiddenError extends AppException {
   }
 }
 
+// 404 Not Found
+export class NotFoundError extends AppException {
+  constructor(message: string = 'Not Found') {
+    super(404, message);
+  }
+}
+
 // 405 Method Not Allowed
 export class MethodNotAllowedError extends AppException {
   constructor(message: string = 'Method Not Allowed') {
@@ -49,6 +56,12 @@ export class UnsupportedMediaTypeError extends AppException {
 export class ValidationErrorException extends AppException {
   constructor(errors: ValidationError[]) {
     const message: string = formatClassValidatorIssues(errors);
+    super(422, message);
+  }
+}
+
+export class UnprocessableContentError extends AppException {
+  constructor(message: string = 'Unprocessable Content') {
     super(422, message);
   }
 }

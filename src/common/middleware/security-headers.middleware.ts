@@ -2,12 +2,17 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 export function securityHeadersMiddleware(): RequestHandler {
   return function securityHeaders(
-    _req: Request,
+    req: Request,
     res: Response,
     next: NextFunction,
   ): void {
     // Remove framework-identifying header
     res.removeHeader('X-Powered-By');
+
+    const path: string = req.originalUrl ?? req.url;
+
+    if (path.startsWith('/docs') || path.startsWith('/openapi.json'))
+      return next();
 
     // Core security headers
     res.setHeader('X-Frame-Options', 'DENY');

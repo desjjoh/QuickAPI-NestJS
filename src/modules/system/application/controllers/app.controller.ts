@@ -1,12 +1,15 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation } from '@nestjs/swagger/dist/decorators';
 
 import { LC } from '@/handlers/lifecycle.handler';
 
 import { RootResponseDto, HealthResponseDto } from '../models';
+import { AppService } from '../services/app.service';
 
 @Controller()
 export class AppController {
+  constructor(private readonly service: AppService) {}
+
   // GET /
   @Get('')
   @ApiOperation({
@@ -18,12 +21,7 @@ export class AppController {
     type: RootResponseDto,
   })
   get_root(): RootResponseDto {
-    return new RootResponseDto('Hello World! Welcome to NestJS');
-  }
-
-  @Post('')
-  post_root() {
-    return;
+    return this.service.get_root('Hello World! Welcome to NestJS');
   }
 
   // GET /health
@@ -43,4 +41,20 @@ export class AppController {
 
     return new HealthResponseDto(alive, uptime, timestamp);
   }
+
+  // GET /ready
+  @Get('/ready')
+  get_ready() {}
+
+  // GET /info
+  @Get('/info')
+  get_info() {}
+
+  // GET /system
+  @Get('/system')
+  get_system() {}
+
+  // GET /metrics
+  @Get('/metrics')
+  get_metrics() {}
 }

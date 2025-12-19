@@ -1,0 +1,124 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+} from '@nestjs/swagger';
+import { Item } from '../models/item.model';
+import { ItemsApiService } from '../services/items.service';
+import { CreateItem } from '../models/item-create.model';
+import { ErrorResponseDto } from '@/library/models/exception.model';
+import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
+import { EntityIdParam } from '@/library/docs/entity-id.param';
+import { UpdateItem } from '../models/item-update.model';
+
+@Controller()
+export class ItemsApiController {
+  constructor(private readonly service: ItemsApiService) {}
+
+  // POST /
+  @Post('')
+  @ApiOperation({ summary: 'Create a new item' })
+  @ApiCreatedResponse({ description: 'Successful Response.', type: Item })
+  @ApiBody({ type: CreateItem })
+  async create_item(@Body() dto: CreateItem): Promise<Item> {
+    return this.service.create(dto);
+  }
+
+  // GET /
+  @Get('')
+  @ApiOperation({
+    summary: 'Get a list of items',
+    description:
+      'Retrieves a paginated list of items. Supports page, limit, sorting, and optional filtering.',
+  })
+  @ApiOkResponse({ description: 'Successful Response.', type: [Item] })
+  async get_items(): Promise<Item[]> {
+    return this.service.getAll();
+  }
+
+  // GET /:id
+  @Get(':id')
+  @EntityIdParam
+  @ApiOperation({
+    summary: 'Get a single item by ID',
+    description:
+      'Fetches a single item by its unique identifier. Returns 404 if the item does not exist.',
+  })
+  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiNotFoundResponse({
+    description: 'No item exists with the provided identifier.',
+    type: ErrorResponseDto,
+  })
+  async get_item(@Param('id', NanoIdParamPipe) id: string): Promise<Item> {
+    return this.service.getById(id);
+  }
+
+  // PATCH /:id
+  @Patch(':id')
+  @EntityIdParam
+  @ApiOperation({
+    summary: 'Update an item by ID',
+    description:
+      'Applies a partial update to an existing item. Only provided fields are modified. Returns the updated resource.',
+  })
+  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiNotFoundResponse({
+    description: 'No item exists with the provided identifier.',
+    type: ErrorResponseDto,
+  })
+  async update_item(
+    @Param('id', NanoIdParamPipe) id: string,
+    @Body() dto: UpdateItem,
+  ): Promise<Item> {
+    return this.service.patch(id, dto);
+  }
+
+  // PUT /:id
+  @Put(':id')
+  @EntityIdParam
+  @ApiOperation({
+    summary: 'Update an item by ID',
+    description:
+      'Applies a partial update to an existing item. Only provided fields are modified. Returns the updated resource.',
+  })
+  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiNotFoundResponse({
+    description: 'No item exists with the provided identifier.',
+    type: ErrorResponseDto,
+  })
+  async replace_item(
+    @Param('id', NanoIdParamPipe) id: string,
+    @Body() dto: CreateItem,
+  ): Promise<Item> {
+    return this.service.put(id, dto);
+  }
+
+  // DELETE /:id
+  @Delete(':id')
+  @EntityIdParam
+  @ApiOperation({
+    summary: 'Delete an item by ID',
+    description:
+      'Removes an item by its ID. Returns the deleted resource for confirmation. Returns 404 if the item is not found.',
+  })
+  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiNotFoundResponse({
+    description: 'No item exists with the provided identifier.',
+    type: ErrorResponseDto,
+  })
+  async delete_item(@Param('id', NanoIdParamPipe) id: string): Promise<Item> {
+    return this.service.remove(id);
+  }
+}

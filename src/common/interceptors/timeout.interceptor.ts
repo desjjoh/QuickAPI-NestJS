@@ -10,7 +10,7 @@ import { HttpArgumentsHost } from '@nestjs/common/interfaces';
 
 @Injectable()
 export class TimeoutInterceptor implements NestInterceptor {
-  constructor(private readonly ms: number = 5000) {}
+  constructor(private readonly ms: number = 5_000) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const http: HttpArgumentsHost = context.switchToHttp();

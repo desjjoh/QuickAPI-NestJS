@@ -1,14 +1,13 @@
 import { Module } from '@nestjs/common';
 
-import { AppConfigModule } from '@/modules/system/configuration/config.module';
-import { DatabaseModule } from '@/modules/system/database/database.module';
-import { AppController } from '@/modules/system/application/controllers/app.controller';
+import { DomainModule } from '@/modules/domain/domain.module';
 
 import { RequestContext } from '@/common/store/request-context.store';
+import { ApiModule } from './api/api.module';
+import { SystemModule } from './system/system.module';
 
 @Module({
-  imports: [AppConfigModule, DatabaseModule],
-  controllers: [AppController],
+  imports: [SystemModule, DomainModule, ApiModule],
   providers: [RequestContext],
 })
 export class AppModule {}
