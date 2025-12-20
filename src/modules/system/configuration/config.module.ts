@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { env } from '@/config/environment.config';
+import { APP_ENV, env } from '@/config/environment.config';
 
 @Module({
   imports: [
@@ -12,10 +12,10 @@ import { env } from '@/config/environment.config';
   ],
   providers: [
     {
-      provide: 'APP_ENV',
+      provide: APP_ENV,
       useValue: env,
     },
   ],
-  exports: ['APP_ENV'],
+  exports: [APP_ENV],
 })
 export class AppConfigModule {}

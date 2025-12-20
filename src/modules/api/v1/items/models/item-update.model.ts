@@ -6,7 +6,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 export class UpdateItem {
   @ApiPropertyOptional({
     description: 'Updated descriptive name of the item (max length 120).',
-    example: 'Reinforced Iron Sword',
+    example: 'Iron Sword',
     minLength: 3,
     maxLength: 120,
     type: String,
@@ -19,7 +19,7 @@ export class UpdateItem {
   @ApiPropertyOptional({
     description:
       'Updated price of the item represented as a decimal with 2 fractional digits.',
-    example: 59.99,
+    example: 49.99,
     minimum: 0,
     type: Number,
   })
@@ -32,7 +32,7 @@ export class UpdateItem {
   @ApiPropertyOptional({
     description:
       'Updated free-text description of the item; omitted when unchanged.',
-    example: 'A reinforced steel blade with improved durability.',
+    example: 'A finely crafted steel blade.',
     type: String,
   })
   @IsOptional()

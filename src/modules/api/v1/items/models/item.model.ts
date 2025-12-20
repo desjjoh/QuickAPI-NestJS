@@ -4,20 +4,12 @@ import { BaseModel } from '@/library/models/base.model';
 
 import { ItemEntity } from '@/modules/domain/items/entities/item.entity';
 
-export class Item extends BaseModel {
+export class ItemDto extends BaseModel {
   @ApiProperty({
     description: 'Human-readable name of the item.',
     example: 'Iron Sword',
   })
   public readonly name!: string;
-
-  @ApiProperty({
-    description: 'Optional description providing additional item details.',
-    example: 'A finely crafted steel blade.',
-    required: false,
-    nullable: true,
-  })
-  public readonly description?: string | null;
 
   @ApiProperty({
     description: 'Item price expressed in the system currency.',
@@ -27,11 +19,19 @@ export class Item extends BaseModel {
   })
   public readonly price!: number;
 
+  @ApiProperty({
+    description: 'Optional description providing additional item details.',
+    example: 'A finely crafted steel blade.',
+    required: false,
+    nullable: true,
+  })
+  public readonly description?: string;
+
   constructor(entity: ItemEntity) {
     super(entity);
 
     this.name = entity.name;
-    this.description = entity.description;
-    this.price = entity.price;
+    this.price = Number(entity.price);
+    this.description = entity.description ?? undefined;
   }
 }

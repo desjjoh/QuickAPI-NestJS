@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ItemsRepository } from '@/modules/domain/items/repository/items.repository';
 import { ItemEntity } from '@/modules/domain/items/entities/item.entity';
 
-import { Item } from '../models/item.model';
+import { ItemDto } from '../models/item.model';
 import { NotFoundError } from '@/common/exceptions/http.exception';
 import { CreateItem } from '../models/item-create.model';
 import { UpdateItem } from '../models/item-update.model';
@@ -12,34 +12,36 @@ import { UpdateItem } from '../models/item-update.model';
 export class ItemsApiService {
   constructor(private readonly itemsService: ItemsRepository) {}
 
-  public async create(payload: CreateItem): Promise<Item> {
-    return this.itemsService.create(payload);
+  public async create(payload: CreateItem): Promise<ItemDto> {
+    const item = await this.itemsService.create(payload);
+
+    return new ItemDto(item);
   }
 
-  public async getAll(): Promise<Item[]> {
+  public async getAll(): Promise<ItemDto[]> {
     const items: ItemEntity[] = await this.itemsService.findAll();
 
-    return items.map((item) => new Item(item));
+    return items.map((item) => new ItemDto(item));
   }
 
-  public async getById(id: string): Promise<Item> {
+  public async getById(id: string): Promise<ItemDto> {
     const item = await this.itemsService.findOneById(id);
 
     if (!item) throw new NotFoundError(`Resource with ID '${id}' not found`);
 
-    return new Item(item);
+    return new ItemDto(item);
   }
 
-  public async patch(id: string, payload: UpdateItem): Promise<Item> {
+  public async patch(id: string, payload: UpdateItem): Promise<ItemDto> {
     const item = await this.itemsService.findOneById(id);
 
     if (!item) throw new NotFoundError(`Resource with ID '${id}' not found`);
 
     const updated = await this.itemsService.update(item, payload);
-    return updated;
+    return new ItemDto(updated);
   }
 
-  public async put(id: string, payload: CreateItem): Promise<Item> {
+  public async put(id: string, payload: CreateItem): Promise<ItemDto> {
     const item = await this.itemsService.findOneById(id);
 
     if (!item) throw new NotFoundError(`Resource with ID '${id}' not found`);
@@ -49,15 +51,16 @@ export class ItemsApiService {
       description: payload.description ?? null,
     });
 
-    return updated;
+    return new ItemDto(updated);
   }
 
-  public async remove(id: string): Promise<Item> {
+  public async remove(id: string): Promise<ItemDto> {
     const item = await this.itemsService.findOneById(id);
 
     if (!item) throw new NotFoundError(`Resource with ID '${id}' not found`);
 
-    const removed = await this.itemsService.remove(item);
-    return new Item(removed);
+    await this.itemsService.remove(item);
+
+    return new ItemDto(item);
   }
 }

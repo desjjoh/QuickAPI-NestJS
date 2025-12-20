@@ -28,6 +28,7 @@ import { rateLimitMiddleware } from '@/common/middleware/rate-limit.middleware';
 import { securityHeadersMiddleware } from '@/common/middleware/security-headers.middleware';
 import { corsMiddleware } from '@/common/middleware/cors.middleware';
 import { bodyLimitMiddleware } from '@/common/middleware/request-size-limit.middleware';
+import { httpMetricsMiddleware } from '@/common/middleware/metrics.middleware';
 
 let app: INestApplication | null = null;
 let ready: boolean = false;
@@ -40,6 +41,7 @@ function createApp(app: INestApplication): void {
   // MIDDLEWARE
   app.use(requestContextMiddleware());
   app.use(outgoingLogger());
+  app.use(httpMetricsMiddleware);
 
   app.use(securityHeadersMiddleware());
   app.use(

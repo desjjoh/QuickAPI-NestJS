@@ -15,7 +15,7 @@ import {
   ApiOkResponse,
   ApiOperation,
 } from '@nestjs/swagger';
-import { Item } from '../models/item.model';
+import { ItemDto } from '../models/item.model';
 import { ItemsApiService } from '../services/items.service';
 import { CreateItem } from '../models/item-create.model';
 import { ErrorResponseDto } from '@/library/models/exception.model';
@@ -25,15 +25,15 @@ import { UpdateItem } from '../models/item-update.model';
 
 @Controller()
 export class ItemsApiController {
-  constructor(private readonly service: ItemsApiService) {}
+  constructor(private readonly svc: ItemsApiService) {}
 
   // POST /
   @Post('')
   @ApiOperation({ summary: 'Create a new item' })
-  @ApiCreatedResponse({ description: 'Successful Response.', type: Item })
+  @ApiCreatedResponse({ description: 'Successful Response.', type: ItemDto })
   @ApiBody({ type: CreateItem })
-  async create_item(@Body() dto: CreateItem): Promise<Item> {
-    return this.service.create(dto);
+  async create_item(@Body() dto: CreateItem): Promise<ItemDto> {
+    return this.svc.create(dto);
   }
 
   // GET /
@@ -43,9 +43,9 @@ export class ItemsApiController {
     description:
       'Retrieves a paginated list of items. Supports page, limit, sorting, and optional filtering.',
   })
-  @ApiOkResponse({ description: 'Successful Response.', type: [Item] })
-  async get_items(): Promise<Item[]> {
-    return this.service.getAll();
+  @ApiOkResponse({ description: 'Successful Response.', type: [ItemDto] })
+  async get_items(): Promise<ItemDto[]> {
+    return this.svc.getAll();
   }
 
   // GET /:id
@@ -56,13 +56,13 @@ export class ItemsApiController {
     description:
       'Fetches a single item by its unique identifier. Returns 404 if the item does not exist.',
   })
-  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiOkResponse({ description: 'Successful Response.', type: ItemDto })
   @ApiNotFoundResponse({
     description: 'No item exists with the provided identifier.',
     type: ErrorResponseDto,
   })
-  async get_item(@Param('id', NanoIdParamPipe) id: string): Promise<Item> {
-    return this.service.getById(id);
+  async get_item(@Param('id', NanoIdParamPipe) id: string): Promise<ItemDto> {
+    return this.svc.getById(id);
   }
 
   // PATCH /:id
@@ -73,7 +73,7 @@ export class ItemsApiController {
     description:
       'Applies a partial update to an existing item. Only provided fields are modified. Returns the updated resource.',
   })
-  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiOkResponse({ description: 'Successful Response.', type: ItemDto })
   @ApiNotFoundResponse({
     description: 'No item exists with the provided identifier.',
     type: ErrorResponseDto,
@@ -81,8 +81,8 @@ export class ItemsApiController {
   async update_item(
     @Param('id', NanoIdParamPipe) id: string,
     @Body() dto: UpdateItem,
-  ): Promise<Item> {
-    return this.service.patch(id, dto);
+  ): Promise<ItemDto> {
+    return this.svc.patch(id, dto);
   }
 
   // PUT /:id
@@ -93,7 +93,7 @@ export class ItemsApiController {
     description:
       'Applies a partial update to an existing item. Only provided fields are modified. Returns the updated resource.',
   })
-  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiOkResponse({ description: 'Successful Response.', type: ItemDto })
   @ApiNotFoundResponse({
     description: 'No item exists with the provided identifier.',
     type: ErrorResponseDto,
@@ -101,8 +101,8 @@ export class ItemsApiController {
   async replace_item(
     @Param('id', NanoIdParamPipe) id: string,
     @Body() dto: CreateItem,
-  ): Promise<Item> {
-    return this.service.put(id, dto);
+  ): Promise<ItemDto> {
+    return this.svc.put(id, dto);
   }
 
   // DELETE /:id
@@ -113,12 +113,14 @@ export class ItemsApiController {
     description:
       'Removes an item by its ID. Returns the deleted resource for confirmation. Returns 404 if the item is not found.',
   })
-  @ApiOkResponse({ description: 'Successful Response.', type: Item })
+  @ApiOkResponse({ description: 'Successful Response.', type: ItemDto })
   @ApiNotFoundResponse({
     description: 'No item exists with the provided identifier.',
     type: ErrorResponseDto,
   })
-  async delete_item(@Param('id', NanoIdParamPipe) id: string): Promise<Item> {
-    return this.service.remove(id);
+  async delete_item(
+    @Param('id', NanoIdParamPipe) id: string,
+  ): Promise<ItemDto> {
+    return this.svc.remove(id);
   }
 }

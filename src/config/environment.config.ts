@@ -106,3 +106,6 @@ export { env };
 
 export const isProd = env.NODE_ENV === 'production';
 export const isDev = env.NODE_ENV === 'development';
+
+export type AppEnv = z.infer<typeof EnvSchema>;
+export const APP_ENV = 'APP_ENV' as const;

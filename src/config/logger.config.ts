@@ -1,6 +1,7 @@
 import moment from 'moment';
 import pino, { type Logger } from 'pino';
 import { gray, cyan, yellow, red, green, magenta, dim } from 'colorette';
+import os from 'node:os';
 
 import { env } from '@/config/environment.config';
 import { log_level } from '@/library/types/env.types';
@@ -36,6 +37,7 @@ function formatLog(
   const ts: string = dim(green(formatTimestamp()));
   const lvl: string = colorLevel(level);
   const rid = context.requestId ? magenta(`[${context.requestId}]`) + ' ' : '';
+  const pid = context.pid ? cyan(`[${context.pid}]`) + ' ' : '';
 
   const meta = { ...context };
 
@@ -43,7 +45,7 @@ function formatLog(
   delete meta.level;
   delete meta.levelLabel;
 
-  return `${ts} ${lvl} ${rid}${msg}`;
+  return `${ts} ${pid}${lvl} ${rid}${msg}`;
 }
 
 const devStream = {
@@ -63,7 +65,10 @@ export const logger: Logger = pino(
   {
     level: defaultLevel,
     timestamp: false,
-    base: {},
+    base: {
+      pid: process.pid,
+      hostname: os.hostname(),
+    },
     formatters: {
       level(label) {
         return { levelLabel: label };
