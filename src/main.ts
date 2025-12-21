@@ -1,9 +1,8 @@
 import { checkNest, startNest, stopNest } from '@/config/nest.config';
-import { LC } from './handlers/lifecycle.handler';
-
+import { LC } from '@/common/handlers/lifecycle.handler';
 import { logger } from '@/config/logger.config';
 import { env } from '@/config/environment.config';
-import { mode } from '@/library/types/env.types';
+import { mode } from '@/config/environment.config';
 
 async function bootstrap(): Promise<void> {
   const env_mode: mode = env.NODE_ENV;

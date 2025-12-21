@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { requestContextRef } from '@/common/store/request-context.store';
-import { generateRequestId } from '@/helpers/nanoid.helper';
+import { generateRequestId } from '@/common/helpers/nanoid.helper';
 
 export function requestContextMiddleware(): RequestHandler {
   return function requestContext(

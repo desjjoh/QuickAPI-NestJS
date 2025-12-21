@@ -2,7 +2,7 @@ import os from 'node:os';
 
 import { Inject, Injectable } from '@nestjs/common';
 
-import { LC } from '@/handlers/lifecycle.handler';
+import { LC } from '@/common/handlers/lifecycle.handler';
 
 import {
   HealthResponseDto,
@@ -16,7 +16,8 @@ import { InfoResponseParams } from '../models/_info.model';
 import { APP_ENV, type AppEnv } from '@/config/environment.config';
 import { HealthIndicatorService } from '../indicators/typeorm.indicator';
 import { DbStatus, SystemResponseParams } from '../models/_system.model';
-import { getEventLoopLag } from '@/helpers/timer.helper';
+import { getEventLoopLag } from '@/common/helpers/event-loop.helper';
+import { mode } from '@/config/environment.config';
 
 @Injectable()
 export class ApplicationControllerService {
@@ -52,10 +53,7 @@ export class ApplicationControllerService {
   public get_info(): InfoResponseDto {
     const name: string = this.env.APP_NAME;
     const version: string = this.env.APP_VERSION;
-
-    const environment: 'development' | 'test' | 'production' =
-      this.env.NODE_ENV;
-
+    const environment: mode = this.env.NODE_ENV;
     const hostname: string = os.hostname();
     const pid: number = process.pid;
 

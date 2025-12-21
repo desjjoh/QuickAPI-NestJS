@@ -1,9 +1,10 @@
+import { mode } from '@/config/environment.config';
 import { ApiProperty } from '@nestjs/swagger';
 
 export type InfoResponseParams = {
   name: string;
   version: string;
-  environment: 'development' | 'production' | 'test';
+  environment: mode;
   hostname: string;
   pid: number;
 };

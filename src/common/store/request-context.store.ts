@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable } from '@nestjs/common';
 
-import { RequestContextStore } from '@/library/types/context.types';
+export type RequestContextStore = {
+  requestId: string;
+  method: string;
+  path: string;
+  ip: string | undefined;
+};
 
 @Injectable()
 export class RequestContext {

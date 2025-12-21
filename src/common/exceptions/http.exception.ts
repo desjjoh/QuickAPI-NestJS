@@ -1,7 +1,7 @@
 import { ValidationError } from 'class-validator';
 
 import { AppException } from './app.exception';
-import { formatClassValidatorIssues } from '@/helpers/validation.helper';
+import { formatClassValidatorIssues } from '@/common/helpers/validation.helper';
 
 // 400 Bad Request
 export class BadRequestError extends AppException {

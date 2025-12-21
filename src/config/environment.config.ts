@@ -4,9 +4,20 @@ import path from 'path';
 import { yellow, red, green, dim, bold } from 'colorette';
 import { config as loadEnv } from 'dotenv';
 
-import { rootPath } from '@/helpers/path.helper';
+import { rootPath } from '@/common/helpers/path.helper';
 
 loadEnv();
+
+export type log_level =
+  | 'error'
+  | 'fatal'
+  | 'warn'
+  | 'info'
+  | 'debug'
+  | 'trace'
+  | 'silent';
+
+export type mode = 'development' | 'test' | 'production';
 
 const req: NodeJS.Require = createRequire(path.join(rootPath, 'package.json'));
 

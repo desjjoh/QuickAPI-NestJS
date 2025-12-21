@@ -20,7 +20,7 @@ import { ItemsApiService } from '../services/items.service';
 import { CreateItem } from '../models/item-create.model';
 import { ErrorResponseDto } from '@/library/models/exception.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
-import { EntityIdParam } from '@/library/docs/entity-id.param';
+import { EntityIdParam } from '@/common/decorators/id-param.decorator';
 import { UpdateItem } from '../models/item-update.model';
 
 @Controller()
