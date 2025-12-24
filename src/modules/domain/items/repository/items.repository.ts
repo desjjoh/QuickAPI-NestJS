@@ -31,7 +31,7 @@ export class ItemsRepository {
     return this.repo.find();
   }
 
-  public async findPaginated(): Promise<[ItemEntity[], number]> {
+  public async findPaginatedAndCount(): Promise<[ItemEntity[], number]> {
     return this.repo.findAndCount();
   }
 
