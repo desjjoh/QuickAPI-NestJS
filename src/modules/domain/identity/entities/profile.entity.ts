@@ -1,0 +1,63 @@
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+
+import { BaseEntity } from '@/common/entities/base.entity';
+import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
+import { AddressEntity } from '@/modules/domain/shared/entities/address.entity';
+
+import { UserEntity } from './user.entity';
+
+class Name {
+  @Column({ type: 'text' })
+  public readonly first!: string;
+
+  @Column({ type: 'text' })
+  public readonly last!: string;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  public readonly preferred!: string | null;
+}
+
+class Personal {
+  @Column({ type: 'date' })
+  public readonly dob!: string;
+
+  @ManyToOne(() => GenderEntity, {
+    eager: true,
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'gender_id', referencedColumnName: 'id' })
+  public readonly gender!: GenderEntity;
+}
+
+class Contact {
+  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
+  public readonly alternate_phone_e164!: string | null;
+
+  @ManyToOne(() => AddressEntity, {
+    eager: true,
+    nullable: true,
+    cascade: ['insert', 'update'],
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'address_id', referencedColumnName: 'id' })
+  public address!: AddressEntity | null;
+}
+
+@Entity('user_profile')
+export class ProfileEntity extends BaseEntity {
+  @OneToOne(() => UserEntity, (user: UserEntity) => user.profile, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn()
+  public readonly user!: UserEntity;
+
+  @Column(() => Name)
+  public readonly name!: Name;
+
+  @Column(() => Personal)
+  public readonly personal!: Personal;
+
+  @Column(() => Contact)
+  public readonly contact!: Contact;
+}

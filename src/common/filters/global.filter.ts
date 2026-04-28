@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 
 import { logger } from '@/config/logger.config';
-import { ErrorResponseDto } from '@/library/models/exception.model';
+import { ErrorResponseDto } from '@/common/models/exception.model';
 import { HttpArgumentsHost } from '@nestjs/common/interfaces';
 
 @Catch(HttpException, Error)

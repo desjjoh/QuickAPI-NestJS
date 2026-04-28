@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { ItemEntity } from '../entities/item.entity';
-import { Base } from '@/library/models/base.model';
+import { Base } from '@/common/models/base.model';
 
 @Injectable()
 export class ItemsRepository {

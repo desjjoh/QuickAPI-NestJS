@@ -1,8 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { BaseModel } from '@/library/models/base.model';
-
 import { ItemEntity } from '@/modules/domain/items/entities/item.entity';
+import { BaseModel } from '@/common/models/base.model';
 
 export class ItemDto extends BaseModel {
   @ApiProperty({
