@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { Routes } from '@nestjs/core';
 
 import { ItemsApiModule } from './items/items.module';
+import { AuthenticationApiModule } from './authentication/authentication.module';
 
 @Module({
   imports: [ItemsApiModule],
@@ -15,6 +16,10 @@ export const apiV1Routes: Routes = [
       {
         path: 'items',
         module: ItemsApiModule,
+      },
+      {
+        path: 'authentication',
+        module: AuthenticationApiModule,
       },
     ],
   },

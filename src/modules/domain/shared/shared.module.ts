@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ImageEntity } from './entities/image.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([])],
+  imports: [TypeOrmModule.forFeature([ImageEntity])],
   providers: [],
-  exports: [TypeOrmModule],
+  exports: [],
 })
 export class SharedDomainModule {}

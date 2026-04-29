@@ -1,10 +1,18 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
+import { ProfileEntity } from './profile.entity';
 
 @Entity('addresses')
 export class AddressEntity extends BaseEntity {
+  @OneToOne(() => ProfileEntity, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'profile_id', referencedColumnName: 'id' })
+  public readonly profile!: ProfileEntity;
+
   @Column({ type: 'text' })
   public readonly address_line_1!: string;
 

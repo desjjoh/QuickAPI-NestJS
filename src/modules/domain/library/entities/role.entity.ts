@@ -1,7 +1,8 @@
 import { Entity, Column, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from '@/common/entities/base.entity';
-import { UserEntity } from './user.entity';
 import { PermissionEntity } from './permission.entity';
+
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 @Entity('roles')
 export class RoleEntity extends BaseEntity {
@@ -15,7 +16,7 @@ export class RoleEntity extends BaseEntity {
   public readonly description!: string | null;
 
   @ManyToMany(() => UserEntity, (user) => user.roles)
-  public readonly users: UserEntity[] = [];
+  public readonly users?: UserEntity[];
 
   @ManyToMany(
     () => PermissionEntity,
@@ -32,5 +33,5 @@ export class RoleEntity extends BaseEntity {
       referencedColumnName: 'id',
     },
   })
-  public readonly permissions: PermissionEntity[] = [];
+  public readonly permissions?: PermissionEntity[];
 }

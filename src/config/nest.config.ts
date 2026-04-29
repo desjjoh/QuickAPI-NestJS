@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
+import cookieParser from 'cookie-parser';
+
 import { SwaggerConfig } from './docs.config';
 import { env } from './environment.config';
 
@@ -42,6 +44,7 @@ function createApp(app: INestApplication): void {
   app.use(requestContextMiddleware());
   app.use(outgoingLogger());
   app.use(httpMetricsMiddleware);
+  app.use(cookieParser());
 
   app.use(securityHeadersMiddleware());
   app.use(

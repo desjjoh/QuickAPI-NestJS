@@ -4,6 +4,7 @@ import {
   RequestHeaderFieldsTooLargeError,
   UnsupportedTransferEncodingError,
 } from '@/common/exceptions/http.exception';
+import { IncomingHttpHeaders } from 'http';
 
 export interface HeaderLimits {
   maxHeaderCount: number;
@@ -27,8 +28,9 @@ export function headerLimitsMiddleware(
     _res: Response,
     next: NextFunction,
   ): void {
-    const headers = req.headers;
-    const headerEntries = Object.entries(headers);
+    const headers: IncomingHttpHeaders = req.headers;
+    const headerEntries: [string, string | string[] | undefined][] =
+      Object.entries(headers);
 
     // Too many header fields
     if (headerEntries.length > limits.maxHeaderCount) {
@@ -41,12 +43,12 @@ export function headerLimitsMiddleware(
 
     // Per-header and total size enforcement
     for (const [key, value] of headerEntries) {
-      const keyBytes = Buffer.byteLength(key);
+      const keyBytes: number = Buffer.byteLength(key);
       const values: string[] = Array.isArray(value) ? value : [value ?? ''];
 
       for (const v of values) {
-        const valueBytes = Buffer.byteLength(v);
-        const size = keyBytes + valueBytes;
+        const valueBytes: number = Buffer.byteLength(v);
+        const size: number = keyBytes + valueBytes;
 
         totalBytes += size;
 
@@ -65,7 +67,8 @@ export function headerLimitsMiddleware(
     }
 
     // Prevent chunked transfer encoding
-    const transferEncoding = req.headers['transfer-encoding'];
+    const transferEncoding: string | undefined =
+      req.headers['transfer-encoding'];
 
     if (!limits.allowChunked && typeof transferEncoding === 'string') {
       if (transferEncoding.toLowerCase().includes('chunked')) {

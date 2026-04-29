@@ -2,9 +2,11 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-import { AddressEntity } from '@/modules/domain/shared/entities/address.entity';
+
+import { ImageEntity } from '@/modules/domain/shared/entities/image.entity';
 
 import { UserEntity } from './user.entity';
+import { AddressEntity } from './address.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -60,4 +62,12 @@ export class ProfileEntity extends BaseEntity {
 
   @Column(() => Contact)
   public readonly contact!: Contact;
+
+  @ManyToOne(() => ImageEntity, {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
+  public readonly avatar!: ImageEntity | null;
 }

@@ -15,8 +15,8 @@ export function httpMetricsMiddleware(
   res.on('finish', () => {
     const duration = Number(performance.now() - start);
 
-    const method = req.method;
-    const status = res.statusCode.toString();
+    const method: string = req.method;
+    const status: string = res.statusCode.toString();
     const route = req.route?.path ?? req.originalUrl ?? 'unknown';
 
     httpRequestCounter.inc({

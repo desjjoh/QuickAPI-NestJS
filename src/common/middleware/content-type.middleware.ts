@@ -43,7 +43,7 @@ export function contentTypeMiddleware(
     next: NextFunction,
   ): void {
     const method: string = req.method.toUpperCase();
-    const contentType = req.headers['content-type'];
+    const contentType: string | undefined = req.headers['content-type'];
 
     // Methods that must NOT send a body
     if (NO_BODY_METHODS.has(method)) {

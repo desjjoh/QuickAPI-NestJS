@@ -6,15 +6,16 @@ import {
   ManyToMany,
   Index,
 } from 'typeorm';
+import { Exclude } from 'class-transformer';
 
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Exclude } from 'class-transformer';
+import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+
 import { ProfileEntity } from './profile.entity';
-import { RoleEntity } from './role.entity';
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
-  @Column({ type: 'text', unique: true })
+  @Column({ type: 'varchar', length: 254, unique: true })
   public readonly email!: string;
 
   @Index()
@@ -50,5 +51,5 @@ export class UserEntity extends BaseEntity {
       referencedColumnName: 'id',
     },
   })
-  public readonly roles: RoleEntity[] = [];
+  public readonly roles?: RoleEntity[];
 }

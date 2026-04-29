@@ -10,12 +10,12 @@ export function outgoingLogger(): RequestHandler {
     }
 
     res.on('finish', () => {
-      const duration = (performance.now() - start).toFixed(2);
+      const duration: string = (performance.now() - start).toFixed(2);
 
-      const method = req.method;
-      const path = req.originalUrl ?? req.url;
+      const method: string = req.method;
+      const path: string = req.originalUrl ?? req.url;
 
-      const code = res.statusCode;
+      const code: number = res.statusCode;
 
       const level: 'error' | 'warn' | 'info' =
         code >= 500 ? 'error' : code >= 400 ? 'warn' : 'info';

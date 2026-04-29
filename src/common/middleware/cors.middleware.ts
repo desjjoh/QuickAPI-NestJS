@@ -13,7 +13,7 @@ export interface CorsOptions {
 
 export function corsMiddleware(opts: CorsOptions): RequestHandler {
   function isAllowedOrigin(origin: string | null): boolean {
-    const allowed = opts.origin;
+    const allowed: string | string[] = opts.origin;
 
     if (!origin) return true;
 
@@ -29,7 +29,8 @@ export function corsMiddleware(opts: CorsOptions): RequestHandler {
   }
 
   return function cors(req: Request, res: Response, next: NextFunction): void {
-    const origin = (req.headers.origin as string | undefined) ?? null;
+    const origin: string | null =
+      (req.headers.origin as string | undefined) ?? null;
 
     // --- Validate origin
     if (!isAllowedOrigin(origin)) {

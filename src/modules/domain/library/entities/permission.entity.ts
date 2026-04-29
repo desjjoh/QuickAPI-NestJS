@@ -14,5 +14,5 @@ export class PermissionEntity extends BaseEntity {
   public readonly description!: string | null;
 
   @ManyToMany(() => RoleEntity, (role: RoleEntity) => role.permissions)
-  public readonly roles: RoleEntity[] = [];
+  public readonly roles?: RoleEntity[];
 }
