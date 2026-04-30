@@ -2,16 +2,20 @@ import { INestApplication } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder, OpenAPIObject } from '@nestjs/swagger';
 import { env } from '@/config/environment.config';
 
+const title = `${env.APP_NAME} API`;
+const description = `${env.APP_NAME} powers the QuickAPP Suite backend.`;
+
 export class SwaggerConfig {
   static setup(app: INestApplication): void {
     const config = new DocumentBuilder()
-      .setTitle(env.APP_NAME)
-      .setDescription(`${env.APP_NAME} API documentation`)
+      .setTitle(title)
+      .setDescription(description)
       .setVersion(env.APP_VERSION)
       .addBearerAuth({
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
+        description: 'Enter a valid JWT access token.',
       })
       .build();
 

@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["node", "Multer"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,

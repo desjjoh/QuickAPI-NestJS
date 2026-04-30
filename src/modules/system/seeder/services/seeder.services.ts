@@ -1,6 +1,12 @@
-import { Inject, Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+import { env } from '@/config/environment.config';
 import { logger } from '@/config/logger.config';
 
 import { SEEDERS } from '../tokens/seeder.tokens';
@@ -13,6 +19,8 @@ type SeederTotals = {
 
 @Injectable()
 export class SeederService implements OnApplicationBootstrap {
+  private readonly logger = new Logger(SeederService.name);
+
   public constructor(
     private readonly dataSource: DataSource,
 
@@ -21,7 +29,7 @@ export class SeederService implements OnApplicationBootstrap {
   ) {}
 
   public async onApplicationBootstrap(): Promise<void> {
-    // if (process.env.DB_SEED !== 'true') return;
+    if (!env.DB_SEED) return;
 
     const start: number = performance.now();
     const orderedSeeders: Seeder[] = [...this.seeders].sort(

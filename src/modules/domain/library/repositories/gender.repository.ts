@@ -10,11 +10,7 @@ export class GenderRepository extends Repository<GenderEntity> {
   }
 
   public async findAll(): Promise<GenderEntity[]> {
-    return this.find({
-      order: {
-        key: 'ASC',
-      },
-    });
+    return this.find({ order: { key: 'ASC' } });
   }
 
   public async findById(id: string): Promise<GenderEntity | null> {

@@ -1,6 +1,5 @@
 import {
   AccountManagementPermissions,
-  PermissionsKey,
   SystemPermissions,
   UserManagementPermissions,
 } from '@/config/permissions.config';
@@ -12,58 +11,57 @@ import {
 import { DataSource, Repository } from 'typeorm';
 
 export type PermissionSeed = {
-  key: PermissionsKey;
+  key: string;
   label: string;
   description: string;
 };
 
 export const PERMISSIONS_SEED: PermissionSeed[] = [
-  // SYSTEM
+  // SYSTEM LEVEL PERMISSIONS
   {
-    key: SystemPermissions.HAS_ALL_PERMISSIONS,
+    key: String(SystemPermissions.HAS_ALL_PERMISSIONS),
     label: 'Has All Permissions',
     description:
       'Grants unrestricted access to all actions across the system, bypassing normal checks.',
   },
 
-  // ACCOUNT
+  // ACCOUNT MANAGEMENT
   {
-    key: AccountManagementPermissions.READ_ACCOUNT,
+    key: String(AccountManagementPermissions.READ_ACCOUNT),
     label: 'Read account',
     description:
       'Allows the user to view their own profile and account details.',
   },
   {
-    key: AccountManagementPermissions.UPDATE_ACCOUNT,
+    key: String(AccountManagementPermissions.UPDATE_ACCOUNT),
     label: 'Update account',
     description:
       'Allows the user to update their own profile and account details.',
   },
   {
-    key: AccountManagementPermissions.DELETE_ACCOUNT,
+    key: String(AccountManagementPermissions.DELETE_ACCOUNT),
     label: 'Delete account',
     description: 'Allows the user to delete or deactivate their own account.',
   },
 
-  // -- ADMINISTRATION
-  // USERS
+  // USER ADMINISTRATION
   {
-    key: UserManagementPermissions.CREATE_USERS,
+    key: String(UserManagementPermissions.CREATE_USERS),
     label: 'Create users',
     description: 'Allows the creation of new user accounts.',
   },
   {
-    key: UserManagementPermissions.READ_USERS,
+    key: String(UserManagementPermissions.READ_USERS),
     label: 'Read users',
     description: 'Allows viewing of user details and lists.',
   },
   {
-    key: UserManagementPermissions.UPDATE_USERS,
+    key: String(UserManagementPermissions.UPDATE_USERS),
     label: 'Update users',
     description: 'Allows editing user information and attributes.',
   },
   {
-    key: UserManagementPermissions.DELETE_USERS,
+    key: String(UserManagementPermissions.DELETE_USERS),
     label: 'Delete users',
     description: 'Allows removal or deactivation of user accounts.',
   },

@@ -1,7 +1,7 @@
 import os from 'node:os';
 
 import { Inject, Injectable } from '@nestjs/common';
-
+import { Response } from 'express';
 import { LC } from '@/common/handlers/lifecycle.handler';
 
 import {
@@ -18,6 +18,9 @@ import { HealthIndicatorService } from '../indicators/typeorm.indicator';
 import { DbStatus, SystemResponseParams } from '../models/_system.model';
 import { getEventLoopLag } from '@/common/helpers/event-loop.helper';
 import { mode } from '@/config/environment.config';
+import { CsrfDto } from '@/modules/domain/identity/models/csrf.model';
+import { hour } from '@/common/constants/milliseconds.constants';
+import { TokenService } from '@/modules/system/tokens/services/token.service';
 
 @Injectable()
 export class ApplicationControllerService {
@@ -25,6 +28,7 @@ export class ApplicationControllerService {
     @Inject(APP_ENV)
     private readonly env: AppEnv,
     private readonly health: HealthIndicatorService,
+    private readonly tokenService: TokenService,
   ) {}
 
   public get_root(message: string): RootResponseDto {
@@ -80,5 +84,25 @@ export class ApplicationControllerService {
       event_loop_lag,
       db,
     } as SystemResponseParams);
+  }
+
+  public async issueCsrf(res: Response) {
+    const { secret, token } = this.tokenService.createCsrfToken();
+
+    const iat = Date.now();
+    const exp = iat + 1 * hour;
+
+    res.cookie('csrf_secret', secret, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    return new CsrfDto({
+      token,
+      iat,
+      exp,
+    });
   }
 }

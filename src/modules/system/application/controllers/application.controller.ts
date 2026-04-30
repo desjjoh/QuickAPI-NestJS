@@ -15,6 +15,9 @@ import {
 } from '../models';
 import { ApplicationControllerService } from '../services/application.service';
 import { metricsRegistry } from '@/config/metrics.config';
+import { minute } from '@/common/constants/milliseconds.constants';
+import { Throttle } from '@nestjs/throttler';
+import { CsrfDto } from '@/modules/domain/identity/models/csrf.model';
 
 @Controller()
 export class ApplicationController {
@@ -110,5 +113,21 @@ export class ApplicationController {
   async get_metrics(@Res() res: Response): Promise<void> {
     res.setHeader('Content-Type', metricsRegistry.contentType);
     res.send(await metricsRegistry.metrics());
+  }
+
+  // GET /csrf
+  @Get('/csrf')
+  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @ApiOperation({
+    summary: 'Issue CSRF token',
+    description:
+      'Generates a CSRF token pair. The server stores a signed secret in an httpOnly cookie and returns a CSRF token for request validation.',
+  })
+  @ApiOkResponse({
+    description: 'CSRF token generated successfully.',
+    type: CsrfDto,
+  })
+  async getCsrf(@Res({ passthrough: true }) res: Response): Promise<CsrfDto> {
+    return this.svc.issueCsrf(res);
   }
 }

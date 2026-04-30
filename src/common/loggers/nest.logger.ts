@@ -10,7 +10,7 @@ enum LOG_LEVEL_ORDER {
   fatal,
 }
 
-const MIN_LEVEL = LOG_LEVEL_ORDER.warn ?? LOG_LEVEL_ORDER.info;
+const MIN_LEVEL = LOG_LEVEL_ORDER.warn;
 
 function allowed(level: keyof typeof LOG_LEVEL_ORDER): boolean {
   return LOG_LEVEL_ORDER[level] >= MIN_LEVEL;
@@ -20,26 +20,27 @@ function allowed(level: keyof typeof LOG_LEVEL_ORDER): boolean {
 export class AppLogger implements LoggerService {
   log(message: string, context?: string) {
     if (!allowed('info')) return;
-    logger.info({ context }, message);
+    logger.info({ context }, String(message));
   }
 
   debug(message: string, context?: string) {
     if (!allowed('debug')) return;
-    logger.debug({ context }, message);
+    logger.debug({ context }, String(message));
   }
 
   verbose(message: string, context?: string) {
     if (!allowed('trace')) return;
-    logger.trace({ context }, message);
+    logger.trace({ context }, String(message));
   }
 
   warn(message: string, context?: string) {
     if (!allowed('warn')) return;
-    logger.warn({ context }, message);
+    logger.warn({ context }, String(message));
   }
 
   error(message: string, trace?: string, context?: string) {
     if (!allowed('error')) return;
-    logger.error({ context, trace }, message);
+
+    logger.error({ context, trace }, String(message));
   }
 }

@@ -7,6 +7,12 @@ import { DomainModule } from '@/modules/domain/domain.module';
 import { RequestContext } from '@/common/store/request-context.store';
 import { ApiModule } from './api/api.module';
 import { SystemModule } from './system/system.module';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { minute } from '@/common/constants/milliseconds.constants';
+import { LocalStrategy } from '@/common/strategies/local.strategy';
+import { RefreshTokenStrategy } from '@/common/strategies/refresh.strategy';
+import { IdentityService } from './domain/identity/services/identity.service';
+import { UserRepository } from './domain/identity/repositories/user.repository';
 
 const rootPath = join(process.cwd(), 'public');
 const serveRoot = '/';
@@ -14,10 +20,18 @@ const serveRoot = '/';
 @Module({
   imports: [
     ServeStaticModule.forRoot({ rootPath, serveRoot }),
+    ThrottlerModule.forRoot({ throttlers: [{ ttl: 1 * minute, limit: 20 }] }),
+
     SystemModule,
     DomainModule,
     ApiModule,
   ],
-  providers: [RequestContext],
+  providers: [
+    RequestContext,
+    IdentityService,
+    UserRepository,
+    LocalStrategy,
+    RefreshTokenStrategy,
+  ],
 })
 export class AppModule {}

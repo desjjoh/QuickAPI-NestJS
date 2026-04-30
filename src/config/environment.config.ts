@@ -5,6 +5,7 @@ import { yellow, red, green, dim, bold } from 'colorette';
 import { config as loadEnv } from 'dotenv';
 
 import { rootPath } from '@/common/helpers/path.helper';
+import { JwtSignOptions } from '@nestjs/jwt';
 
 loadEnv();
 
@@ -50,6 +51,40 @@ const EnvSchema = z.object({
   DB_USER: z.string(),
   DB_PASSWORD: z.string(),
   DB_DATABASE: z.string(),
+
+  DB_SEED: z
+    .preprocess((value) => {
+      if (value === undefined) return false;
+
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return value;
+
+      const normalized = value.trim().toLowerCase();
+
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+
+      return value;
+    }, z.boolean())
+    .default(false),
+
+  JWT_SECRET_KEY: z.string().min(32),
+  REFRESH_SECRET_KEY: z.string().min(32),
+  CRYPTO_SECRET: z.string().min(32),
+
+  JWT_EXPIRY_TIME: z.custom<JwtSignOptions['expiresIn']>(
+    (value) => typeof value === 'string' || typeof value === 'number',
+    {
+      message: 'JWT_EXPIRY_TIME must be a valid JWT expiresIn value.',
+    },
+  ),
+
+  REFRESH_EXPIRY_TIME: z.custom<JwtSignOptions['expiresIn']>(
+    (value) => typeof value === 'string' || typeof value === 'number',
+    {
+      message: 'REFRESH_EXPIRY_TIME must be a valid JWT expiresIn value.',
+    },
+  ),
 });
 
 function formatIssue(issue: z.core.$ZodIssue): string {

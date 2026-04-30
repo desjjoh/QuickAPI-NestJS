@@ -5,16 +5,21 @@ import { SeedingModule } from '@/modules/system/seeder/seeder.module';
 
 import { CountryEntity } from './entities/country.entity';
 import { GenderEntity } from './entities/gender.entity';
+import { PermissionEntity } from './entities/permission.entity';
+import { RoleEntity } from './entities/role.entity';
+import { ImageEntity } from './entities/image.entity';
+
+import { PermissionRepository } from './repositories/permission.repository';
+import { RoleRepository } from './repositories/role.repository';
+import { GenderRepository } from './repositories/gender.repository';
+import { CountryRepository } from './repositories/country.repository';
 
 import { GenderSeeder } from './seeders/gender.seeder';
 import { CountrySeeder } from './seeders/country.seeder';
-
-import { GenderRepository } from './repositories/gender.repository';
-import { CountryRepository } from './repositories/country.repository';
 import { PermissionSeeder } from './seeders/permission.seeder';
 import { RoleSeeder } from './seeders/role.seeder';
-import { PermissionEntity } from './entities/permission.entity';
-import { RoleEntity } from './entities/role.entity';
+import { ImageService } from './services/image.service';
+import { ImageRepository } from './repositories/image.repository';
 
 @Module({
   imports: [
@@ -23,6 +28,7 @@ import { RoleEntity } from './entities/role.entity';
       GenderEntity,
       PermissionEntity,
       RoleEntity,
+      ImageEntity,
     ]),
     SeedingModule.forFeature([
       new GenderSeeder(),
@@ -31,7 +37,20 @@ import { RoleEntity } from './entities/role.entity';
       new RoleSeeder(),
     ]),
   ],
-  providers: [CountryRepository, GenderRepository],
-  exports: [CountryRepository, GenderRepository],
+  providers: [
+    CountryRepository,
+    GenderRepository,
+    PermissionRepository,
+    RoleRepository,
+    ImageService,
+    ImageRepository,
+  ],
+  exports: [
+    CountryRepository,
+    GenderRepository,
+    PermissionRepository,
+    RoleRepository,
+    ImageService,
+  ],
 })
 export class LibraryModule {}

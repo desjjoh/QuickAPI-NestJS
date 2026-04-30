@@ -2,11 +2,10 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-
-import { ImageEntity } from '@/modules/domain/shared/entities/image.entity';
+import { ImageEntity } from '@/modules/domain/library/entities/image.entity';
 
 import { UserEntity } from './user.entity';
-import { AddressEntity } from './address.entity';
+import { UserAddressEntity } from './address.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -36,31 +35,32 @@ class Contact {
   @Column({ type: 'varchar', length: 20, nullable: true, default: null })
   public readonly alternate_phone_e164!: string | null;
 
-  @ManyToOne(() => AddressEntity, {
-    eager: true,
-    nullable: true,
-    cascade: ['insert', 'update'],
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'address_id', referencedColumnName: 'id' })
-  public address!: AddressEntity | null;
+  @OneToOne(
+    () => UserAddressEntity,
+    (address: UserAddressEntity) => address.profile,
+    {
+      eager: true,
+      cascade: ['insert', 'update'],
+      nullable: true,
+    },
+  )
+  public readonly address?: UserAddressEntity;
 }
 
-@Entity('user_profile')
-export class ProfileEntity extends BaseEntity {
+@Entity('user_profiles')
+export class UserProfileEntity extends BaseEntity {
   @OneToOne(() => UserEntity, (user: UserEntity) => user.profile, {
     onDelete: 'CASCADE',
   })
-  @JoinColumn()
   public readonly user!: UserEntity;
 
-  @Column(() => Name)
+  @Column(() => Name, { prefix: false })
   public readonly name!: Name;
 
-  @Column(() => Personal)
+  @Column(() => Personal, { prefix: false })
   public readonly personal!: Personal;
 
-  @Column(() => Contact)
+  @Column(() => Contact, { prefix: false })
   public readonly contact!: Contact;
 
   @ManyToOne(() => ImageEntity, {
@@ -69,5 +69,5 @@ export class ProfileEntity extends BaseEntity {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
-  public readonly avatar!: ImageEntity | null;
+  public readonly avatar?: ImageEntity;
 }
