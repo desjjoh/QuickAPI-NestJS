@@ -1,7 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export type DbStatus = 'connected' | 'disconnected';
-
 export type SystemResponseParams = {
   uptime: number;
   timestamp: number;

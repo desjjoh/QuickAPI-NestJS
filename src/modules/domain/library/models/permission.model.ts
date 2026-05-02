@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PermissionEntity } from '../entities/permission.entity';
+import { WithBaseModel } from '@/common/models/base.model';
 
 export class PermissionDto {
   @ApiProperty({
@@ -37,3 +38,5 @@ export class PermissionDto {
     this.description = permission.description ?? null;
   }
 }
+
+export class BasePermissionDto extends WithBaseModel(PermissionDto) {}

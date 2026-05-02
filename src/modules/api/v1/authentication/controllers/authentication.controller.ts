@@ -33,7 +33,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { LocalAuthGuard } from '@/common/guards/local.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 
-@ApiTags('Authentication')
+@ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
 @Controller()
 export class AuthApiController {

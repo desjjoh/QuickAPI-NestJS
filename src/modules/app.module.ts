@@ -13,6 +13,7 @@ import { LocalStrategy } from '@/common/strategies/local.strategy';
 import { RefreshTokenStrategy } from '@/common/strategies/refresh.strategy';
 import { IdentityService } from './domain/identity/services/identity.service';
 import { UserRepository } from './domain/identity/repositories/user.repository';
+import { AccessTokenStrategy } from '@/common/strategies/access.strategy';
 
 const rootPath = join(process.cwd(), 'public');
 const serveRoot = '/';
@@ -30,8 +31,10 @@ const serveRoot = '/';
     RequestContext,
     IdentityService,
     UserRepository,
+
     LocalStrategy,
     RefreshTokenStrategy,
+    AccessTokenStrategy,
   ],
 })
 export class AppModule {}

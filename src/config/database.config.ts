@@ -13,7 +13,7 @@ export const typeOrmConfig: TypeOrmModuleAsyncOptions = {
     password: config.get<string>('DB_PASSWORD'),
     database: config.get<string>('DB_DATABASE'),
     autoLoadEntities: true,
-    synchronize: true,
+    synchronize: config.get<boolean>('DB_SYNC'),
     logging: false,
   }),
 };

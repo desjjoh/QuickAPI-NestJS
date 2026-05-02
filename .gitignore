@@ -1,6 +1,9 @@
 # Archives
 archive
 
+# Certificates
+certs
+
 # Logs
 *.log
 npm-debug.log*

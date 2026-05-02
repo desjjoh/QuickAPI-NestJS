@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AddressEntity } from '../entities/address.entity';
+import { WithBaseModel } from './base.model';
 
 export class AddressDto {
   @ApiProperty({
@@ -51,3 +52,5 @@ export class AddressDto {
     this.country = address.country.key;
   }
 }
+
+export class BaseAddressDto extends WithBaseModel(AddressDto) {}

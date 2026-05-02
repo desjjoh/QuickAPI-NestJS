@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
+import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 
 import { SwaggerConfig } from './docs.config';
@@ -49,7 +50,7 @@ function createApp(app: INestApplication): void {
   app.use(securityHeadersMiddleware());
   app.use(
     corsMiddleware({
-      origin: ['*'],
+      origin: ['https://localhost:5173'],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
       exposedHeaders: ['Authorization', 'Set-Cookie'],
@@ -120,10 +121,15 @@ function createApp(app: INestApplication): void {
 
 export async function startNest(): Promise<void> {
   const appLogger: AppLogger = new AppLogger();
+  const httpsOptions = {
+    key: fs.readFileSync('certs/localhost-key.pem'),
+    cert: fs.readFileSync('certs/localhost.pem'),
+  };
 
   app = await NestFactory.create(AppModule, {
     logger: appLogger,
     rawBody: false,
+    httpsOptions,
   });
 
   createApp(app);

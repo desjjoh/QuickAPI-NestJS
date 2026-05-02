@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CountryEntity } from '../entities/country.entity';
-
+import { WithBaseModel } from '@/common/models/base.model';
 export class CountryDto {
   @ApiProperty({
     example: 'canada',
@@ -42,3 +42,5 @@ export class CountryDto {
     this.calling_code = country.calling_code;
   }
 }
+
+export class BaseCountryDto extends WithBaseModel(CountryDto) {}

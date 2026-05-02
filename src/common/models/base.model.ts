@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { BaseEntity } from '../entities/base.entity';
 
+interface BaseEntityLike {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export type Base<T> = Omit<T, 'id' | 'createdAt' | 'updatedAt'>;
 
 export class BaseModel {
@@ -30,4 +36,33 @@ export class BaseModel {
     this.createdAt = entity.createdAt;
     this.updatedAt = entity.updatedAt;
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Constructor<T = object> = new (...args: any[]) => T;
+
+export function WithBaseModel<TBase extends Constructor>(BaseClass: TBase) {
+  abstract class BaseModelClass extends BaseClass {
+    @ApiProperty()
+    public readonly id: string;
+
+    @ApiProperty()
+    public readonly createdAt: Date;
+
+    @ApiProperty()
+    public readonly updatedAt: Date;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public constructor(...args: any[]) {
+      super(...args);
+
+      const entity = args[0] as BaseEntityLike;
+
+      this.id = entity.id;
+      this.createdAt = entity.createdAt;
+      this.updatedAt = entity.updatedAt;
+    }
+  }
+
+  return BaseModelClass;
 }

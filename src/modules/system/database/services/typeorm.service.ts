@@ -1,14 +1,13 @@
 import { DataSource } from 'typeorm';
 
 import { Injectable } from '@nestjs/common';
-
-import { DbStatus } from '../models/_system.model';
+import { DbStatus } from '../types/database.types';
 
 @Injectable()
-export class HealthIndicatorService {
+export class TypeOrmService {
   constructor(private readonly dataSource: DataSource) {}
 
-  public async get_typeorm_status(): Promise<DbStatus> {
+  public async get_status(): Promise<DbStatus> {
     if (this.dataSource.isInitialized) return 'connected';
 
     return 'disconnected';

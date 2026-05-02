@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { GenderEntity } from '../entities/gender.entity';
-import { BaseModel } from '@/common/models/base.model';
+import { WithBaseModel } from '@/common/models/base.model';
 
-export class GenderDto extends BaseModel {
+export class GenderDto {
   @ApiProperty({
     example: 'female',
     description:
@@ -17,9 +17,9 @@ export class GenderDto extends BaseModel {
   public readonly label: string;
 
   public constructor(gender: GenderEntity) {
-    super(gender);
-
     this.key = gender.key;
     this.label = gender.label;
   }
 }
+
+export class BaseGenderDto extends WithBaseModel(GenderDto) {}

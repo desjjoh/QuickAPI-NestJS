@@ -1,3 +1,9 @@
+export enum PermissionDomain {
+  SYSTEM = 'SYSTEM',
+  ACCOUNT_MANAGEMENT = 'ACCOUNT_MANAGEMENT',
+  USER_ADMINISTRATION = 'USER_ADMINISTRATION',
+}
+
 // SYSTEM
 export enum SystemPermissions {
   HAS_ALL_PERMISSIONS = 'has_all_permissions',
@@ -12,15 +18,20 @@ export enum AccountManagementPermissions {
 
 // -- ADMINISTRATION
 // USERS
-export enum UserManagementPermissions {
+export enum UserAdministrationPermissions {
   CREATE_USERS = 'create_users',
   READ_USERS = 'read_users',
   UPDATE_USERS = 'update_users',
   DELETE_USERS = 'delete_users',
 }
 
+export type PermissionsKey =
+  | SystemPermissions
+  | AccountManagementPermissions
+  | UserAdministrationPermissions;
+
 export const PERMISSION_MATRIX = {
-  SYSTEM: SystemPermissions,
-  ACCOUNT_MANAGEMENT: AccountManagementPermissions,
-  USER_MANAGEMENT: UserManagementPermissions,
+  [PermissionDomain.SYSTEM]: SystemPermissions,
+  [PermissionDomain.ACCOUNT_MANAGEMENT]: AccountManagementPermissions,
+  [PermissionDomain.USER_ADMINISTRATION]: UserAdministrationPermissions,
 };

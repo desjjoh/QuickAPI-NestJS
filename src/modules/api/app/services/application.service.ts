@@ -14,21 +14,18 @@ import {
 
 import { InfoResponseParams } from '../models/_info.model';
 import { APP_ENV, type AppEnv } from '@/config/environment.config';
-import { HealthIndicatorService } from '../indicators/typeorm.indicator';
-import { DbStatus, SystemResponseParams } from '../models/_system.model';
+import { SystemResponseParams } from '../models/_system.model';
 import { getEventLoopLag } from '@/common/helpers/event-loop.helper';
 import { mode } from '@/config/environment.config';
-import { CsrfDto } from '@/modules/domain/identity/models/csrf.model';
-import { hour } from '@/common/constants/milliseconds.constants';
-import { TokenService } from '@/modules/system/tokens/services/token.service';
+import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
+import { DbStatus } from '@/modules/system/database/types/database.types';
 
 @Injectable()
 export class ApplicationControllerService {
   constructor(
     @Inject(APP_ENV)
     private readonly env: AppEnv,
-    private readonly health: HealthIndicatorService,
-    private readonly tokenService: TokenService,
+    private readonly health: TypeOrmService,
   ) {}
 
   public get_root(message: string): RootResponseDto {
@@ -46,7 +43,7 @@ export class ApplicationControllerService {
   public async get_ready(): Promise<ReadyResponseDto> {
     const lifecycleReady: boolean = LC.isReady();
 
-    const typeormStatus: DbStatus = await this.health.get_typeorm_status();
+    const typeormStatus: DbStatus = await this.health.get_status();
     const typeormReady: boolean = typeormStatus === 'connected';
 
     const ready = lifecycleReady && typeormReady;
@@ -76,7 +73,7 @@ export class ApplicationControllerService {
 
     const lag_ms: number = await getEventLoopLag();
     const event_loop_lag: number = Number(lag_ms.toFixed(3));
-    const db: DbStatus = await this.health.get_typeorm_status();
+    const db: DbStatus = await this.health.get_status();
 
     return new SystemResponseDto({
       uptime,
@@ -84,25 +81,5 @@ export class ApplicationControllerService {
       event_loop_lag,
       db,
     } as SystemResponseParams);
-  }
-
-  public async issueCsrf(res: Response) {
-    const { secret, token } = this.tokenService.createCsrfToken();
-
-    const iat = Date.now();
-    const exp = iat + 1 * hour;
-
-    res.cookie('csrf_secret', secret, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
-
-    return new CsrfDto({
-      token,
-      iat,
-      exp,
-    });
   }
 }

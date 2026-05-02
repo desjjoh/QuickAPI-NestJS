@@ -1,11 +1,34 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+import { IsEnum, IsOptional } from 'class-validator';
+
+import { PaginationOptions } from '@/common/models/pagination.model';
 import { BaseModel } from '@/common/models/base.model';
-import { UserEntity } from '../entities/user.entity';
 import { AddressDto } from '@/common/models/address.model';
+
+import { UserEntity } from '../entities/user.entity';
 import { ImageDto } from '../../library/models/image.model';
 import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
+
+enum SORT_OPTIONS {
+  CREATED = 'user.createdAt',
+  LAST_NAME = 'profile.name.last',
+  EMAIL = 'user.identity.email',
+  NAME = 'fullname',
+}
+
+export class UserPaginationOptions extends PaginationOptions {
+  @ApiPropertyOptional({
+    description: 'Sort order for the users list. Defaults to `CREATED`.',
+    enum: SORT_OPTIONS,
+    default: SORT_OPTIONS.CREATED,
+    example: SORT_OPTIONS.CREATED,
+  })
+  @IsEnum(SORT_OPTIONS)
+  @IsOptional()
+  public readonly sort: SORT_OPTIONS = SORT_OPTIONS.CREATED;
+}
 
 export class IdentityDto {
   @ApiProperty({

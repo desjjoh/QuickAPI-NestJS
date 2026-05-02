@@ -1,7 +1,7 @@
 import {
   AccountManagementPermissions,
   SystemPermissions,
-  UserManagementPermissions,
+  UserAdministrationPermissions,
 } from '@/config/permissions.config';
 import { PermissionEntity } from '../entities/permission.entity';
 import {
@@ -46,22 +46,22 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
 
   // USER ADMINISTRATION
   {
-    key: String(UserManagementPermissions.CREATE_USERS),
+    key: String(UserAdministrationPermissions.CREATE_USERS),
     label: 'Create users',
     description: 'Allows the creation of new user accounts.',
   },
   {
-    key: String(UserManagementPermissions.READ_USERS),
+    key: String(UserAdministrationPermissions.READ_USERS),
     label: 'Read users',
     description: 'Allows viewing of user details and lists.',
   },
   {
-    key: String(UserManagementPermissions.UPDATE_USERS),
+    key: String(UserAdministrationPermissions.UPDATE_USERS),
     label: 'Update users',
     description: 'Allows editing user information and attributes.',
   },
   {
-    key: String(UserManagementPermissions.DELETE_USERS),
+    key: String(UserAdministrationPermissions.DELETE_USERS),
     label: 'Delete users',
     description: 'Allows removal or deactivation of user accounts.',
   },

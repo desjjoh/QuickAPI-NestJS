@@ -52,6 +52,22 @@ const EnvSchema = z.object({
   DB_PASSWORD: z.string(),
   DB_DATABASE: z.string(),
 
+  DB_SYNC: z
+    .preprocess((value) => {
+      if (value === undefined) return false;
+
+      if (typeof value === 'boolean') return value;
+      if (typeof value !== 'string') return value;
+
+      const normalized = value.trim().toLowerCase();
+
+      if (normalized === 'true') return true;
+      if (normalized === 'false') return false;
+
+      return value;
+    }, z.boolean())
+    .default(false),
+
   DB_SEED: z
     .preprocess((value) => {
       if (value === undefined) return false;

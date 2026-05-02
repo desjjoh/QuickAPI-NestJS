@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoleEntity } from '../entities/role.entity';
 import { PermissionEntity } from '../entities/permission.entity';
+import { WithBaseModel } from '@/common/models/base.model';
 
 export class RoleDto {
   @ApiProperty({
@@ -40,3 +41,5 @@ export class RoleDto {
       [];
   }
 }
+
+export class BaseRoleDto extends WithBaseModel(RoleDto) {}

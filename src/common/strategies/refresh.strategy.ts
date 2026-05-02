@@ -26,7 +26,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     req: Request,
     payload: RefreshPayload,
   ): Promise<{
-    user: UserEntity;
+    userEntity: UserEntity;
     refresh: string;
     email: string;
     sub: string;
@@ -48,7 +48,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     if (hash !== user.credentials.refresh)
       throw new UnauthorizedException('Invalid refresh token');
 
-    return { ...payload, user: user, refresh };
+    return { ...payload, userEntity: user, refresh };
   }
 }
 

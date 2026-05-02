@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ImageEntity } from '../entities/image.entity';
+import { WithBaseModel } from '@/common/models/base.model';
 
 export class ImageDto {
   @ApiProperty({
@@ -67,3 +68,5 @@ export class ImageDto {
     this.alt_text = image.alt_text ?? null;
   }
 }
+
+export class BaseImageDto extends WithBaseModel(ImageDto) {}
