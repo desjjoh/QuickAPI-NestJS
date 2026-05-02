@@ -6,11 +6,7 @@ import { Request } from 'express';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
-
-export interface Payload {
-  email: string;
-  sub: string;
-}
+import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
 
 export interface AccessTokenValidationPayload {
   accessToken: string;
@@ -32,7 +28,7 @@ class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
 
   async validate(
     req: Request,
-    payload: Payload,
+    payload: RefreshPayload,
   ): Promise<AccessTokenValidationPayload> {
     const accessToken = req
       .get('Authorization')
@@ -41,6 +37,9 @@ class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
     if (!accessToken) throw new UnauthorizedException('Access token missing');
 
     const user = await this.userRepository.findByIdOrFail(payload.sub);
+
+    if (payload.version !== user.credentials.token_version)
+      throw new UnauthorizedException('Session has been revoked');
 
     return { ...payload, accessToken, userEntity: user };
   }

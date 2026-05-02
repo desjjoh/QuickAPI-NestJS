@@ -4,7 +4,6 @@ import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 
 import type {
   DecodedToken,
-  JwtPayload,
   RefreshPayload,
   TokenPair,
   TokenServiceOptions,
@@ -22,20 +21,15 @@ export class TokenService {
   }
 
   public async createTokenPair(payload: RefreshPayload): Promise<TokenPair> {
-    const basePayload: JwtPayload = {
-      sub: payload.sub,
-      email: payload.email,
-    };
-
     const [access_token, refresh_token] = await Promise.all([
-      this.createAccessToken(basePayload),
+      this.createAccessToken(payload),
       this.createRefreshToken(payload),
     ]);
 
     return { access_token, refresh_token };
   }
 
-  public async createAccessToken(payload: JwtPayload): Promise<string> {
+  public async createAccessToken(payload: RefreshPayload): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.options.jwtSecret,
       expiresIn: this.options.jwtExpiryTime,
