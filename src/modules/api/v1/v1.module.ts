@@ -4,11 +4,13 @@ import { AuthenticationApiModule } from './authentication/authentication.module'
 import { AdministrationApiModule } from './administration/administration.module';
 import { SecurityApiModule } from './security/security.module';
 import { LibraryApiModule } from './library/library.module';
+import { AccountApiModule } from './account/account.module';
 
 @Module({
   imports: [
     SecurityApiModule,
     AuthenticationApiModule,
+    AccountApiModule,
     AdministrationApiModule,
     LibraryApiModule,
   ],
@@ -20,20 +22,24 @@ export const apiV1Routes: Routes = [
     path: 'v1',
     children: [
       {
-        path: 'administration',
-        module: AdministrationApiModule,
+        path: 'security',
+        module: SecurityApiModule,
       },
       {
         path: 'authentication',
         module: AuthenticationApiModule,
       },
       {
-        path: 'library',
-        module: LibraryApiModule,
+        path: 'account',
+        module: AccountApiModule,
       },
       {
-        path: 'security',
-        module: SecurityApiModule,
+        path: 'administration',
+        module: AdministrationApiModule,
+      },
+      {
+        path: 'library',
+        module: LibraryApiModule,
       },
     ],
   },

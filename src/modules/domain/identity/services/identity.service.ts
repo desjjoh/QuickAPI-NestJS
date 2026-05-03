@@ -8,11 +8,14 @@ import { TokenService } from '@/modules/system/tokens/services/token.service';
 import { JWTDto } from '../models/jwt.model';
 import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
+import { ImageService } from '../../library/services/image.service';
+import { DeepPartial } from 'typeorm';
 
 @Injectable()
 export class IdentityService {
   public constructor(
     private readonly tokenService: TokenService,
+    private readonly imageService: ImageService,
     private readonly userRepository: UserRepository,
   ) {}
 
@@ -105,5 +108,22 @@ export class IdentityService {
     });
 
     return this.userRepository.save(updatedUser);
+  }
+
+  public async deleteUser(user: UserEntity, res: Response): Promise<void> {
+    const existing = await this.userRepository.findByIdOrFail(user.id);
+    const avatar = existing.profile.avatar;
+
+    if (avatar) await this.imageService.remove(avatar);
+
+    await this.userRepository.remove(existing);
+
+    this.revokeTokens(existing, res);
+  }
+
+  public async updateUser(user: UserEntity, dto: DeepPartial<UserEntity>) {
+    await this.userRepository.update(user.id, dto);
+
+    return this.userRepository.findByIdOrFail(user.id);
   }
 }

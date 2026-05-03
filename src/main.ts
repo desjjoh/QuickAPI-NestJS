@@ -26,7 +26,9 @@ async function bootstrap(): Promise<void> {
 
   await LC.startup();
 
-  logger.info(`HTTP server running on port ${port} — http://localhost:${port}`);
+  logger.info(
+    `HTTP server running on port ${port} — https://localhost:${port}`,
+  );
 }
 
 bootstrap().catch((err: unknown) => {

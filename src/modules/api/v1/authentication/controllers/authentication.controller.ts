@@ -14,6 +14,7 @@ import {
   ApiBody,
   ApiConflictResponse,
   ApiCreatedResponse,
+  ApiNoContentResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -101,7 +102,7 @@ export class AuthApiController {
     description:
       'Invalidates the current refresh token, clears authentication cookies, and revokes the active session.',
   })
-  @ApiOkResponse({
+  @ApiNoContentResponse({
     description: 'User successfully signed out.',
   })
   @ApiUnauthorizedResponse({

@@ -1,23 +1,14 @@
-import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
-import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { BaseCountryDto } from '@/modules/domain/library/models/country.model';
 import { BaseGenderDto } from '@/modules/domain/library/models/gender.model';
 import { BaseRoleDto } from '@/modules/domain/library/models/role.model';
-import { CountryRepository } from '@/modules/domain/library/repositories/country.repository';
-import { GenderRepository } from '@/modules/domain/library/repositories/gender.repository';
-import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
+import { LibraryService } from '../services/library.service';
 
 @ApiTags('Reference Data')
 @Controller('')
 export class GenderController {
-  public constructor(
-    private readonly countryRepository: CountryRepository,
-    private readonly genderRepository: GenderRepository,
-    private readonly roleRepository: RoleRepository,
-  ) {}
+  public constructor(private readonly svc: LibraryService) {}
 
   // GET /countries
   @Get('countries')
@@ -31,8 +22,7 @@ export class GenderController {
     type: [BaseCountryDto],
   })
   public async getCountries(): Promise<BaseCountryDto[]> {
-    const countries: CountryEntity[] = await this.countryRepository.findAll();
-    return countries.map((e: CountryEntity) => new BaseCountryDto(e));
+    return this.svc.getCountries();
   }
 
   // GET /genders
@@ -47,8 +37,7 @@ export class GenderController {
     type: [BaseGenderDto],
   })
   public async getGenders(): Promise<BaseGenderDto[]> {
-    const genders: GenderEntity[] = await this.genderRepository.findAll();
-    return genders.map((e: GenderEntity) => new BaseGenderDto(e));
+    return this.svc.getGenders();
   }
 
   // GET /roles
@@ -63,7 +52,6 @@ export class GenderController {
     type: [BaseRoleDto],
   })
   public async getRoles(): Promise<BaseRoleDto[]> {
-    const roles: RoleEntity[] = await this.roleRepository.findAll();
-    return roles.map((role: RoleEntity) => new BaseRoleDto(role));
+    return this.svc.getRoles();
   }
 }

@@ -1,30 +1,33 @@
 import { ApiPlatformAdmin } from '@/common/decorators/platform-admin.decorator';
 import { JwtAuthGuard } from '@/common/guards/jwt.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
-import {
-  PaginationDto,
-  PaginationMeta,
-} from '@/common/models/pagination.model';
+import { PaginationDto } from '@/common/models/pagination.model';
 import {
   PERMISSION_MATRIX,
   PermissionDomain,
 } from '@/config/permissions.config';
-import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import {
   UserDto,
   UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiOperation, ApiOkResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  ApiOperation,
+  ApiOkResponse,
+  ApiBearerAuth,
+  ApiNotFoundResponse,
+} from '@nestjs/swagger';
 import { Permissions } from '@/common/decorators/permissions.decorator';
+import { EntityIdParam } from '@/common/decorators/id-param.decorator';
+import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
+import { UserAdminService } from '../service/users.service';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
 export class UserAdministrationController {
-  public constructor(private readonly repo: UserRepository) {}
+  public constructor(private readonly svc: UserAdminService) {}
 
   // GET /
   @Get('')
@@ -41,16 +44,32 @@ export class UserAdministrationController {
     PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].READ_USERS,
   )
   public async getPaginatedUsers(
-    @Query() params: UserPaginationOptions,
+    @Query() pageOptions: UserPaginationOptions,
   ): Promise<PaginationDto<UserDto>> {
-    const [response, itemCount] = await this.repo.paginate(params);
+    return this.svc.paginateUsers(pageOptions);
+  }
 
-    const users: UserDto[] = response.map((e: UserEntity) => new UserDto(e));
-    const meta: PaginationMeta = new PaginationMeta({
-      pageOptions: params,
-      itemCount,
-    });
-
-    return new PaginationDto(users, meta);
+  // GET /:id
+  @Get(':id')
+  @ApiOperation({
+    summary: 'Get user by ID',
+    description:
+      'Returns a single user account record for administration, including identity, profile, roles, and permission data.',
+  })
+  @ApiOkResponse({
+    description: 'User record returned successfully.',
+    type: UserDto,
+  })
+  @ApiNotFoundResponse({
+    description: 'No user was found for the provided ID.',
+  })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].READ_USERS,
+  )
+  @EntityIdParam
+  public async getUserById(
+    @Param('id', NanoIdParamPipe) id: string,
+  ): Promise<UserDto> {
+    return this.svc.findUser(id);
   }
 }

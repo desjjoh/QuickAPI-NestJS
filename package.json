@@ -1,6 +1,6 @@
 {
   "name": "quickapi-nestjs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Same design goals as QuickAPI: clean structure, logging, error handling, persistence, and production Docker setup.",
   "author": "John Desjardins",
   "license": "MIT",
