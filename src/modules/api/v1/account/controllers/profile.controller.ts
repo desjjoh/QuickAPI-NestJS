@@ -14,6 +14,7 @@ import {
   UseInterceptors,
   UploadedFile,
   Body,
+  Res,
 } from '@nestjs/common';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import {
@@ -25,21 +26,24 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
-import { MeApiService } from '../services/me.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { storage } from '@/config/storage.config';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
+import { ProfileApiService } from '../services/profile.service';
+import { megabyte } from '@/common/constants/bytes.constants';
+import type { Response } from 'express';
+import { UpdateAddressDto } from '../models/updateAddress.model';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
 @Controller('profile')
 @UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
 export class ProfileApiController {
-  public constructor(private readonly svc: MeApiService) {}
+  public constructor(private readonly svc: ProfileApiService) {}
 
-  // PATCH /profile
+  // PATCH /
   @Patch('')
   @ApiBody({ type: Object })
   @ApiOperation({
@@ -57,11 +61,14 @@ export class ProfileApiController {
   public async updateProfile(
     @CurrentUser() user: UserEntity,
     @Body() dto: object,
-  ): Promise<JWTDto> {
-    return;
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    void user;
+    void dto;
+    void res;
   }
 
-  // PUT /profile/avatar
+  // PUT /avatar
   @Put('avatar')
   @ApiOperation({
     summary: 'Set profile avatar',
@@ -79,21 +86,53 @@ export class ProfileApiController {
   )
   public async uploadAvatar(
     @CurrentUser() user: UserEntity,
-    @UploadedFile(new ImageUploadValidationPipe({ fileIsRequired: true }))
+    @UploadedFile(
+      new ImageUploadValidationPipe({
+        maxSize: 1 * megabyte,
+        fileIsRequired: true,
+      }),
+    )
     file: Express.Multer.File,
-  ) {
-    return;
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.uploadAvatar(user, file, res);
   }
 
-  // DELETE /profile/avatar
+  // DELETE /avatar
   @Delete('avatar')
-  public async removeAvatar() {}
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async removeAvatar(
+    @CurrentUser() user: UserEntity,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.removeAvatar(user, res);
+  }
 
-  // PUT /profile/address
+  // PUT /address
   @Put('address')
-  public async uploadAddress() {}
+  @ApiBody({ type: UpdateAddressDto })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async uploadAddress(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateAddressDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updateAddress(user, dto, res);
+  }
 
-  // DELETE /profile/address
+  // DELETE /address
   @Delete('address')
-  public async removeAddress() {}
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async removeAddress(
+    @CurrentUser() user: UserEntity,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.removeAddress(user, res);
+  }
 }

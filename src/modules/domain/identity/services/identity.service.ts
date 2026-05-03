@@ -10,6 +10,7 @@ import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { ImageService } from '../../library/services/image.service';
 import { DeepPartial } from 'typeorm';
+import { UserAddressEntity } from '../entities/address.entity';
 
 @Injectable()
 export class IdentityService {
@@ -108,6 +109,12 @@ export class IdentityService {
     });
 
     return this.userRepository.save(updatedUser);
+  }
+
+  public async deleteAddress(address: UserAddressEntity): Promise<void> {
+    await this.userRepository.manager.delete(UserAddressEntity, {
+      id: address.id,
+    });
   }
 
   public async deleteUser(user: UserEntity, res: Response): Promise<void> {

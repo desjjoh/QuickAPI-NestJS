@@ -3,7 +3,7 @@ import multer, { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
-const rootPath = join(process.cwd(), 'upload');
+const rootPath = join(process.cwd(), 'uploads');
 
 const storage: multer.StorageEngine = diskStorage({
   destination: rootPath,

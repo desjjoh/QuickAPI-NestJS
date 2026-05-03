@@ -20,7 +20,9 @@ export class ImageRepository extends Repository<ImageEntity> {
       alt_text: payload.alt_text ?? null,
     });
 
-    return this.save(image);
+    const created = await this.save(image);
+
+    return this.findOneByOrFail({ id: created.id });
   }
 
   public async findAll(): Promise<ImageEntity[]> {

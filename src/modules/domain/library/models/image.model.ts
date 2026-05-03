@@ -4,28 +4,28 @@ import { WithBaseModel } from '@/common/models/base.model';
 
 export class ImageDto {
   @ApiProperty({
-    example: 'https://example.com/avatar.webp',
+    example: 'https://example.com/public/avatar.png',
     description:
       'Public URL used by clients to load and display the stored image.',
   })
   public readonly url: string;
 
   @ApiProperty({
-    example: 'avatars/user-123/avatar.webp',
+    example: 'user-avatars/avatar.png',
     description:
       'Storage provider key used internally to locate, replace, or delete the image file.',
   })
   public readonly storage_key: string;
 
   @ApiProperty({
-    example: 'avatar.webp',
+    example: 'avatar.png',
     description:
       'Original or generated filename associated with the stored image.',
   })
   public readonly filename: string;
 
   @ApiProperty({
-    example: 'image/webp',
+    example: 'image/png',
     description:
       'MIME type of the stored image, used to describe the file format.',
   })

@@ -44,7 +44,7 @@ class Contact {
       nullable: true,
     },
   )
-  public readonly address?: UserAddressEntity;
+  public readonly address!: UserAddressEntity | null;
 }
 
 @Entity('user_profiles')
@@ -69,5 +69,5 @@ export class UserProfileEntity extends BaseEntity {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
-  public readonly avatar?: ImageEntity;
+  public readonly avatar!: ImageEntity | null;
 }

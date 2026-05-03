@@ -4,17 +4,24 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { imageSize } from 'image-size';
+import { readFile } from 'node:fs/promises';
+
 import { ImageEntity } from '../entities/image.entity';
 import { ImageRepository } from '../repositories/image.repository';
 import { Base } from '@/common/models/base.model';
+import { useFileManager } from '@/common/handlers/file.handler';
+import { join, posix } from 'path';
+import { env } from '@/config/environment.config';
+import { ISizeCalculationResult } from 'image-size/types/interface';
 
-type CreateImageInput = {
+export type CreateImageInput = {
   file: Express.Multer.File;
   alt_text?: string | null;
   folder: string;
 };
 
-type UpdateImageInput = {
+export type UpdateImageInput = {
   image: ImageEntity;
   file: Express.Multer.File;
   alt_text?: string | null;
@@ -27,21 +34,29 @@ type StoredFileResult = {
   filename: string;
 };
 
-type ImageMetadata = {
-  width: number;
-  height: number;
-};
+const fileManager = useFileManager();
+
+const APP_URL = env.APP_URL;
+const PUBLIC_ROUTE = 'public';
+
+const publicRootPath = join(process.cwd(), PUBLIC_ROUTE);
 
 @Injectable()
 export class ImageService {
   public constructor(private readonly imageRepository: ImageRepository) {}
 
+  private buildPublicUrl(storageKey: string): string {
+    return new URL(
+      posix.join(`/${PUBLIC_ROUTE}`, storageKey),
+      APP_URL,
+    ).toString();
+  }
+
   public async findById(id: string): Promise<ImageEntity> {
     const image = await this.imageRepository.findById(id);
 
-    if (!image) {
+    if (!image)
       throw new NotFoundException(`Image with ID "${id}" was not found.`);
-    }
 
     return image;
   }
@@ -113,47 +128,33 @@ export class ImageService {
 
   private async extractMetadata(
     file: Express.Multer.File,
-  ): Promise<ImageMetadata> {
-    void file;
-    // TODO:
-    // - Read file buffer/path
-    // - Use image-size or sharp
-    // - Return actual width/height
-    //
-    // Current convention:
-    // 0 means unavailable/unknown.
+  ): Promise<ISizeCalculationResult> {
+    const buffer = await readFile(file.path);
 
-    return {
-      width: 0,
-      height: 0,
-    };
+    return imageSize(buffer as unknown as Uint8Array);
   }
 
   private async storeFile(
     file: Express.Multer.File,
     folder: string,
   ): Promise<StoredFileResult> {
-    // TODO:
-    // Replace with FileStorageService/PublicStorageService later.
-    //
-    // Expected behavior:
-    // - Move file from temp upload path to public/uploads/<folder>
-    // - Return public URL and internal storage key.
+    const storageKey = join(folder, file.filename);
+    const sourcePath = file.path;
+
+    const destinationPath = join(publicRootPath, storageKey);
+
+    await fileManager.moveFile(sourcePath, destinationPath);
 
     return {
-      url: `/uploads/${folder}/${file.filename}`,
-      storage_key: `uploads/${folder}/${file.filename}`,
+      url: this.buildPublicUrl(storageKey),
+      storage_key: storageKey,
       filename: file.filename,
     };
   }
 
   private async removeStoredFile(storageKey: string): Promise<void> {
-    void storageKey;
-    // TODO:
-    // Replace with FileStorageService/PublicStorageService later.
-    //
-    // Expected behavior:
-    // - Delete the file from local public storage
-    // - Ignore missing files if appropriate
+    const filePath = join(publicRootPath, storageKey);
+
+    await fileManager.removeFile(filePath);
   }
 }

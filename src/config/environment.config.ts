@@ -27,6 +27,7 @@ const pkg = req(pkgPath);
 
 const EnvSchema = z.object({
   APP_NAME: z.string().default(pkg.name),
+  APP_URL: z.url(),
   APP_VERSION: z
     .string()
     .regex(
