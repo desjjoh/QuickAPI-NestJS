@@ -40,7 +40,11 @@ export class MeApiController {
 
   // DELETE /
   @Delete('')
-  @ApiBody({ type: DeleteAccountDto })
+  @ApiBody({
+    type: DeleteAccountDto,
+    description:
+      'Account deletion confirmation payload. Includes the required credentials or confirmation fields needed to verify that the authenticated user intentionally requested account deletion.',
+  })
   @ApiOperation({
     summary: 'Delete current account',
     description:
@@ -57,12 +61,16 @@ export class MeApiController {
     @Body() dto: DeleteAccountDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    this.svc.deleteMe(user, dto, res);
+    return this.svc.deleteMe(user, dto, res);
   }
 
   // PATCH /email
   @Patch('email')
-  @ApiBody({ type: UpdateEmailDto })
+  @ApiBody({
+    type: UpdateEmailDto,
+    description:
+      'Email update payload. Includes the new email address and any required verification fields, such as the current password, needed to confirm the account owner is authorizing the change.',
+  })
   @ApiOperation({
     summary: 'Update account email',
     description:
@@ -83,13 +91,17 @@ export class MeApiController {
     return this.svc.updateEmail(user, dto, res);
   }
 
-  // PATCH /profile/avatar
+  // PATCH /phone
   @Patch('phone')
   public async updatePrimaryPhone() {}
 
   // PATCH /password
   @Patch('password')
-  @ApiBody({ type: UpdatePasswordDto })
+  @ApiBody({
+    type: UpdatePasswordDto,
+    description:
+      'Password update payload. Includes the current password and the new password so the account owner can be verified before credentials are changed.',
+  })
   @ApiOperation({
     summary: 'Update account password',
     description:

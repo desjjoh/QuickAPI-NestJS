@@ -35,6 +35,7 @@ import { ProfileApiService } from '../services/profile.service';
 import { megabyte } from '@/common/constants/bytes.constants';
 import type { Response } from 'express';
 import { UpdateAddressDto } from '../models/updateAddress.model';
+import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
@@ -52,7 +53,8 @@ export class ProfileApiController {
       'Updates profile details for the authenticated account, such as name, date of birth, gender, or contact information.',
   })
   @ApiOkResponse({
-    description: 'Profile information updated successfully.',
+    description:
+      'Profile information updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
     type: JWTDto,
   })
   @Permissions(
@@ -76,8 +78,14 @@ export class ProfileApiController {
       'Uploads and sets the authenticated user’s profile avatar. Replaces the existing avatar if one is already assigned.',
   })
   @ApiConsumes('multipart/form-data')
+  @ApiFileUpload({
+    fieldName: 'avatar',
+    description:
+      'Image file to use as the authenticated user’s profile avatar. The file must pass image validation and size restrictions.',
+  })
   @ApiOkResponse({
-    description: 'Profile avatar updated successfully.',
+    description:
+      'Profile avatar updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
     type: JWTDto,
   })
   @UseInterceptors(FileInterceptor('avatar', { storage }))
@@ -100,6 +108,16 @@ export class ProfileApiController {
 
   // DELETE /avatar
   @Delete('avatar')
+  @ApiOperation({
+    summary: 'Remove profile avatar',
+    description:
+      'Removes the authenticated user’s current profile avatar. The avatar relation is cleared, the associated image record is removed, and the stored image file is deleted. If no avatar exists, the request fails.',
+  })
+  @ApiOkResponse({
+    description:
+      'Profile avatar removed successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
+  })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
@@ -112,7 +130,21 @@ export class ProfileApiController {
 
   // PUT /address
   @Put('address')
-  @ApiBody({ type: UpdateAddressDto })
+  @ApiOperation({
+    summary: 'Set profile address',
+    description:
+      'Creates or updates the authenticated user’s profile address. If an address already exists, it is updated. If no address exists, a new address is created and assigned to the user profile.',
+  })
+  @ApiBody({
+    type: UpdateAddressDto,
+    description:
+      'Complete address payload used to create or replace the authenticated user’s profile address.',
+  })
+  @ApiOkResponse({
+    description:
+      'Profile address created or updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
+  })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
@@ -126,6 +158,16 @@ export class ProfileApiController {
 
   // DELETE /address
   @Delete('address')
+  @ApiOperation({
+    summary: 'Remove profile address',
+    description:
+      'Removes the authenticated user’s profile address. The address relation is cleared from the user profile and the existing address record is deleted through the user aggregate. If no address exists, the request fails.',
+  })
+  @ApiOkResponse({
+    description:
+      'Profile address removed successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
+  })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
