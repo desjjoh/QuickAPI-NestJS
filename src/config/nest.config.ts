@@ -129,7 +129,6 @@ export async function startNest(): Promise<void> {
   app = await NestFactory.create(AppModule, {
     logger: appLogger,
     rawBody: false,
-    // bodyParser: false,
     httpsOptions,
   });
 
