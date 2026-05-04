@@ -5,10 +5,11 @@ import { ApplicationControllerService } from './services/application.service';
 
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
 import { AppConfigModule } from '@/modules/system/configuration/config.module';
+import { TestController } from './controllers/test.controller';
 
 @Module({
   imports: [AppConfigModule],
   providers: [TypeOrmService, ApplicationControllerService],
-  controllers: [ApplicationController],
+  controllers: [ApplicationController, TestController],
 })
 export class ApplicationModule {}

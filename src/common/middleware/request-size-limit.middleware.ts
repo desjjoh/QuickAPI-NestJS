@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
 import { RequestBodyTooLargeError } from '@/common/exceptions/http.exception';
+import { requestContextRef } from '@/common/store/request-context.store';
 
 export interface BodyLimitOptions {
   defaultLimit: number;
@@ -52,6 +53,26 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
       return;
     }
 
+    const context = requestContextRef?.getStore();
+
+    let completed = false;
+
+    function finish(error?: Error): void {
+      if (completed) return;
+
+      completed = true;
+
+      if (context) {
+        requestContextRef?.run(context, () => {
+          next(error);
+        });
+
+        return;
+      }
+
+      next(error);
+    }
+
     const limit = selectLimit(req.path);
     const declaredLength = getContentLength(req);
 
@@ -61,7 +82,7 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
       res.setHeader('X-Body-Actual-Bytes', '0');
       res.setHeader('X-Body-Remaining-Bytes', '0');
 
-      next(
+      finish(
         new RequestBodyTooLargeError(
           `Request body exceeds limit of ${limit} bytes.`,
         ),
@@ -71,22 +92,20 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
     }
 
     let total = 0;
-    let settled = false;
     const chunks: Buffer[] = [];
 
     req.on('data', (chunk: Buffer): void => {
-      if (settled) return;
+      if (completed) return;
 
       total += chunk.length;
 
       if (total > limit) {
-        settled = true;
         req.pause();
 
         res.setHeader('X-Body-Actual-Bytes', String(total));
         res.setHeader('X-Body-Remaining-Bytes', '0');
 
-        next(
+        finish(
           new RequestBodyTooLargeError(
             `Request body exceeds limit of ${limit} bytes.`,
           ),
@@ -99,9 +118,7 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
     });
 
     req.on('end', (): void => {
-      if (settled) return;
-
-      settled = true;
+      if (completed) return;
 
       const buffer = Buffer.concat(chunks);
       const actualLength = buffer.length;
@@ -111,7 +128,7 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
       res.setHeader('X-Body-Remaining-Bytes', String(remaining));
 
       if (declaredLength !== null && declaredLength !== actualLength) {
-        next(
+        finish(
           new BadRequestException(
             `Request body length mismatch. Expected ${declaredLength} bytes but received ${actualLength} bytes.`,
           ),
@@ -122,30 +139,24 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
 
       if (actualLength === 0) {
         req.body = {};
-        next();
+        finish();
         return;
       }
 
       try {
         req.body = JSON.parse(buffer.toString('utf8')) as unknown;
-        next();
+        finish();
       } catch {
-        next(new BadRequestException('Invalid JSON request body.'));
+        finish(new BadRequestException('Invalid JSON request body.'));
       }
     });
 
     req.on('error', (error: Error): void => {
-      if (settled) return;
-
-      settled = true;
-      next(error);
+      finish(error);
     });
 
     req.on('aborted', (): void => {
-      if (settled) return;
-
-      settled = true;
-      next(new BadRequestException('Request body was aborted.'));
+      finish(new BadRequestException('Request body was aborted.'));
     });
   };
 }

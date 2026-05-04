@@ -22,6 +22,7 @@ export class UserRepository extends Repository<UserEntity> {
       credentials: {
         ...user.credentials,
         token_version: user.credentials.token_version + 1,
+        refresh: null,
       },
     });
   }
