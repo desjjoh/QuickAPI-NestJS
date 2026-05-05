@@ -6,9 +6,10 @@ import { ApplicationControllerService } from './services/application.service';
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
 import { AppConfigModule } from '@/modules/system/configuration/config.module';
 import { TestController } from './controllers/test.controller';
+import { EmailModule } from '@/modules/system/email/email.module';
 
 @Module({
-  imports: [AppConfigModule],
+  imports: [AppConfigModule, EmailModule],
   providers: [TypeOrmService, ApplicationControllerService],
   controllers: [ApplicationController, TestController],
 })

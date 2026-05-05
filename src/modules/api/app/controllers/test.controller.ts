@@ -1,18 +1,42 @@
 import { megabyte } from '@/common/constants/bytes.constants';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
 import { storage } from '@/config/storage.config';
-import { Controller, Put, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { EmailService } from '@/modules/system/email/services/email.service';
+import {
+  Controller,
+  Post,
+  Put,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiTags } from '@nestjs/swagger/dist/decorators';
 
 @ApiTags('Test Routes')
 @Controller()
 export class TestController {
+  constructor(private readonly emailSvc: EmailService) {}
+
+  // POST /email
+  @Post('send-email')
+  public async sendTestEmail(): Promise<void> {
+    await this.emailSvc.sendEmail({
+      to: 'john.desjardins@littleknightsoftware.com',
+      subject: 'Hello from Postmark',
+      htmlBody: '<strong>Hello</strong> dear Postmark user.',
+      textBody: 'Hello from Postmark!',
+      tag: 'postmark-test',
+      metadata: {
+        source: 'email-test-controller',
+      },
+    });
+  }
+
   // PUT /image
-  @Put('image')
+  @Put('upload-image')
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('image', { storage }))
-  public async uploadAvatar(
+  public async recieveImage(
     @UploadedFile(
       new ImageUploadValidationPipe({
         maxSize: 1 * megabyte,

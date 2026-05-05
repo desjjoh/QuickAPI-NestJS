@@ -102,6 +102,16 @@ const EnvSchema = z.object({
       message: 'REFRESH_EXPIRY_TIME must be a valid JWT expiresIn value.',
     },
   ),
+
+  POSTMARK_SERVER_TOKEN: z
+    .string()
+    .min(1, 'POSTMARK_SERVER_TOKEN is required.'),
+  POSTMARK_FROM_EMAIL: z.email(
+    'POSTMARK_FROM_EMAIL must be a valid email address.',
+  ),
+  POSTMARK_MESSAGE_STREAM: z
+    .enum(['outbound', 'broadcast'])
+    .default('outbound'),
 });
 
 function formatIssue(issue: z.core.$ZodIssue): string {
