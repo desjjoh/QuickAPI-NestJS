@@ -23,8 +23,8 @@ export class TestController {
     await this.emailSvc.sendEmail({
       to: 'john.desjardins@littleknightsoftware.com',
       subject: 'Hello from Postmark',
-      htmlBody: '<strong>Hello</strong> dear Postmark user.',
-      textBody: 'Hello from Postmark!',
+      template: '<strong>Hello</strong> dear Postmark user.',
+      model: {},
       tag: 'postmark-test',
       metadata: {
         source: 'email-test-controller',

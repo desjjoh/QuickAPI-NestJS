@@ -1,14 +1,12 @@
-// src/system/email/email.service.ts
-
-import { Inject, Injectable } from '@nestjs/common';
 import * as postmark from 'postmark';
 
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+
+import { compile } from '@/common/helpers/handlebars.helper';
 
 import { POSTMARK_CLIENT } from '../tokens/client.token';
 import { SendEmailOptions } from '../types/options.types';
-import { ConfigurationError } from '@/common/errors/config.error';
-import { InvalidOperationError } from '@/common/errors/operation.error';
 
 @Injectable()
 export class EmailService {
@@ -18,24 +16,24 @@ export class EmailService {
     private readonly configService: ConfigService,
   ) {}
 
-  public async sendEmail(options: SendEmailOptions): Promise<void> {
-    const from = this.configService.get<string>('POSTMARK_FROM_EMAIL');
-    const messageStream =
-      this.configService.get<string>('POSTMARK_MESSAGE_STREAM') ?? 'outbound';
+  public async sendEmail<TModel extends Record<string, unknown>>(
+    options: SendEmailOptions<TModel>,
+  ): Promise<void> {
+    const from: string = this.configService.get<string>('POSTMARK_FROM_EMAIL')!;
+    const messageStream = this.configService.get<string>(
+      'POSTMARK_MESSAGE_STREAM',
+    );
 
-    if (!from) throw new ConfigurationError('POSTMARK_FROM_EMAIL is required.');
-
-    if (!options.textBody && !options.htmlBody)
-      throw new InvalidOperationError(
-        'Either textBody or htmlBody is required.',
-      );
+    const htmlTemplate = compile<TModel>({
+      template: options.template,
+      data: options.model,
+    });
 
     await this.postmarkClient.sendEmail({
       From: from,
       To: options.to,
       Subject: options.subject,
-      TextBody: options.textBody,
-      HtmlBody: options.htmlBody,
+      HtmlBody: htmlTemplate,
       MessageStream: messageStream,
       Tag: options.tag,
       Metadata: options.metadata,
