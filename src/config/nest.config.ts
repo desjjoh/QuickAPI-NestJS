@@ -50,7 +50,7 @@ function createApp(app: INestApplication): void {
   app.use(securityHeadersMiddleware());
   app.use(
     corsMiddleware({
-      origin: ['https://localhost:5173'],
+      origin: [env.WEB_URL],
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
       exposedHeaders: ['Authorization', 'Set-Cookie'],

@@ -35,6 +35,7 @@ const EnvSchema = z.object({
       'APP_VERSION must follow full SemVer (e.g., 1.2.3 or 1.2.3-beta+001)',
     )
     .default(pkg.version),
+  WEB_URL: z.url(),
   NODE_ENV: z.enum(['development', 'test', 'production']),
   PORT: z.coerce.number(),
   LOG_LEVEL: z.enum([

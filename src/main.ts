@@ -11,8 +11,6 @@ async function bootstrap(): Promise<void> {
   const version: string = env.APP_VERSION;
   const node_v: string = process.version;
 
-  const port: number = env.PORT;
-
   logger.info(`Booting ${name} v${version} (${env_mode}) — Node.js ${node_v}`);
 
   LC.register([
@@ -26,9 +24,7 @@ async function bootstrap(): Promise<void> {
 
   await LC.startup();
 
-  logger.info(
-    `HTTP server running on port ${port} — https://localhost:${port}`,
-  );
+  logger.info(`HTTP server running on port ${env.PORT} — ${env.APP_URL}`);
 }
 
 bootstrap().catch((err: unknown) => {

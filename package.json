@@ -30,7 +30,6 @@
     "class-validator": "^0.14.2",
     "colorette": "^2.0.20",
     "cookie-parser": "^1.4.7",
-    "csurf": "^1.11.0",
     "handlebars": "^4.7.9",
     "image-size": "^2.0.2",
     "moment": "^2.30.1",
