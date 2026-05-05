@@ -19,24 +19,33 @@ export class EmailService {
   public async sendEmail<TModel extends Record<string, unknown>>(
     options: SendEmailOptions<TModel>,
   ): Promise<void> {
-    const from: string = this.configService.get<string>('POSTMARK_FROM_EMAIL')!;
-    const messageStream = this.configService.get<string>(
-      'POSTMARK_MESSAGE_STREAM',
+    const from: string = this.configService.getOrThrow<string>(
+      'POSTMARK_FROM_EMAIL',
     );
 
-    const htmlTemplate = compile<TModel>({
-      template: options.template,
+    const messageStream =
+      this.configService.get<string>('POSTMARK_MESSAGE_STREAM') ?? 'outbound';
+
+    const htmlBody = compile<TModel>({
+      template: options.template.html,
       data: options.model,
     });
+
+    const metadata: Record<string, string> = {
+      template: options.template.key,
+      category: options.template.tag,
+      ...options.template.metadata,
+      ...options.metadata,
+    };
 
     await this.postmarkClient.sendEmail({
       From: from,
       To: options.to,
-      Subject: options.subject,
-      HtmlBody: htmlTemplate,
+      Subject: options.template.subject,
+      HtmlBody: htmlBody,
       MessageStream: messageStream,
-      Tag: options.tag,
-      Metadata: options.metadata,
+      Tag: options.tag ?? options.template.tag,
+      Metadata: metadata,
     });
   }
 }

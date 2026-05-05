@@ -2,6 +2,7 @@ import { megabyte } from '@/common/constants/bytes.constants';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
 import { storage } from '@/config/storage.config';
 import { EmailService } from '@/modules/system/email/services/email.service';
+import { TestEmailTemplate } from '@/modules/system/email/templates/test.template';
 import {
   Controller,
   Post,
@@ -22,9 +23,7 @@ export class TestController {
   public async sendTestEmail(): Promise<void> {
     await this.emailSvc.sendEmail({
       to: 'john.desjardins@littleknightsoftware.com',
-      subject: 'Hello from Postmark',
-      template: '<strong>Hello</strong> dear Postmark user.',
-      model: {},
+      template: TestEmailTemplate,
       tag: 'postmark-test',
       metadata: {
         source: 'email-test-controller',
