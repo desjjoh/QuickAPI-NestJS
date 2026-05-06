@@ -10,12 +10,20 @@ import {
   UserDto,
   UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiOperation,
   ApiOkResponse,
   ApiBearerAuth,
   ApiNotFoundResponse,
+  ApiNoContentResponse,
 } from '@nestjs/swagger';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { EntityIdParam } from '@/common/decorators/id-param.decorator';
@@ -71,5 +79,28 @@ export class UserAdministrationController {
     @Param('id', NanoIdParamPipe) id: string,
   ): Promise<UserDto> {
     return this.svc.findUser(id);
+  }
+
+  // DELETE /:id
+  @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete user',
+    description:
+      'Permanently deletes a user account by ID through user administration. This operation performs account cleanup before deletion, including removal of account-owned profile resources such as avatar and address data where applicable.',
+  })
+  @EntityIdParam
+  @ApiNoContentResponse({
+    description: 'User account deleted successfully.',
+  })
+  @ApiNotFoundResponse({
+    description: 'No user account was found for the provided ID.',
+  })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].DELETE_USERS,
+  )
+  public async removeUserById(
+    @Param('id', NanoIdParamPipe) id: string,
+  ): Promise<void> {
+    return this.svc.removeUser(id);
   }
 }

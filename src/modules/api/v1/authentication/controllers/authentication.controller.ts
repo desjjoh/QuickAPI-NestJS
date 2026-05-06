@@ -38,7 +38,7 @@ import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 @UseGuards(CsrfGuard)
 @Controller()
 export class AuthApiController {
-  public constructor(private readonly service: AuthService) {}
+  public constructor(private readonly svc: AuthService) {}
 
   // POST /register
   @Post('register')
@@ -65,7 +65,7 @@ export class AuthApiController {
     @Body() input: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.service.register(input, res);
+    return this.svc.register(input, res);
   }
 
   // POST /sign-in
@@ -92,7 +92,7 @@ export class AuthApiController {
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.service.signIn(user, res);
+    return this.svc.signIn(user, res);
   }
 
   // POST /sign-out
@@ -115,7 +115,7 @@ export class AuthApiController {
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
-    await this.service.signOut(user, res);
+    await this.svc.signOut(user, res);
   }
 
   // GET /refresh
@@ -140,6 +140,6 @@ export class AuthApiController {
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.service.verify(user, res);
+    return this.svc.verify(user, res);
   }
 }

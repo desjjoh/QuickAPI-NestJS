@@ -7,10 +7,14 @@ import { Base } from '@/common/models/base.model';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
+import { ImageService } from '../../library/services/image.service';
 
 @Injectable()
 export class UserRepository extends Repository<UserEntity> {
-  public constructor(private readonly dataSource: DataSource) {
+  public constructor(
+    private readonly imageSvc: ImageService,
+    private readonly dataSource: DataSource,
+  ) {
     super(UserEntity, dataSource.createEntityManager());
   }
 
@@ -75,5 +79,14 @@ export class UserRepository extends Repository<UserEntity> {
     const created = await this.save(user);
 
     return this.findByIdOrFail(created.id);
+  }
+
+  public async removeUser(id: string): Promise<void> {
+    const user = await this.findByIdOrFail(id);
+    const avatar = user.profile.avatar;
+
+    if (avatar) await this.imageSvc.remove(avatar);
+
+    await this.remove(user);
   }
 }

@@ -12,7 +12,7 @@ import { TOKEN_SERVICE_OPTIONS } from '../tokens/options.token';
 
 export class TokenService {
   public constructor(
-    private readonly jwtService: JwtService,
+    private readonly jwtSvc: JwtService,
 
     @Inject(TOKEN_SERVICE_OPTIONS)
     private readonly options: TokenServiceOptions,
@@ -30,33 +30,33 @@ export class TokenService {
   }
 
   public async createAccessToken(payload: RefreshPayload): Promise<string> {
-    return this.jwtService.signAsync(payload, {
+    return this.jwtSvc.signAsync(payload, {
       secret: this.options.jwtSecret,
       expiresIn: this.options.jwtExpiryTime,
     });
   }
 
   public async createRefreshToken(payload: RefreshPayload): Promise<string> {
-    return this.jwtService.signAsync(payload, {
+    return this.jwtSvc.signAsync(payload, {
       secret: this.options.refreshSecret,
       expiresIn: this.options.refreshExpiryTime,
     });
   }
 
   public async verifyAccessToken(token: string): Promise<DecodedToken> {
-    return this.jwtService.verifyAsync<DecodedToken>(token, {
+    return this.jwtSvc.verifyAsync<DecodedToken>(token, {
       secret: this.options.jwtSecret,
     });
   }
 
   public async verifyRefreshToken(token: string): Promise<DecodedToken> {
-    return this.jwtService.verifyAsync<DecodedToken>(token, {
+    return this.jwtSvc.verifyAsync<DecodedToken>(token, {
       secret: this.options.refreshSecret,
     });
   }
 
   public decode(token: string): DecodedToken {
-    return this.jwtService.decode(token) as DecodedToken;
+    return this.jwtSvc.decode(token) as DecodedToken;
   }
 
   public hashToken(token: string): string {

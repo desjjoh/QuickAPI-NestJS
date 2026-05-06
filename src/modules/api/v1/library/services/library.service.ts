@@ -13,23 +13,23 @@ import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 @Injectable()
 export class LibraryService {
   public constructor(
-    private readonly countryRepository: CountryRepository,
-    private readonly genderRepository: GenderRepository,
-    private readonly roleRepository: RoleRepository,
+    private readonly countryRepo: CountryRepository,
+    private readonly genderRepo: GenderRepository,
+    private readonly roleRepo: RoleRepository,
   ) {}
 
   public async getCountries(): Promise<BaseCountryDto[]> {
-    const countries: CountryEntity[] = await this.countryRepository.findAll();
+    const countries: CountryEntity[] = await this.countryRepo.findAll();
     return countries.map((e: CountryEntity) => new BaseCountryDto(e));
   }
 
   public async getGenders(): Promise<BaseGenderDto[]> {
-    const genders: GenderEntity[] = await this.genderRepository.findAll();
+    const genders: GenderEntity[] = await this.genderRepo.findAll();
     return genders.map((e: GenderEntity) => new BaseGenderDto(e));
   }
 
   public async getRoles(): Promise<BaseRoleDto[]> {
-    const roles: RoleEntity[] = await this.roleRepository.findAll();
+    const roles: RoleEntity[] = await this.roleRepo.findAll();
     return roles.map((role: RoleEntity) => new BaseRoleDto(role));
   }
 }

@@ -12,16 +12,16 @@ import { DeleteAccountDto } from '../models/deleteAccount.model';
 
 @Injectable()
 export class MeApiService {
-  public constructor(private readonly service: IdentityService) {}
+  public constructor(private readonly svc: IdentityService) {}
 
   public async deleteMe(
     user: UserEntity,
     dto: DeleteAccountDto,
     res: Response,
   ): Promise<void> {
-    await this.service.validateUser(user.identity.email, dto.password);
+    await this.svc.validateUser(user.identity.email, dto.password);
 
-    await this.service.deleteUser(user, res);
+    await this.svc.deleteUser(user, res);
   }
 
   public async updateEmail(
@@ -29,13 +29,13 @@ export class MeApiService {
     dto: UpdateEmailDto,
     res: Response,
   ): Promise<JWTDto> {
-    await this.service.validateUser(user.identity.email, dto.password);
+    await this.svc.validateUser(user.identity.email, dto.password);
 
-    const updated = await this.service.updateUser(user, {
+    const updated = await this.svc.updateUser(user, {
       identity: { email: dto.confirm },
     });
 
-    return this.service.issueTokens(updated, res);
+    return this.svc.issueTokens(updated, res);
   }
 
   public async updatePassword(
@@ -43,13 +43,13 @@ export class MeApiService {
     dto: UpdatePasswordDto,
     res: Response,
   ): Promise<JWTDto> {
-    await this.service.validateUser(user.identity.email, dto.password);
+    await this.svc.validateUser(user.identity.email, dto.password);
 
-    const hashed = await this.service.hashPassword(dto.confirm);
-    const updated = await this.service.updateUser(user, {
+    const hashed = await this.svc.hashPassword(dto.confirm);
+    const updated = await this.svc.updateUser(user, {
       identity: { password: hashed },
     });
 
-    return this.service.issueTokens(updated, res);
+    return this.svc.issueTokens(updated, res);
   }
 }

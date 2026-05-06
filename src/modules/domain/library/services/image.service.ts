@@ -43,7 +43,7 @@ const publicRootPath = join(process.cwd(), PUBLIC_ROUTE);
 
 @Injectable()
 export class ImageService {
-  public constructor(private readonly imageRepository: ImageRepository) {}
+  public constructor(private readonly imgRepo: ImageRepository) {}
 
   private buildPublicUrl(storageKey: string): string {
     return new URL(
@@ -53,7 +53,7 @@ export class ImageService {
   }
 
   public async findById(id: string): Promise<ImageEntity> {
-    const image = await this.imageRepository.findById(id);
+    const image = await this.imgRepo.findById(id);
 
     if (!image)
       throw new NotFoundException(`Image with ID "${id}" was not found.`);
@@ -78,7 +78,7 @@ export class ImageService {
       alt_text: input.alt_text ?? null,
     };
 
-    return this.imageRepository.createImage(payload);
+    return this.imgRepo.createImage(payload);
   }
 
   public async update(input: UpdateImageInput): Promise<ImageEntity> {
@@ -100,10 +100,7 @@ export class ImageService {
       alt_text: input.alt_text,
     };
 
-    const updatedImage = await this.imageRepository.updateImage(
-      input.image,
-      payload,
-    );
+    const updatedImage = await this.imgRepo.updateImage(input.image, payload);
 
     await this.removeStoredFile(previousStorageKey);
 
@@ -113,7 +110,7 @@ export class ImageService {
   public async remove(image: ImageEntity): Promise<ImageEntity> {
     await this.removeStoredFile(image.storage_key);
 
-    return this.imageRepository.deleteImage(image);
+    return this.imgRepo.deleteImage(image);
   }
 
   private validateImage(file: Express.Multer.File): void {

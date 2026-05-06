@@ -31,4 +31,8 @@ export class UserAdminService {
 
     return new UserDto(user);
   }
+
+  public async removeUser(id: string): Promise<void> {
+    return this.repo.removeUser(id);
+  }
 }

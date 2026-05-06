@@ -11,34 +11,34 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 @Injectable()
 export class AuthService {
   public constructor(
-    private readonly identityService: IdentityService,
-    private readonly userRepository: UserRepository,
+    private readonly identitySvc: IdentityService,
+    private readonly userRepo: UserRepository,
   ) {}
 
   public async register(dto: RegisterDto, res: Response): Promise<JWTDto> {
-    const existingUser = await this.userRepository.findByEmail(dto.email);
+    const existingUser = await this.userRepo.findByEmail(dto.email);
 
     if (existingUser)
       throw new ConflictException('A user with this email already exists.');
 
-    const password = await this.identityService.hashPassword(dto.password);
+    const password = await this.identitySvc.hashPassword(dto.password);
 
-    const user = await this.userRepository.createUser(
+    const user = await this.userRepo.createUser(
       RegisterMapper.toCreateUserInput(dto, password),
     );
 
-    return this.identityService.issueTokens(user, res);
+    return this.identitySvc.issueTokens(user, res);
   }
 
   public async signIn(user: UserEntity, res: Response): Promise<JWTDto> {
-    return this.identityService.issueTokens(user, res);
+    return this.identitySvc.issueTokens(user, res);
   }
 
   public async verify(user: UserEntity, res: Response): Promise<JWTDto> {
-    return this.identityService.issueTokens(user, res);
+    return this.identitySvc.issueTokens(user, res);
   }
 
   public async signOut(user: UserEntity, res: Response): Promise<void> {
-    await this.identityService.revokeTokens(user, res);
+    await this.identitySvc.revokeTokens(user, res);
   }
 }

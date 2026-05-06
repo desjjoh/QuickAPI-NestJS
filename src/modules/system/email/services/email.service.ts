@@ -13,18 +13,18 @@ export class EmailService {
   public constructor(
     @Inject(POSTMARK_CLIENT)
     private readonly postmarkClient: postmark.ServerClient,
-    private readonly configService: ConfigService,
+    private readonly configSvc: ConfigService,
   ) {}
 
   public async sendEmail<TModel extends Record<string, unknown>>(
     options: SendEmailOptions<TModel>,
   ): Promise<void> {
-    const from: string = this.configService.getOrThrow<string>(
+    const from: string = this.configSvc.getOrThrow<string>(
       'POSTMARK_FROM_EMAIL',
     );
 
     const messageStream =
-      this.configService.get<string>('POSTMARK_MESSAGE_STREAM') ?? 'outbound';
+      this.configSvc.get<string>('POSTMARK_MESSAGE_STREAM') ?? 'outbound';
 
     const htmlBody = compile<TModel>({
       template: options.template.html,
