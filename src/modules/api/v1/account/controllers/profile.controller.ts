@@ -46,7 +46,11 @@ export class ProfileApiController {
 
   // PATCH /
   @Put('')
-  @ApiBody({ type: UpdateProfileDto })
+  @ApiBody({
+    type: UpdateProfileDto,
+    description:
+      'Complete editable profile payload. All fields are required. Send null for nullable fields to clear them.',
+  })
   @ApiOperation({
     summary: 'Update profile information',
     description:
@@ -62,12 +66,10 @@ export class ProfileApiController {
   )
   public async updateProfile(
     @CurrentUser() user: UserEntity,
-    @Body() dto: object,
+    @Body() dto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    void user;
-    void dto;
-    void res;
+    this.svc.updateProfile(user, dto, res);
   }
 
   // PUT /avatar
