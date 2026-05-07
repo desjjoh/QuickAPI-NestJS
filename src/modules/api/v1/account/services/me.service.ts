@@ -9,6 +9,7 @@ import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
+import { UpdatePhoneDto } from '../models/updatePhone.model';
 
 @Injectable()
 export class MeApiService {
@@ -33,6 +34,18 @@ export class MeApiService {
 
     const updated = await this.svc.updateUser(user, {
       identity: { email: dto.confirm },
+    });
+
+    return this.svc.issueTokens(updated, res);
+  }
+
+  public async updatePhone(
+    user: UserEntity,
+    dto: UpdatePhoneDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const updated = await this.svc.updateUser(user, {
+      identity: { phone_e164: dto.phone_e164 },
     });
 
     return this.svc.issueTokens(updated, res);

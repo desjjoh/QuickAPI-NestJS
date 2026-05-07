@@ -9,7 +9,6 @@ import {
   Controller,
   UseGuards,
   Delete,
-  Patch,
   Put,
   UseInterceptors,
   UploadedFile,
@@ -36,6 +35,7 @@ import { megabyte } from '@/common/constants/bytes.constants';
 import type { Response } from 'express';
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
+import { UpdateProfileDto } from '../models/updateProfile.model';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
@@ -45,8 +45,8 @@ export class ProfileApiController {
   public constructor(private readonly svc: ProfileApiService) {}
 
   // PATCH /
-  @Patch('')
-  @ApiBody({ type: Object })
+  @Put('')
+  @ApiBody({ type: UpdateProfileDto })
   @ApiOperation({
     summary: 'Update profile information',
     description:

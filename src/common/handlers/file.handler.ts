@@ -41,9 +41,8 @@ function useFileManager(): IUseFileManager {
         reject: (reason?: unknown) => void,
       ) => {
         fs.writeFile(srcPath, payload, (err: NodeJS.ErrnoException | null) => {
-          if (err) {
-            reject(`Could not write to file ${srcPath}.`);
-          } else resolve();
+          if (err) reject(`Could not write to file ${srcPath}.`);
+          else resolve();
         });
       },
     );
@@ -56,9 +55,8 @@ function useFileManager(): IUseFileManager {
         reject: (reason?: unknown) => void,
       ) => {
         fs.rm(srcPath, (err: NodeJS.ErrnoException | null) => {
-          if (err) {
-            reject(`Could not remove file ${srcPath}.`);
-          } else resolve();
+          if (err) reject(`Could not remove file ${srcPath}.`);
+          else resolve();
         });
       },
     );

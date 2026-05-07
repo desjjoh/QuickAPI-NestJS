@@ -30,6 +30,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
+import { UpdatePhoneDto } from '../models/updatePhone.model';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
@@ -93,7 +94,22 @@ export class MeApiController {
 
   // PATCH /phone
   @Patch('phone')
-  public async updatePrimaryPhone() {}
+  @ApiOperation({
+    summary: 'Update primary phone number',
+    description:
+      'Updates the authenticated user’s primary phone number using an E.164 formatted value.',
+  })
+  @ApiOkResponse({
+    description: 'The primary phone number was updated successfully.',
+    type: JWTDto,
+  })
+  public async updatePrimaryPhone(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdatePhoneDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updatePhone(user, dto, res);
+  }
 
   // PATCH /password
   @Patch('password')
