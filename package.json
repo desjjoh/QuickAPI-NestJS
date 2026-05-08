@@ -10,7 +10,13 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "typeorm": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
+    "migration:create": "npm run typeorm -- migration:create src/database/migrations/migration",
+    "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/migration -d src/database/typeorm.datasource.ts",
+    "migration:run": "npm run typeorm -- migration:run -d src/database/typeorm.datasource.ts",
+    "migration:revert": "npm run typeorm -- migration:revert -d src/database/typeorm.datasource.ts",
+    "migration:show": "npm run typeorm -- migration:show -d src/database/typeorm.datasource.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
