@@ -1,9 +1,12 @@
 import { Request } from 'express';
 import multer, { diskStorage } from 'multer';
-import { extname, join } from 'path';
+import { extname, isAbsolute, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import { env } from './environment.config';
 
-const rootPath = join(process.cwd(), 'tmp');
+const rootPath = isAbsolute(env.UPLOAD_TMP_DIR)
+  ? env.UPLOAD_TMP_DIR
+  : join(process.cwd(), env.UPLOAD_TMP_DIR);
 
 const storage: multer.StorageEngine = diskStorage({
   destination: rootPath,

@@ -36,8 +36,8 @@ type StoredFileResult = {
 
 const fileManager = useFileManager();
 
-const APP_URL = env.APP_URL;
-const PUBLIC_ROUTE = 'public';
+const APP_URL = env.PUBLIC_API_URL;
+const PUBLIC_ROUTE = env.STATIC_ROOT_PATH;
 
 const publicRootPath = join(process.cwd(), PUBLIC_ROUTE);
 

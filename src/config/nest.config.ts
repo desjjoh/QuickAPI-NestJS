@@ -1,10 +1,12 @@
 import {
   INestApplication,
+  NestApplicationOptions,
   ValidationError,
   ValidationPipe,
 } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
+import path from 'path';
 import * as fs from 'fs';
 import cookieParser from 'cookie-parser';
 
@@ -33,7 +35,9 @@ import { corsMiddleware } from '@/common/middleware/cors.middleware';
 import { bodyLimitMiddleware } from '@/common/middleware/request-size-limit.middleware';
 import { httpMetricsMiddleware } from '@/common/middleware/metrics.middleware';
 
-let app: INestApplication | null = null;
+import { rootPath } from '@/common/helpers/path.helper';
+
+const app: INestApplication | null = null;
 let ready: boolean = false;
 
 function createApp(app: INestApplication): void {
@@ -50,35 +54,35 @@ function createApp(app: INestApplication): void {
   app.use(securityHeadersMiddleware());
   app.use(
     corsMiddleware({
-      origin: [env.WEB_URL],
-      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-      exposedHeaders: ['Authorization', 'Set-Cookie'],
-      credentials: true,
-      maxAge: 86_400,
+      origin: env.CORS_ORIGINS,
+      methods: env.CORS_METHODS,
+      allowedHeaders: env.CORS_ALLOWED_HEADERS,
+      exposedHeaders: env.CORS_EXPOSED_HEADERS,
+      credentials: env.CORS_CREDENTIALS,
+      maxAge: env.CORS_MAX_AGE_SECONDS,
     }),
   );
 
   app.use(
     rateLimitMiddleware({
-      windowMs: 60_000,
-      max: 200,
+      windowMs: env.RATE_LIMIT_WINDOW_MS,
+      max: env.RATE_LIMIT_MAX,
       keyGenerator: (req) => req.ip ?? 'unknown',
     }),
   );
 
   app.use(
     methodWhitelistMiddleware({
-      allowedMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      allowedMethods: env.ALLOWED_HTTP_METHODS,
     }),
   );
 
   app.use(
     headerLimitsMiddleware({
-      maxHeaderCount: 100,
-      maxSingleHeaderBytes: 4_096,
-      maxTotalHeaderBytes: 8_192,
-      allowChunked: false,
+      maxHeaderCount: env.HEADER_MAX_COUNT,
+      maxSingleHeaderBytes: env.HEADER_MAX_SINGLE_BYTES,
+      maxTotalHeaderBytes: env.HEADER_MAX_TOTAL_BYTES,
+      allowChunked: env.HEADER_ALLOW_CHUNKED,
     }),
   );
 
@@ -86,20 +90,20 @@ function createApp(app: INestApplication): void {
 
   app.use(
     contentTypeMiddleware({
-      defaultAllowed: ['application/json', 'multipart/form-data'],
+      defaultAllowed: env.ALLOWED_CONTENT_TYPES,
       routeOverrides: [],
     }),
   );
 
   app.use(
     bodyLimitMiddleware({
-      defaultLimit: 1_048_576,
+      defaultLimit: env.REQUEST_BODY_LIMIT_BYTES,
       routeOverrides: [],
     }),
   );
 
   // INTERCEPTORS
-  app.useGlobalInterceptors(new TimeoutInterceptor(5_000));
+  app.useGlobalInterceptors(new TimeoutInterceptor(env.REQUEST_TIMEOUT_MS));
 
   // PIPES
   app.useGlobalPipes(
@@ -119,18 +123,35 @@ function createApp(app: INestApplication): void {
   SwaggerConfig.setup(app);
 }
 
-export async function startNest(): Promise<void> {
-  const appLogger: AppLogger = new AppLogger();
-  const httpsOptions = {
-    key: fs.readFileSync('certs/localhost-key.pem'),
-    cert: fs.readFileSync('certs/localhost.pem'),
-  };
+function resolveCertPath(certPath: string): string {
+  return path.isAbsolute(certPath) ? certPath : path.join(rootPath, certPath);
+}
 
-  app = await NestFactory.create(AppModule, {
+export function createNestOptions(
+  appLogger: NestApplicationOptions['logger'],
+): NestApplicationOptions {
+  const options: NestApplicationOptions = {
     logger: appLogger,
     rawBody: false,
-    httpsOptions,
-  });
+  };
+
+  if (env.HTTPS_ENABLED) {
+    options.httpsOptions = {
+      key: fs.readFileSync(resolveCertPath(env.HTTPS_KEY_PATH!)),
+      cert: fs.readFileSync(resolveCertPath(env.HTTPS_CERT_PATH!)),
+    };
+  }
+
+  return options;
+}
+
+export async function startNest(): Promise<void> {
+  const appLogger: AppLogger = new AppLogger();
+
+  const app: INestApplication = await NestFactory.create(
+    AppModule,
+    createNestOptions(appLogger),
+  );
 
   createApp(app);
 

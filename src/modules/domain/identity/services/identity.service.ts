@@ -1,14 +1,19 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
+import { DeepPartial } from 'typeorm';
 
-import { day } from '@/common/constants/milliseconds.constants';
+import {
+  getClearRefreshCookieOptions,
+  getRefreshCookieName,
+  getRefreshCookieOptions,
+} from '@/config/cookie.config';
+
 import { TokenService } from '@/modules/system/tokens/services/token.service';
 
 import { JWTDto } from '../models/jwt.model';
 import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
-import { DeepPartial } from 'typeorm';
 import { UserAddressEntity } from '../entities/address.entity';
 
 @Injectable()
@@ -65,13 +70,11 @@ export class IdentityService {
     const accessToken = this.tokenSvc.decode(tokens.access_token);
     const refreshToken = this.tokenSvc.decode(tokens.refresh_token);
 
-    res.cookie('refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: true,
-      path: '/',
-      maxAge: 7 * day,
-    });
+    res.cookie(
+      getRefreshCookieName(),
+      tokens.refresh_token,
+      getRefreshCookieOptions(),
+    );
 
     return new JWTDto({
       refresh: refreshToken.exp,
@@ -85,12 +88,7 @@ export class IdentityService {
   public async revokeTokens(user: UserEntity, res: Response): Promise<void> {
     await this.userRepo.incrementTokenVersion(user.id);
 
-    res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
   private async updateRefreshToken(
@@ -122,11 +120,6 @@ export class IdentityService {
   public async deleteUser(user: UserEntity, res: Response): Promise<void> {
     await this.userRepo.removeUser(user.id);
 
-    res.clearCookie('refresh_token', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 }

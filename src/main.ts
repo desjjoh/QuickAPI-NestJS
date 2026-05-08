@@ -24,7 +24,9 @@ async function bootstrap(): Promise<void> {
 
   await LC.startup();
 
-  logger.info(`HTTP server running on port ${env.PORT} — ${env.APP_URL}`);
+  logger.info(
+    `HTTP server running on port ${env.PORT} — ${env.PUBLIC_API_URL}`,
+  );
 }
 
 bootstrap().catch((err: unknown) => {

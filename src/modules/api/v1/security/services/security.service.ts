@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 
+import {
+  getCsrfCookieName,
+  getCsrfCookieOptions,
+} from '@/config/cookie.config';
+
 import { hour } from '@/common/constants/milliseconds.constants';
 import { TokenService } from '@/modules/system/tokens/services/token.service';
 import { CsrfDto } from '../models/csrf.model';
@@ -15,12 +20,7 @@ export class SecurityApiService {
     const iat = Date.now();
     const exp = iat + 1 * hour;
 
-    res.cookie('csrf_secret', secret, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.cookie(getCsrfCookieName(), secret, getCsrfCookieOptions());
 
     return new CsrfDto({
       token,

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import { DomainModule } from '@/modules/domain/domain.module';
 
@@ -14,14 +14,29 @@ import { RefreshTokenStrategy } from '@/common/strategies/refresh.strategy';
 import { IdentityService } from './domain/identity/services/identity.service';
 import { UserRepository } from './domain/identity/repositories/user.repository';
 import { AccessTokenStrategy } from '@/common/strategies/access.strategy';
+import { env } from '@/config/environment.config';
 
-const rootPath = join(process.cwd(), 'public');
-const serveRoot = '/';
+function resolveStaticRootPath(staticRootPath: string): string {
+  return isAbsolute(staticRootPath)
+    ? staticRootPath
+    : join(process.cwd(), staticRootPath);
+}
 
 @Module({
   imports: [
-    ServeStaticModule.forRoot({ rootPath, serveRoot }),
-    ThrottlerModule.forRoot({ throttlers: [{ ttl: 1 * minute, limit: 20 }] }),
+    ServeStaticModule.forRoot({
+      rootPath: resolveStaticRootPath(env.STATIC_ROOT_PATH),
+      serveRoot: env.STATIC_SERVE_ROOT,
+    }),
+
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: env.GLOBAL_THROTTLE_TTL_MINUTES * minute,
+          limit: env.GLOBAL_THROTTLE_LIMIT,
+        },
+      ],
+    }),
 
     SystemModule,
     DomainModule,
