@@ -6,6 +6,7 @@ import {
   ManyToMany,
   Index,
   JoinColumn,
+  type Relation,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
@@ -42,7 +43,7 @@ export class UserEntity extends BaseEntity {
     },
   )
   @JoinColumn({ name: 'credentials_id', referencedColumnName: 'id' })
-  public readonly credentials!: UserCredentialsEntity;
+  public readonly credentials!: Relation<UserCredentialsEntity>;
 
   @OneToOne(
     () => UserProfileEntity,
@@ -55,7 +56,7 @@ export class UserEntity extends BaseEntity {
     },
   )
   @JoinColumn({ name: 'profile_id', referencedColumnName: 'id' })
-  public readonly profile!: UserProfileEntity;
+  public readonly profile!: Relation<UserProfileEntity>;
 
   @ManyToMany(() => RoleEntity, (role: RoleEntity) => role.users, {
     eager: true,
@@ -71,5 +72,5 @@ export class UserEntity extends BaseEntity {
       referencedColumnName: 'id',
     },
   })
-  public readonly roles?: RoleEntity[];
+  public readonly roles?: Relation<RoleEntity[]>;
 }

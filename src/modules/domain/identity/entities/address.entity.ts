@@ -1,4 +1,4 @@
-import { Entity, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, OneToOne, JoinColumn, type Relation } from 'typeorm';
 
 import { AddressEntity } from '@/common/entities/address.entity';
 
@@ -11,5 +11,5 @@ export class UserAddressEntity extends AddressEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'profile_id', referencedColumnName: 'id' })
-  public readonly profile!: UserProfileEntity;
+  public readonly profile!: Relation<UserProfileEntity>;
 }

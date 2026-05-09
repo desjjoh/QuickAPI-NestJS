@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToOne,
+  type Relation,
+} from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
@@ -28,7 +35,7 @@ class Personal {
     onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'gender_id', referencedColumnName: 'id' })
-  public readonly gender!: GenderEntity;
+  public readonly gender!: Relation<GenderEntity>;
 }
 
 class Contact {
@@ -44,7 +51,7 @@ class Contact {
       nullable: true,
     },
   )
-  public readonly address!: UserAddressEntity | null;
+  public readonly address!: Relation<UserAddressEntity | null>;
 }
 
 @Entity('user_profiles')
@@ -52,7 +59,7 @@ export class UserProfileEntity extends BaseEntity {
   @OneToOne(() => UserEntity, (user: UserEntity) => user.profile, {
     onDelete: 'CASCADE',
   })
-  public readonly user!: UserEntity;
+  public readonly user!: Relation<UserEntity>;
 
   @Column(() => Name, { prefix: false })
   public readonly name!: Name;
@@ -69,5 +76,5 @@ export class UserProfileEntity extends BaseEntity {
     onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
-  public readonly avatar!: ImageEntity | null;
+  public readonly avatar!: Relation<ImageEntity | null>;
 }

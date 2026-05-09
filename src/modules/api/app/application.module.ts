@@ -4,10 +4,9 @@ import { ApplicationController } from './controllers/application.controller';
 import { ApplicationControllerService } from './services/application.service';
 
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
-import { AppConfigModule } from '@/modules/system/configuration/config.module';
 
 @Module({
-  imports: [AppConfigModule],
+  imports: [],
   providers: [TypeOrmService, ApplicationControllerService],
   controllers: [ApplicationController],
 })

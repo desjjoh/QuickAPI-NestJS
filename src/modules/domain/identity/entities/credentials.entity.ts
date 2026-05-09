@@ -1,5 +1,5 @@
 import { Exclude } from 'class-transformer';
-import { Entity, OneToOne, Column } from 'typeorm';
+import { Entity, OneToOne, Column, type Relation } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 
@@ -11,7 +11,7 @@ export class UserCredentialsEntity extends BaseEntity {
     nullable: false,
     onDelete: 'CASCADE',
   })
-  public readonly user!: UserEntity;
+  public readonly user!: Relation<UserEntity>;
 
   @Exclude()
   @Column({ type: 'text', nullable: true, default: null })

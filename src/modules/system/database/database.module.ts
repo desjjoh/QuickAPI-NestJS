@@ -5,7 +5,7 @@ import { typeOrmConfig } from '@/config/database.config';
 import { TypeOrmService } from './services/typeorm.service';
 
 @Module({
-  imports: [TypeOrmModule.forRootAsync(typeOrmConfig)],
+  imports: [TypeOrmModule.forRoot(typeOrmConfig)],
   providers: [TypeOrmService],
   exports: [TypeOrmService],
 })

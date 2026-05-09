@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToMany } from 'typeorm';
+import { Entity, Column, ManyToMany, type Relation } from 'typeorm';
 import { BaseEntity } from '@/common/entities/base.entity';
 import { RoleEntity } from './role.entity';
 
@@ -14,5 +14,5 @@ export class PermissionEntity extends BaseEntity {
   public readonly description!: string | null;
 
   @ManyToMany(() => RoleEntity, (role: RoleEntity) => role.permissions)
-  public readonly roles?: RoleEntity[];
+  public readonly roles?: Relation<RoleEntity[]>;
 }

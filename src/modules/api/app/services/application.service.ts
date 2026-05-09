@@ -1,7 +1,6 @@
 import os from 'node:os';
 
-import { Inject, Injectable } from '@nestjs/common';
-import { Response } from 'express';
+import { Injectable } from '@nestjs/common';
 import { LC } from '@/common/handlers/lifecycle.handler';
 
 import {
@@ -13,7 +12,7 @@ import {
 } from '../models';
 
 import { InfoResponseParams } from '../models/_info.model';
-import { APP_ENV, type AppEnv } from '@/config/environment.config';
+import { env } from '@/config/environment.config';
 import { SystemResponseParams } from '../models/_system.model';
 import { getEventLoopLag } from '@/common/helpers/event-loop.helper';
 import { mode } from '@/config/environment.config';
@@ -22,11 +21,7 @@ import { DbStatus } from '@/modules/system/database/types/database.types';
 
 @Injectable()
 export class ApplicationControllerService {
-  constructor(
-    @Inject(APP_ENV)
-    private readonly env: AppEnv,
-    private readonly health: TypeOrmService,
-  ) {}
+  constructor(private readonly health: TypeOrmService) {}
 
   public get_root(message: string): RootResponseDto {
     return new RootResponseDto(message);
@@ -52,9 +47,9 @@ export class ApplicationControllerService {
   }
 
   public get_info(): InfoResponseDto {
-    const name: string = this.env.APP_NAME;
-    const version: string = this.env.APP_VERSION;
-    const environment: mode = this.env.NODE_ENV;
+    const name: string = env.APP_NAME;
+    const version: string = env.APP_VERSION;
+    const environment: mode = env.NODE_ENV;
     const hostname: string = os.hostname();
     const pid: number = process.pid;
 

@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, Column, ManyToMany, JoinTable, type Relation } from 'typeorm';
 import { BaseEntity } from '@/common/entities/base.entity';
 import { PermissionEntity } from './permission.entity';
 
@@ -33,5 +33,5 @@ export class RoleEntity extends BaseEntity {
       referencedColumnName: 'id',
     },
   })
-  public readonly permissions?: PermissionEntity[];
+  public readonly permissions?: Relation<PermissionEntity[]>;
 }
