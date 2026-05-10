@@ -4,8 +4,13 @@ on:
   push:
     branches:
       - main
-      - develop
+      - staging
+      - dev
   pull_request:
+    branches:
+      - main
+      - staging
+      - dev
 
 jobs:
   check:
