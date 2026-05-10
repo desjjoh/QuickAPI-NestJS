@@ -27,3 +27,134 @@ jobs:
 
       - name: Run project checks
         run: npm run check
+
+  migration-check:
+    name: Migration Check
+    runs-on: ubuntu-latest
+    needs: check
+
+    services:
+      mysql:
+        image: mysql:8.4
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: quickapi_test
+          MYSQL_USER: quickapi_app
+          MYSQL_PASSWORD: quickapi_password
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=20s
+
+    env:
+      APP_NAME: quickapi-nestjs
+      APP_VERSION: 1.0.1
+      PUBLIC_API_URL: http://localhost:4000
+
+      NODE_ENV: test
+      PORT: 4000
+      LOG_LEVEL: silent
+
+      CORS_ORIGINS: http://localhost:5173
+      CORS_METHODS: GET,POST,PUT,PATCH,DELETE
+      CORS_ALLOWED_HEADERS: Content-Type,Authorization,X-CSRF-Token
+      CORS_EXPOSED_HEADERS: Authorization,Set-Cookie
+      CORS_CREDENTIALS: 'true'
+      CORS_MAX_AGE_SECONDS: 86400
+
+      HTTPS_ENABLED: 'false'
+      HTTPS_KEY_PATH: certs/localhost-key.pem
+      HTTPS_CERT_PATH: certs/localhost.pem
+
+      COOKIE_SECURE: 'false'
+      COOKIE_SAME_SITE: strict
+      COOKIE_PATH: /
+      COOKIE_DOMAIN: ''
+      REFRESH_COOKIE_NAME: refresh_token
+      REFRESH_COOKIE_MAX_AGE_DAYS: 7
+      CSRF_COOKIE_NAME: csrf_token
+      CSRF_COOKIE_MAX_AGE_MINUTES: 15
+
+      STATIC_SERVE_ENABLED: 'false'
+      STATIC_ROOT_PATH: public
+      STATIC_SERVE_ROOT: /
+
+      UPLOAD_TMP_DIR: tmp
+
+      RATE_LIMIT_WINDOW_MS: 60000
+      RATE_LIMIT_MAX: 200
+
+      REQUEST_TIMEOUT_MS: 5000
+      REQUEST_BODY_LIMIT_BYTES: 1048576
+
+      HEADER_MAX_COUNT: 100
+      HEADER_MAX_SINGLE_BYTES: 4096
+      HEADER_MAX_TOTAL_BYTES: 8192
+      HEADER_ALLOW_CHUNKED: 'false'
+
+      ALLOWED_HTTP_METHODS: GET,POST,PUT,PATCH,DELETE
+      ALLOWED_CONTENT_TYPES: application/json,multipart/form-data
+
+      GLOBAL_THROTTLE_TTL_MINUTES: 60000
+      GLOBAL_THROTTLE_LIMIT: 200
+
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: quickapi_app
+      DB_PASSWORD: quickapi_password
+      DB_DATABASE: quickapi_test
+      DB_SYNC: 'false'
+      DB_SEED: 'false'
+      DB_MIGRATIONS_RUN: 'false'
+      DB_SSL: 'false'
+      DB_SSL_REJECT_UNAUTHORIZED: 'false'
+      DB_POOL_CONNECTION_LIMIT: 10
+      DB_POOL_WAIT_FOR_CONNECTIONS: 'true'
+      DB_POOL_QUEUE_LIMIT: 100
+      DB_CONNECT_TIMEOUT_MS: 10000
+      DB_SLOW_QUERY_LOG_MS: 1000
+
+      JWT_SECRET_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      REFRESH_SECRET_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+      CRYPTO_SECRET: cccccccccccccccccccccccccccccccc
+      JWT_EXPIRY_TIME: 15m
+      REFRESH_EXPIRY_TIME: 7d
+
+      POSTMARK_SERVER_TOKEN: postmark-test-token
+      POSTMARK_FROM_EMAIL: noreply@example.com
+      POSTMARK_MESSAGE_STREAM: outbound
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations
+        run: npm run migration:run
+
+      - name: Show migration status
+        run: npm run migration:show
+
+      - name: Revert migrations
+        run: npm run migration:revert
+
+      - name: Show reverted migration status
+        run: npm run migration:show
+
+      - name: Run migrations again
+        run: npm run migration:run
+
+      - name: Show final migration status
+        run: npm run migration:show
