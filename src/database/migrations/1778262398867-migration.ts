@@ -100,64 +100,17 @@ export class Migration1778262398867 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE \`profile_addresses\` DROP FOREIGN KEY \`FK_9713871a604cf293846c87eeabf\``,
     );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_17022daf3f885f7d35423e9971\` ON \`role_permissions\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_178199805b901ccd220ab7740e\` ON \`role_permissions\``,
-    );
+
     await queryRunner.query(`DROP TABLE \`role_permissions\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_b23c65e50a758245a33ee35fda\` ON \`user_roles\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_87b8888186ca9769c960e92687\` ON \`user_roles\``,
-    );
     await queryRunner.query(`DROP TABLE \`user_roles\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_017943867ed5ceef9c03edd974\` ON \`permissions\``,
-    );
     await queryRunner.query(`DROP TABLE \`permissions\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_a87cf0659c3ac379b339acf36a\` ON \`roles\``,
-    );
     await queryRunner.query(`DROP TABLE \`roles\``);
-    await queryRunner.query(
-      `DROP INDEX \`UQ_97672ac88f789774dd47f7c8be3\` ON \`users\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_4263ae397e23dff35b72ddfd34\` ON \`users\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`REL_23371445bd80cb3e413089551b\` ON \`users\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`REL_caed45fe7b9ee802ffa015c300\` ON \`users\``,
-    );
     await queryRunner.query(`DROP TABLE \`users\``);
     await queryRunner.query(`DROP TABLE \`user_credentials\``);
     await queryRunner.query(`DROP TABLE \`user_profiles\``);
-    await queryRunner.query(
-      `DROP INDEX \`REL_56b42e153434fec87f1a7b2730\` ON \`profile_addresses\``,
-    );
     await queryRunner.query(`DROP TABLE \`profile_addresses\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_2425fcf752ffcac4e4e8f90ccf\` ON \`images\``,
-    );
     await queryRunner.query(`DROP TABLE \`images\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_39523689c025976b5c89521ab0\` ON \`genders\``,
-    );
     await queryRunner.query(`DROP TABLE \`genders\``);
-    await queryRunner.query(
-      `DROP INDEX \`IDX_b29f9172f8b660e7834000c424\` ON \`countries\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_9706e3c52695ce44a202f24c26\` ON \`countries\``,
-    );
-    await queryRunner.query(
-      `DROP INDEX \`IDX_a318337c8cc3824514d3dfe2a6\` ON \`countries\``,
-    );
     await queryRunner.query(`DROP TABLE \`countries\``);
   }
 }
