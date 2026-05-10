@@ -7,7 +7,7 @@ import { config as loadEnv } from 'dotenv';
 import { rootPath } from '@/common/helpers/path.helper';
 import { JwtSignOptions } from '@nestjs/jwt';
 
-loadEnv();
+loadEnv({ quiet: true });
 
 export type log_level =
   | 'error'
@@ -50,7 +50,7 @@ const booleanFromEnv = z.preprocess((value) => {
   return value;
 }, z.boolean());
 
-const EnvSchema = z
+export const EnvSchema = z
   .object({
     APP_NAME: z.string().default(pkg.name),
     APP_VERSION: z
@@ -177,6 +177,14 @@ const EnvSchema = z
       .default('outbound'),
   })
   .superRefine((env, ctx) => {
+    if (env.NODE_ENV === 'production' && env.DB_SYNC === true) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DB_SYNC'],
+        message: 'DB_SYNC must be false in production. Use migrations.',
+      });
+    }
+
     if (!env.HTTPS_ENABLED) return;
 
     if (!env.HTTPS_KEY_PATH) {
@@ -244,7 +252,7 @@ function printEnvErrors(issues: z.core.$ZodIssue[]): void {
 let env: z.infer<typeof EnvSchema>;
 
 try {
-  env = EnvSchema.parse(process.env);
+  env = parseEnv(process.env);
 } catch (err: unknown) {
   if (err instanceof ZodError) {
     printEnvErrors(err.issues);
@@ -264,3 +272,7 @@ export const isDev = env.NODE_ENV === 'development';
 
 export type AppEnv = z.infer<typeof EnvSchema>;
 export const APP_ENV = 'APP_ENV' as const;
+
+export function parseEnv(input: NodeJS.ProcessEnv): AppEnv {
+  return EnvSchema.parse(input);
+}
