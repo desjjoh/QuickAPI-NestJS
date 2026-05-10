@@ -1,4 +1,4 @@
-import { mode } from '@/config/environment.config';
+import { mode } from '@/config/environment.schema';
 import { ApiProperty } from '@nestjs/swagger';
 
 export type InfoResponseParams = {

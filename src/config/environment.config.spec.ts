@@ -1,4 +1,4 @@
-import { parseEnv } from './environment.config';
+import { parseEnv } from './environment.schema';
 
 function createValidEnv(
   overrides: Partial<NodeJS.ProcessEnv> = {},

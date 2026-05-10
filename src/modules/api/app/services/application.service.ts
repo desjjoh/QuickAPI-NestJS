@@ -15,9 +15,10 @@ import { InfoResponseParams } from '../models/_info.model';
 import { env } from '@/config/environment.config';
 import { SystemResponseParams } from '../models/_system.model';
 import { getEventLoopLag } from '@/common/helpers/event-loop.helper';
-import { mode } from '@/config/environment.config';
+
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
 import { DbStatus } from '@/modules/system/database/types/database.types';
+import { mode } from '@/config/environment.schema';
 
 @Injectable()
 export class ApplicationControllerService {
