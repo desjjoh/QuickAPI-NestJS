@@ -1,20 +1,21 @@
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { isAbsolute, join } from 'node:path';
 
-import { DomainModule } from '@/modules/domain/domain.module';
-
+import { env } from '@/config/environment.config';
 import { RequestContext } from '@/common/store/request-context.store';
-import { ApiModule } from './api/api.module';
-import { SystemModule } from './system/system.module';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { AccessTokenStrategy } from '@/common/strategies/access.strategy';
 import { minute } from '@/common/constants/milliseconds.constants';
 import { LocalStrategy } from '@/common/strategies/local.strategy';
 import { RefreshTokenStrategy } from '@/common/strategies/refresh.strategy';
+
+import { DomainModule } from '@/modules/domain/domain.module';
+
+import { ApiModule } from './api/api.module';
+import { SystemModule } from './system/system.module';
 import { IdentityService } from './domain/identity/services/identity.service';
 import { UserRepository } from './domain/identity/repositories/user.repository';
-import { AccessTokenStrategy } from '@/common/strategies/access.strategy';
-import { env } from '@/config/environment.config';
 
 function resolveStaticRootPath(staticRootPath: string): string {
   return isAbsolute(staticRootPath)
@@ -22,13 +23,18 @@ function resolveStaticRootPath(staticRootPath: string): string {
     : join(process.cwd(), staticRootPath);
 }
 
+const staticImports = env.STATIC_SERVE_ENABLED
+  ? [
+      ServeStaticModule.forRoot({
+        rootPath: resolveStaticRootPath(env.STATIC_ROOT_PATH),
+        serveRoot: env.STATIC_SERVE_ROOT,
+      }),
+    ]
+  : [];
+
 @Module({
   imports: [
-    ServeStaticModule.forRoot({
-      rootPath: resolveStaticRootPath(env.STATIC_ROOT_PATH),
-      serveRoot: env.STATIC_SERVE_ROOT,
-    }),
-
+    ...staticImports,
     ThrottlerModule.forRoot({
       throttlers: [
         {

@@ -37,7 +37,7 @@ import { httpMetricsMiddleware } from '@/common/middleware/metrics.middleware';
 
 import { rootPath } from '@/common/helpers/path.helper';
 
-const app: INestApplication | null = null;
+let app: INestApplication | null = null;
 let ready: boolean = false;
 
 function createApp(app: INestApplication): void {
@@ -148,10 +148,7 @@ export function createNestOptions(
 export async function startNest(): Promise<void> {
   const appLogger: AppLogger = new AppLogger();
 
-  const app: INestApplication = await NestFactory.create(
-    AppModule,
-    createNestOptions(appLogger),
-  );
+  app = await NestFactory.create(AppModule, createNestOptions(appLogger));
 
   createApp(app);
 

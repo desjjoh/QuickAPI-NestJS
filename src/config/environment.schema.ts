@@ -130,7 +130,7 @@ export const EnvSchema = z
     HEADER_MAX_TOTAL_BYTES: positiveIntegerFromEnv.default(8_192),
     HEADER_ALLOW_CHUNKED: booleanFromEnv.default(false),
 
-    GLOBAL_THROTTLE_TTL_MINUTES: positiveIntegerFromEnv.default(60_000),
+    GLOBAL_THROTTLE_TTL_MINUTES: positiveIntegerFromEnv.default(60),
     GLOBAL_THROTTLE_LIMIT: positiveIntegerFromEnv.default(200),
 
     DB_HOST: z.string(),

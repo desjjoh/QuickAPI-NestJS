@@ -25,6 +25,8 @@ A modular, production-minded NestJS API template designed for rapid backend serv
 - **Email module** powered by Postmark with typed template support
 - **Profile image upload support** with validation, disk storage, and image metadata handling
 - **Graceful lifecycle orchestration** through a shared lifecycle handler
+- **Docker Compose local infrastructure** with MySQL and API services
+- **GitHub Actions CI** for quality checks, migrations, and E2E readiness verification
 
 ---
 
@@ -70,6 +72,12 @@ src/
 │       ├── seeder/            # Reusable database seeding infrastructure
 │       └── tokens/            # JWT/refresh/CSRF token services and configuration
 └── main.ts                    # Application entrypoint and lifecycle startup
+
+test/
+├── e2e/                       # E2E tests
+├── helpers/                   # Test app helpers
+├── jest-e2e.json              # E2E Jest config
+└── setup-env.ts               # Test environment bootstrap
 ```
 
 ---
@@ -109,34 +117,134 @@ https://localhost:8080/docs-json
 
 ---
 
+## Environment Configuration
+
+This project uses Zod-backed environment validation. The app validates configuration at startup and exits early if required values are missing or invalid.
+
+Start by copying the example file:
+
+```bash
+cp .env.example .env
+```
+
+The full environment shape is documented in `.env.example`.
+
+Important production rule:
+
+```env
+DB_SYNC="false"
+```
+
+`DB_SYNC=true` is rejected when `NODE_ENV=production`. Schema changes should be applied through TypeORM migrations.
+
+### Local Docker MySQL Environment
+
+When running the app on the host machine against Docker MySQL, use:
+
+```env
+DB_HOST="localhost"
+DB_PORT="3307"
+DB_USER="quickapi_app"
+DB_PASSWORD="quickapi_password"
+DB_DATABASE="quickapi"
+DB_SYNC="false"
+DB_SSL="false"
+```
+
+When the API itself runs inside Docker Compose, `docker-compose.yml` overrides the database host and port:
+
+```env
+DB_HOST="mysql"
+DB_PORT="3306"
+```
+
+---
+
 ## Environment Variables (`.env`)
 
 ```bash
-APP_NAME=quickapi-nestjs
-APP_URL=https://localhost:3000
-APP_VERSION=1.0.1
-WEB_URL=https://localhost:8080
-NODE_ENV=development
-PORT=8080
-LOG_LEVEL=debug
+APP_NAME="quickapi-nestjs"
+APP_VERSION="1.0.0"
+PUBLIC_API_URL="http://localhost:4000"
 
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=root
-DB_DATABASE=quickapi
-DB_SYNC=false
-DB_SEED=false
+NODE_ENV="development"
+PORT="4000"
+LOG_LEVEL="info"
 
-JWT_SECRET_KEY=replace-with-at-least-32-characters
-REFRESH_SECRET_KEY=replace-with-at-least-32-characters
-CRYPTO_SECRET=replace-with-at-least-32-characters
-JWT_EXPIRY_TIME=15m
-REFRESH_EXPIRY_TIME=7d
+CORS_ORIGINS="http://localhost:5173"
+CORS_METHODS="GET,POST,PUT,PATCH,DELETE"
+CORS_ALLOWED_HEADERS="Content-Type,Authorization,X-CSRF-Token"
+CORS_EXPOSED_HEADERS="Authorization,Set-Cookie"
+CORS_CREDENTIALS="true"
+CORS_MAX_AGE_SECONDS="86400"
 
-POSTMARK_SERVER_TOKEN=replace-with-postmark-token
-POSTMARK_FROM_EMAIL=no-reply@example.com
-POSTMARK_MESSAGE_STREAM=outbound
+HTTPS_ENABLED="false"
+HTTPS_KEY_PATH="certs/localhost-key.pem"
+HTTPS_CERT_PATH="certs/localhost.pem"
+
+COOKIE_SECURE="false"
+COOKIE_SAME_SITE="strict"
+COOKIE_PATH="/"
+COOKIE_DOMAIN=""
+
+REFRESH_COOKIE_NAME="refresh_token"
+REFRESH_COOKIE_MAX_AGE_DAYS="7"
+
+CSRF_COOKIE_NAME="csrf_token"
+CSRF_COOKIE_MAX_AGE_MINUTES="15"
+
+STATIC_SERVE_ENABLED="false"
+STATIC_ROOT_PATH="public"
+STATIC_SERVE_ROOT="/"
+
+UPLOAD_TMP_DIR="tmp"
+
+RATE_LIMIT_WINDOW_MS="60000"
+RATE_LIMIT_MAX="200"
+
+REQUEST_TIMEOUT_MS="5000"
+REQUEST_BODY_LIMIT_BYTES="1048576"
+
+HEADER_MAX_COUNT="100"
+HEADER_MAX_SINGLE_BYTES="4096"
+HEADER_MAX_TOTAL_BYTES="8192"
+HEADER_ALLOW_CHUNKED="false"
+
+ALLOWED_HTTP_METHODS="GET,POST,PUT,PATCH,DELETE"
+ALLOWED_CONTENT_TYPES="application/json,multipart/form-data"
+
+GLOBAL_THROTTLE_TTL_MINUTES="1"
+GLOBAL_THROTTLE_LIMIT="200"
+
+DB_HOST="localhost"
+DB_PORT="3307"
+DB_USER="quickapi_app"
+DB_PASSWORD="quickapi_password"
+DB_DATABASE="quickapi"
+
+DB_SYNC="false"
+DB_SEED="false"
+DB_MIGRATIONS_RUN="false"
+
+DB_SSL="false"
+DB_SSL_REJECT_UNAUTHORIZED="true"
+
+DB_POOL_CONNECTION_LIMIT="10"
+DB_POOL_WAIT_FOR_CONNECTIONS="true"
+DB_POOL_QUEUE_LIMIT="100"
+DB_CONNECT_TIMEOUT_MS="10000"
+DB_SLOW_QUERY_LOG_MS="1000"
+
+JWT_SECRET_KEY="replace-with-at-least-32-characters"
+REFRESH_SECRET_KEY="replace-with-at-least-32-characters"
+CRYPTO_SECRET="replace-with-at-least-32-characters"
+
+JWT_EXPIRY_TIME="15m"
+REFRESH_EXPIRY_TIME="7d"
+
+POSTMARK_SERVER_TOKEN="replace-with-postmark-token"
+POSTMARK_FROM_EMAIL="noreply@example.com"
+POSTMARK_MESSAGE_STREAM="outbound"
 ```
 
 Each variable is validated at startup using Zod. The application exits early with formatted validation errors if the environment is incomplete or invalid.
@@ -147,14 +255,120 @@ Each variable is validated at startup using Zod. The application exits early wit
 
 ## Local HTTPS Certificates
 
-The Nest application is currently configured to start with local HTTPS options and expects certificate files at:
+Local HTTPS is supported by mounting certificate files into the Docker container or by using local certificate paths when running the app directly.
+
+Expected local certificate paths:
 
 ```bash
 certs/localhost-key.pem
 certs/localhost.pem
 ```
 
-For local development, generate trusted local certificates before running the server, or update the HTTPS options for your environment.
+Recommended local HTTPS settings:
+
+```env
+PUBLIC_API_URL="https://localhost:4000"
+HTTPS_ENABLED="true"
+HTTPS_KEY_PATH="certs/localhost-key.pem"
+HTTPS_CERT_PATH="certs/localhost.pem"
+COOKIE_SECURE="true"
+```
+
+Certificate files should not be committed to Git. The `certs/` folder may contain a `.gitkeep` placeholder, but real cert files should remain local.
+
+For production behind a reverse proxy or load balancer, the app may run without owning TLS directly:
+
+```env
+HTTPS_ENABLED="false"
+COOKIE_SECURE="true"
+PUBLIC_API_URL="https://api.example.com"
+```
+
+---
+
+## Local Docker Infrastructure
+
+The local Docker setup provides MySQL and an optional API container.
+
+Start MySQL:
+
+```bash
+npm run docker:mysql:up
+npm run docker:status
+```
+
+Run migrations against Docker MySQL from the host machine:
+
+```bash
+npm run migration:run
+npm run migration:show
+```
+
+Start the API container:
+
+```bash
+npm run docker:api:up
+npm run docker:api:logs
+```
+
+Check readiness:
+
+```bash
+curl -k https://localhost:4000/ready
+```
+
+The `-k` flag is useful for local self-signed certificates.
+
+### Runtime Folders
+
+The API uses local runtime folders for public assets and temporary uploads:
+
+```bash
+public/
+tmp/
+```
+
+These folders are mounted into the API container. Generated contents should not be committed to Git.
+
+---
+
+## Database & Migrations
+
+QuickAPI-NestJS uses **TypeORM + MySQL** with migration-based schema management.
+
+Migration commands:
+
+```bash
+npm run migration:show
+npm run migration:generate
+npm run migration:run
+npm run migration:revert
+```
+
+Recommended local workflow:
+
+1. Update entities.
+2. Generate a migration.
+3. Review the generated migration.
+4. Run it locally.
+5. Confirm the app starts with `DB_SYNC=false`.
+
+```bash
+npm run migration:generate
+npm run migration:run
+npm run migration:show
+```
+
+For disposable local/test databases, verify that migrations can revert and re-run:
+
+```bash
+npm run migration:revert
+npm run migration:show
+npm run migration:run
+npm run migration:show
+```
+
+Production schema changes should be explicit, reviewed, and applied through migrations. Use `migration:revert` only when rollback is safe. For destructive schema changes, prefer a reviewed forward-fix migration after backup review.
 
 ---
 
@@ -201,20 +415,106 @@ Built-in operational endpoints include:
 | `/system`  | Runtime diagnostics such as uptime, event loop lag, and database status |
 | `/metrics` | Prometheus-formatted metrics                                            |
 
-The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms.
+## The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms.
+
+## Quality Checks
+
+Run the baseline quality gate:
+
+```bash
+npm run check
+```
+
+This runs:
+
+- Prettier formatting check
+- ESLint
+- TypeScript typecheck
+- Unit tests
+- Production build
+
+Run E2E tests:
+
+```bash
+npm run check:e2e
+```
+
+Run the full local check:
+
+```bash
+npm run check:full
+```
+
+---
+
+## Continuous Integration
+
+GitHub Actions runs two CI jobs:
+
+1. **Check**
+   - install dependencies
+   - format check
+   - lint
+   - typecheck
+   - unit tests
+   - build
+
+2. **Migration Check**
+   - start MySQL service
+   - run migrations
+   - show migration status
+   - revert migrations
+   - run migrations again
+   - run E2E readiness tests against the migrated database
+
+This proves that a fresh CI environment can install the project, validate it, build it, create the database schema from migrations, and run the readiness E2E test.
 
 ---
 
 ## Development Scripts
 
-| Script                | Description                                       |
-| --------------------- | ------------------------------------------------- |
-| `npm run start`       | Start the Nest application through the Nest CLI   |
-| `npm run start:dev`   | Start development server with watch mode          |
-| `npm run start:debug` | Start development server with debugger/watch mode |
-| `npm run build`       | Compile the Nest application to `dist/`           |
-| `npm run start:prod`  | Start the compiled application from `dist/main`   |
-| `npm run format`      | Format TypeScript sources using Prettier          |
+| Script                     | Description                                       |
+| -------------------------- | ------------------------------------------------- |
+| `npm run start`            | Start the Nest application through the Nest CLI   |
+| `npm run start:dev`        | Start development server with watch mode          |
+| `npm run start:debug`      | Start development server with debugger/watch mode |
+| `npm run build`            | Compile the Nest application to `dist/`           |
+| `npm run start:prod`       | Start the compiled application from `dist/main`   |
+| `npm run format`           | Format TypeScript sources using Prettier          |
+| `npm run format:check`     | Check formatting without writing changes          |
+| `npm run lint`             | Run ESLint                                        |
+| `npm run lint:fix`         | Run ESLint with auto-fix                          |
+| `npm run typecheck`        | Run TypeScript without emitting files             |
+| `npm test`                 | Run unit tests                                    |
+| `npm run test:e2e`         | Run E2E tests                                     |
+| `npm run check`            | Run baseline local quality gate                   |
+| `npm run check:e2e`        | Run E2E checks                                    |
+| `npm run check:full`       | Run baseline quality gate and E2E checks          |
+| `npm run migration:show`   | Show TypeORM migration status                     |
+| `npm run migration:run`    | Run pending TypeORM migrations                    |
+| `npm run migration:revert` | Revert the latest TypeORM migration               |
+| `npm run docker:build`     | Build the production Docker image                 |
+| `npm run docker:mysql:up`  | Start local Docker MySQL                          |
+| `npm run docker:api:up`    | Start the API container                           |
+| `npm run docker:status`    | Show Docker Compose service status                |
+
+---
+
+## Production / Staging Notes
+
+This template is designed to support a staging-to-production workflow, but hosting details are intentionally environment-specific.
+
+Recommended deployment contract:
+
+- Build the Docker image from the repository.
+- Inject secrets and environment variables through the hosting platform.
+- Run database migrations before or during deployment.
+- Keep `DB_SYNC=false` in production.
+- Use HTTPS publicly.
+- Set `COOKIE_SECURE=true` for HTTPS environments.
+- Use `/ready` for readiness checks.
+- Use `/metrics` for Prometheus scraping.
+- Do not bake `.env`, certificates, runtime uploads, or local temp files into the image.
 
 ---
 
