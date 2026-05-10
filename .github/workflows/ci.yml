@@ -158,3 +158,6 @@ jobs:
 
       - name: Show final migration status
         run: npm run migration:show
+
+      - name: Run E2E tests
+        run: npm run test:e2e
