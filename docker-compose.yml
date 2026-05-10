@@ -23,5 +23,45 @@ services:
       retries: 10
       start_period: 20s
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: quickapi-api
+    restart: unless-stopped
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - '4000:4000'
+
+    env_file:
+      - .env
+
+    environment:
+      NODE_ENV: production
+
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: quickapi_app
+      DB_PASSWORD: quickapi_password
+      DB_DATABASE: quickapi
+
+      PUBLIC_API_URL: https://localhost:4000
+
+      HTTPS_ENABLED: 'true'
+      HTTPS_KEY_PATH: certs/localhost-key.pem
+      HTTPS_CERT_PATH: certs/localhost.pem
+
+      COOKIE_SECURE: 'true'
+
+    volumes:
+      - ./certs:/app/certs:ro
+      - ./public:/app/public
+      - ./tmp:/app/tmp
+
 volumes:
   quickapi_mysql_data:
