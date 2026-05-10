@@ -415,7 +415,7 @@ Built-in operational endpoints include:
 | `/system`  | Runtime diagnostics such as uptime, event loop lag, and database status |
 | `/metrics` | Prometheus-formatted metrics                                            |
 
-## The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms.
+The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms.
 
 ## Quality Checks
 
@@ -488,8 +488,7 @@ This proves that a fresh CI environment can install the project, validate it, bu
 | `npm test`                 | Run unit tests                                    |
 | `npm run test:e2e`         | Run E2E tests                                     |
 | `npm run check`            | Run baseline local quality gate                   |
-| `npm run check:e2e`        | Run E2E checks                                    |
-| `npm run check:full`       | Run baseline quality gate and E2E checks          |
+| `npm run check:e2e`        | Run baseline quality gate and E2E checks          |
 | `npm run migration:show`   | Show TypeORM migration status                     |
 | `npm run migration:run`    | Run pending TypeORM migrations                    |
 | `npm run migration:revert` | Revert the latest TypeORM migration               |
