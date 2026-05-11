@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Migration1778262398867 implements MigrationInterface {
-  name = 'Migration1778262398867';
+export class Migration1778520634793 implements MigrationInterface {
+  name = 'Migration1778520634793';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -23,7 +23,10 @@ export class Migration1778262398867 implements MigrationInterface {
       `CREATE TABLE \`user_credentials\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`refresh\` text NULL, \`token_version\` int NOT NULL DEFAULT '0', PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
     );
     await queryRunner.query(
-      `CREATE TABLE \`users\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`credentials_id\` varchar(16) NULL, \`profile_id\` varchar(16) NOT NULL, \`email\` varchar(254) NOT NULL, \`phone_e164\` varchar(20) NULL, \`password\` text NULL, UNIQUE INDEX \`REL_caed45fe7b9ee802ffa015c300\` (\`credentials_id\`), UNIQUE INDEX \`REL_23371445bd80cb3e413089551b\` (\`profile_id\`), INDEX \`IDX_4263ae397e23dff35b72ddfd34\` (\`phone_e164\`), UNIQUE INDEX \`UQ_97672ac88f789774dd47f7c8be3\` (\`email\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
+      `CREATE TABLE \`account_statuses\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`key\` varchar(64) NOT NULL, \`label\` text NOT NULL, \`description\` text NULL, UNIQUE INDEX \`IDX_3d9c0d5337245d3d44f8079751\` (\`key\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE \`users\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`credentials_id\` varchar(16) NOT NULL, \`profile_id\` varchar(16) NOT NULL, \`status_id\` varchar(16) NOT NULL, \`email\` varchar(254) NOT NULL, \`phone_e164\` varchar(20) NULL, \`password\` text NULL, UNIQUE INDEX \`REL_caed45fe7b9ee802ffa015c300\` (\`credentials_id\`), UNIQUE INDEX \`REL_23371445bd80cb3e413089551b\` (\`profile_id\`), INDEX \`IDX_4263ae397e23dff35b72ddfd34\` (\`phone_e164\`), UNIQUE INDEX \`UQ_97672ac88f789774dd47f7c8be3\` (\`email\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
     );
     await queryRunner.query(
       `CREATE TABLE \`roles\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`key\` varchar(64) NOT NULL, \`label\` text NOT NULL, \`description\` text NULL, UNIQUE INDEX \`IDX_a87cf0659c3ac379b339acf36a\` (\`key\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
@@ -56,6 +59,9 @@ export class Migration1778262398867 implements MigrationInterface {
       `ALTER TABLE \`users\` ADD CONSTRAINT \`FK_23371445bd80cb3e413089551bf\` FOREIGN KEY (\`profile_id\`) REFERENCES \`user_profiles\`(\`id\`) ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
+      `ALTER TABLE \`users\` ADD CONSTRAINT \`FK_9d295cb2f8df33c080e23acfb8f\` FOREIGN KEY (\`status_id\`) REFERENCES \`account_statuses\`(\`id\`) ON DELETE RESTRICT ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
       `ALTER TABLE \`user_roles\` ADD CONSTRAINT \`FK_87b8888186ca9769c960e926870\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE ON UPDATE CASCADE`,
     );
     await queryRunner.query(
@@ -83,6 +89,9 @@ export class Migration1778262398867 implements MigrationInterface {
       `ALTER TABLE \`user_roles\` DROP FOREIGN KEY \`FK_87b8888186ca9769c960e926870\``,
     );
     await queryRunner.query(
+      `ALTER TABLE \`users\` DROP FOREIGN KEY \`FK_9d295cb2f8df33c080e23acfb8f\``,
+    );
+    await queryRunner.query(
       `ALTER TABLE \`users\` DROP FOREIGN KEY \`FK_23371445bd80cb3e413089551bf\``,
     );
     await queryRunner.query(
@@ -106,6 +115,7 @@ export class Migration1778262398867 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE \`permissions\``);
     await queryRunner.query(`DROP TABLE \`roles\``);
     await queryRunner.query(`DROP TABLE \`users\``);
+    await queryRunner.query(`DROP TABLE \`account_statuses\``);
     await queryRunner.query(`DROP TABLE \`user_credentials\``);
     await queryRunner.query(`DROP TABLE \`user_profiles\``);
     await queryRunner.query(`DROP TABLE \`profile_addresses\``);
