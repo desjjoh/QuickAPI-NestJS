@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -65,6 +66,12 @@ export class IdentityService {
 
     if (!hasPermission)
       throw new UnauthorizedException('User does not have required permission');
+  }
+
+  public assertCanAuthenticate(user: UserEntity): void {
+    if (user.status.key === ACCOUNT_STATUS_KEYS.ACTIVE) return;
+
+    throw new ForbiddenException('Account is not active.');
   }
 
   public async hashPassword(password: string): Promise<string> {
