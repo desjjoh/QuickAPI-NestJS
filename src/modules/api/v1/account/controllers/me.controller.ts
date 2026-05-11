@@ -13,6 +13,7 @@ import {
   Patch,
   Res,
   Body,
+  Put,
 } from '@nestjs/common';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import {
@@ -92,25 +93,6 @@ export class MeApiController {
     return this.svc.updateEmail(user, dto, res);
   }
 
-  // PATCH /phone
-  @Patch('phone')
-  @ApiOperation({
-    summary: 'Update primary phone number',
-    description:
-      'Updates the authenticated user’s primary phone number using an E.164 formatted value.',
-  })
-  @ApiOkResponse({
-    description: 'The primary phone number was updated successfully.',
-    type: JWTDto,
-  })
-  public async updatePrimaryPhone(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdatePhoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updatePhone(user, dto, res);
-  }
-
   // PATCH /password
   @Patch('password')
   @ApiBody({
@@ -136,5 +118,24 @@ export class MeApiController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     return this.svc.updatePassword(user, dto, res);
+  }
+
+  // PATCH /phone
+  @Put('phone')
+  @ApiOperation({
+    summary: 'Update primary phone number',
+    description:
+      'Updates the authenticated user’s primary phone number using an E.164 formatted value.',
+  })
+  @ApiOkResponse({
+    description: 'The primary phone number was updated successfully.',
+    type: JWTDto,
+  })
+  public async updatePrimaryPhone(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdatePhoneDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updatePhone(user, dto, res);
   }
 }

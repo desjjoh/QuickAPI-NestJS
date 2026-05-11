@@ -20,6 +20,9 @@ import { PermissionSeeder } from './seeders/permission.seeder';
 import { RoleSeeder } from './seeders/role.seeder';
 import { ImageService } from './services/image.service';
 import { ImageRepository } from './repositories/image.repository';
+import { AccountStatusEntity } from './entities/accountstatus.entity';
+import { AccountStatusRepository } from './repositories/accountstatus.repository';
+import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
 
 @Module({
   imports: [
@@ -28,6 +31,7 @@ import { ImageRepository } from './repositories/image.repository';
       GenderEntity,
       PermissionEntity,
       RoleEntity,
+      AccountStatusEntity,
       ImageEntity,
     ]),
     SeedingModule.forFeature([
@@ -35,6 +39,7 @@ import { ImageRepository } from './repositories/image.repository';
       new CountrySeeder(),
       new PermissionSeeder(),
       new RoleSeeder(),
+      new AccountStatusSeeder(),
     ]),
   ],
   providers: [
@@ -42,6 +47,7 @@ import { ImageRepository } from './repositories/image.repository';
     GenderRepository,
     PermissionRepository,
     RoleRepository,
+    AccountStatusRepository,
     ImageService,
     ImageRepository,
   ],
@@ -50,6 +56,7 @@ import { ImageRepository } from './repositories/image.repository';
     GenderRepository,
     PermissionRepository,
     RoleRepository,
+    AccountStatusRepository,
     ImageService,
   ],
 })

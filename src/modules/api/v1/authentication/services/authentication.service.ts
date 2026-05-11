@@ -1,29 +1,19 @@
 // src/modules/auth/services/auth.service.ts
 
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Response } from 'express';
 import { RegisterDto, RegisterMapper } from '../models/register.model';
 import { IdentityService } from '@/modules/domain/identity/services/identity.service';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 @Injectable()
 export class AuthService {
-  public constructor(
-    private readonly identitySvc: IdentityService,
-    private readonly userRepo: UserRepository,
-  ) {}
+  public constructor(private readonly identitySvc: IdentityService) {}
 
   public async register(dto: RegisterDto, res: Response): Promise<JWTDto> {
-    const existingUser = await this.userRepo.findByEmail(dto.email);
-
-    if (existingUser)
-      throw new ConflictException('A user with this email already exists.');
-
-    const password = await this.identitySvc.hashPassword(dto.password);
-
-    const user = await this.userRepo.createUser(
+    const password: string = await this.identitySvc.hashPassword(dto.password);
+    const user: UserEntity = await this.identitySvc.createUser(
       RegisterMapper.toCreateUserInput(dto, password),
     );
 

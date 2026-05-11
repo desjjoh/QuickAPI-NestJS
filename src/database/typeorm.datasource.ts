@@ -12,6 +12,7 @@ import { UserAddressEntity } from '@/modules/domain/identity/entities/address.en
 import { UserCredentialsEntity } from '@/modules/domain/identity/entities/credentials.entity';
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -30,6 +31,7 @@ const dataSourceOptions: DataSourceOptions = {
     ImageEntity,
     PermissionEntity,
     RoleEntity,
+    AccountStatusEntity,
     // IDENTITY MODULE
     UserAddressEntity,
     UserCredentialsEntity,

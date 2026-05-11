@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
 import { DeepPartial } from 'typeorm';
@@ -15,19 +20,27 @@ import { JWTDto } from '../models/jwt.model';
 import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { UserAddressEntity } from '../entities/address.entity';
+import { AccountStatusRepository } from '../../library/repositories/accountstatus.repository';
+import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
+import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import {
+  DecodedToken,
+  TokenPair,
+} from '@/modules/system/tokens/types/token.types';
 
 @Injectable()
 export class IdentityService {
   public constructor(
     private readonly tokenSvc: TokenService,
     private readonly userRepo: UserRepository,
+    private readonly statusRepo: AccountStatusRepository,
   ) {}
 
   public async validateUser(
     email: string,
     password: string,
   ): Promise<UserEntity> {
-    const user = await this.userRepo.findByEmail(email);
+    const user: UserEntity | null = await this.userRepo.findByEmail(email);
 
     if (!user?.identity?.password)
       throw new UnauthorizedException('Invalid credentials');
@@ -40,13 +53,15 @@ export class IdentityService {
   }
 
   public hasPermission(user: UserEntity, keys: string[]): void {
-    const userPermissions = new Set(
+    const userPermissions: Set<string> = new Set(
       user.roles?.flatMap(
         (role) => role.permissions?.map((permission) => permission.key) ?? [],
       ) ?? [],
     );
 
-    const hasPermission = keys.some((key) => userPermissions.has(key));
+    const hasPermission: boolean = keys.some((key: string) =>
+      userPermissions.has(key),
+    );
 
     if (!hasPermission)
       throw new UnauthorizedException('User does not have required permission');
@@ -57,18 +72,22 @@ export class IdentityService {
   }
 
   public async issueTokens(user: UserEntity, res: Response): Promise<JWTDto> {
-    const tokens = await this.tokenSvc.createTokenPair({
+    const tokens: TokenPair = await this.tokenSvc.createTokenPair({
       sub: user.id,
       email: user.identity.email,
       version: user.credentials.token_version,
     });
 
-    const hashedRefreshToken = this.tokenSvc.hashToken(tokens.refresh_token);
+    const hashedRefreshToken: string = this.tokenSvc.hashToken(
+      tokens.refresh_token,
+    );
 
     await this.updateRefreshToken(user, hashedRefreshToken);
 
-    const accessToken = this.tokenSvc.decode(tokens.access_token);
-    const refreshToken = this.tokenSvc.decode(tokens.refresh_token);
+    const accessToken: DecodedToken = this.tokenSvc.decode(tokens.access_token);
+    const refreshToken: DecodedToken = this.tokenSvc.decode(
+      tokens.refresh_token,
+    );
 
     res.cookie(
       getRefreshCookieName(),
@@ -95,7 +114,7 @@ export class IdentityService {
     user: UserEntity,
     refresh: string,
   ): Promise<UserEntity> {
-    const updatedUser = this.userRepo.merge(user, {
+    const updatedUser: UserEntity = this.userRepo.merge(user, {
       credentials: {
         ...user.credentials,
         refresh,
@@ -121,5 +140,42 @@ export class IdentityService {
     await this.userRepo.removeUser(user.id);
 
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
+  }
+
+  private async getDefaultAccountStatus(): Promise<AccountStatusEntity> {
+    const status: AccountStatusEntity | null = await this.statusRepo.findOne({
+      where: { key: ACCOUNT_STATUS_KEYS.ACTIVE },
+    });
+
+    if (!status) {
+      throw new InternalServerErrorException(
+        'Default account status is not seeded.',
+      );
+    }
+
+    return status;
+  }
+
+  public async createUser(input: DeepPartial<UserEntity>): Promise<UserEntity> {
+    const email: string | undefined = input.identity?.email;
+
+    if (!email)
+      throw new InternalServerErrorException(
+        'Cannot create user without an email address.',
+      );
+
+    const existingUser: UserEntity | null =
+      await this.userRepo.findByEmail(email);
+
+    if (existingUser)
+      throw new ConflictException('A user with this email already exists.');
+
+    const status: AccountStatusEntity = await this.getDefaultAccountStatus();
+    const user: UserEntity = await this.userRepo.createUser({
+      ...input,
+      status: { id: status.id },
+    });
+
+    return this.userRepo.findByIdOrFail(user.id);
   }
 }
