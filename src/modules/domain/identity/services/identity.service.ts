@@ -173,6 +173,10 @@ export class IdentityService {
     const status: AccountStatusEntity = await this.getDefaultAccountStatus();
     const user: UserEntity = await this.userRepo.createUser({
       ...input,
+      credentials: {
+        refresh: null,
+        token_version: 0,
+      },
       status: { id: status.id },
     });
 

@@ -39,7 +39,7 @@ export class UserEntity extends BaseEntity {
   @OneToOne(
     () => UserCredentialsEntity,
     (credentials: UserCredentialsEntity) => credentials.user,
-    { cascade: true, eager: true },
+    { eager: true, cascade: true, nullable: false },
   )
   @JoinColumn({ name: 'credentials_id', referencedColumnName: 'id' })
   public readonly credentials!: Relation<UserCredentialsEntity>;
