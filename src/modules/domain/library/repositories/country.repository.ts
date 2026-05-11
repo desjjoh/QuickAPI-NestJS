@@ -10,7 +10,7 @@ export class CountryRepository extends Repository<CountryEntity> {
   }
 
   public async findAll(): Promise<CountryEntity[]> {
-    return this.find({ order: { label: 'ASC' } });
+    return this.find({ order: { key: 'ASC' } });
   }
 
   public async findById(id: string): Promise<CountryEntity | null> {
