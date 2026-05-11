@@ -36,8 +36,10 @@ function formatLog(
 ): string {
   const ts: string = dim(green(formatTimestamp()));
   const lvl: string = colorLevel(level);
-  const rid = context.requestId ? magenta(`[${context.requestId}]`) + ' ' : '';
-  const pid = context.pid ? cyan(`[${context.pid}]`) + ' ' : '';
+  const rid: string = context.requestId
+    ? magenta(`[${context.requestId}]`) + ' '
+    : '';
+  const pid: string = context.pid ? cyan(`[${context.pid}]`) + ' ' : '';
 
   const meta = { ...context };
 

@@ -14,7 +14,11 @@ class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(email: string, password: string): Promise<UserEntity> {
-    return this.service.validateUser(email, password);
+    const user = await this.service.validateUser(email, password);
+
+    this.service.assertCanAuthenticate(user);
+
+    return user;
   }
 }
 

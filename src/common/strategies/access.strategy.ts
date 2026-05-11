@@ -7,6 +7,7 @@ import { UserRepository } from '@/modules/domain/identity/repositories/user.repo
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
+import { IdentityService } from '@/modules/domain/identity/services/identity.service';
 
 export interface AccessTokenValidationPayload {
   accessToken: string;
@@ -17,7 +18,10 @@ export interface AccessTokenValidationPayload {
 
 @Injectable()
 class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
-  constructor(private userRepository: UserRepository) {
+  constructor(
+    private readonly repo: UserRepository,
+    private readonly svc: IdentityService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -34,9 +38,10 @@ class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
       .get('Authorization')
       ?.replace(/^Bearer\s+/i, '')
       ?.trim();
+
     if (!accessToken) throw new UnauthorizedException('Access token missing');
 
-    const user = await this.userRepository.findByIdOrFail(payload.sub);
+    const user = await this.repo.findByIdOrFail(payload.sub);
 
     if (payload.version !== user.credentials.token_version)
       throw new UnauthorizedException('Session has been revoked');

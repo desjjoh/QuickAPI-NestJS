@@ -1,16 +1,24 @@
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { createHmac } from 'crypto';
 import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { IdentityService } from '@/modules/domain/identity/services/identity.service';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(private readonly repo: UserRepository) {
+  constructor(
+    private readonly repo: UserRepository,
+    private readonly svc: IdentityService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => {
@@ -34,9 +42,13 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     const refresh = req.cookies?.['refresh_token'];
     if (!refresh) throw new UnauthorizedException('Refresh token missing');
 
-    const user = await this.repo.findByEmail(payload.email);
+    const user = await this.repo.findByIdOrFail(payload.sub);
 
-    if (!user?.credentials.refresh)
+    if (!user) throw new NotFoundException('User was not found');
+
+    this.svc.assertCanAuthenticate(user);
+
+    if (!user.credentials.refresh)
       throw new UnauthorizedException('No refresh token stored');
 
     if (payload.version !== user.credentials.token_version)
