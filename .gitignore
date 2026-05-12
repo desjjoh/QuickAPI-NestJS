@@ -1,9 +1,6 @@
 # Certificates
 certs
 
-# Public file storage
-public
-
 # Logs
 *.log
 npm-debug.log*
@@ -106,7 +103,6 @@ dist
 .vuepress/dist
 
 # vuepress v2.x temp and cache directory
-tmp
 .temp
 .cache
 
