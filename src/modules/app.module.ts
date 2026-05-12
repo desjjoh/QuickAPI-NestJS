@@ -14,7 +14,7 @@ import { DomainModule } from '@/modules/domain/domain.module';
 
 import { ApiModule } from './api/api.module';
 import { SystemModule } from './system/system.module';
-import { IdentityService } from './domain/identity/services/identity.service';
+import { UserService } from './domain/identity/services/user.service';
 import { UserRepository } from './domain/identity/repositories/user.repository';
 
 function resolveStaticRootPath(staticRootPath: string): string {
@@ -50,7 +50,7 @@ const staticImports = env.STATIC_SERVE_ENABLED
   ],
   providers: [
     RequestContext,
-    IdentityService,
+    UserService,
     UserRepository,
 
     LocalStrategy,

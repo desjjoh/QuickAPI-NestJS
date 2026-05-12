@@ -60,6 +60,7 @@ export const EnvSchema = z
       .default(pkg.version),
 
     PUBLIC_API_URL: z.url(),
+    PUBLIC_WEB_URL: z.url(),
     NODE_ENV: z.enum(['development', 'test', 'production']),
     PORT: z.coerce.number(),
     LOG_LEVEL: z.enum([

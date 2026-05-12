@@ -2,7 +2,7 @@ import { Response } from 'express';
 
 import { Injectable } from '@nestjs/common';
 
-import { IdentityService } from '@/modules/domain/identity/services/identity.service';
+import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 
@@ -10,19 +10,23 @@ import { UpdateEmailDto } from '../models/updateEmail.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 
 @Injectable()
 export class MeApiService {
-  public constructor(private readonly svc: IdentityService) {}
+  public constructor(
+    private readonly userSvc: UserService,
+    private readonly refreshSvc: RefreshService,
+  ) {}
 
   public async deleteMe(
     user: UserEntity,
     dto: DeleteAccountDto,
     res: Response,
   ): Promise<void> {
-    await this.svc.validateUser(user.identity.email, dto.password);
+    await this.userSvc.validateUser(user.identity.email, dto.password);
 
-    await this.svc.deleteUser(user, res);
+    await this.userSvc.deleteUser(user, res);
   }
 
   public async updateEmail(
@@ -30,13 +34,13 @@ export class MeApiService {
     dto: UpdateEmailDto,
     res: Response,
   ): Promise<JWTDto> {
-    await this.svc.validateUser(user.identity.email, dto.password);
+    await this.userSvc.validateUser(user.identity.email, dto.password);
 
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       identity: { email: dto.confirm },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async updatePhone(
@@ -44,11 +48,11 @@ export class MeApiService {
     dto: UpdatePhoneDto,
     res: Response,
   ): Promise<JWTDto> {
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       identity: { phone_e164: dto.phone_e164 },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async updatePassword(
@@ -56,13 +60,13 @@ export class MeApiService {
     dto: UpdatePasswordDto,
     res: Response,
   ): Promise<JWTDto> {
-    await this.svc.validateUser(user.identity.email, dto.password);
+    await this.userSvc.validateUser(user.identity.email, dto.password);
 
-    const hashed = await this.svc.hashPassword(dto.confirm);
-    const updated = await this.svc.updateUser(user, {
+    const hashed = await this.userSvc.hashPassword(dto.confirm);
+    const updated = await this.userSvc.updateUser(user, {
       identity: { password: hashed },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 }

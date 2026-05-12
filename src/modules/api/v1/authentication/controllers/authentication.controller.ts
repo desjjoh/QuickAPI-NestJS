@@ -25,7 +25,7 @@ import { Throttle } from '@nestjs/throttler';
 import { minute } from '@/common/constants/milliseconds.constants';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 
-import { RegisterDto } from '../models/register.model';
+import { RegisterDto, RegistrationPendingDto } from '../models/register.model';
 import { AuthService } from '../services/authentication.service';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { SignInDto } from '../models/signin.model';
@@ -56,16 +56,13 @@ export class AuthApiController {
   })
   @ApiCreatedResponse({
     description: 'The user account was created successfully.',
-    type: JWTDto,
+    type: RegistrationPendingDto,
   })
   @ApiConflictResponse({
     description: 'A user with the provided email address already exists.',
   })
-  async register(
-    @Body() input: RegisterDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.register(input, res);
+  async register(@Body() input: RegisterDto): Promise<RegistrationPendingDto> {
+    return this.svc.register(input);
   }
 
   // POST /sign-in

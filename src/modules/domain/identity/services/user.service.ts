@@ -12,27 +12,21 @@ import { DeepPartial } from 'typeorm';
 import {
   getClearRefreshCookieOptions,
   getRefreshCookieName,
-  getRefreshCookieOptions,
 } from '@/config/cookie.config';
 
-import { TokenService } from '@/modules/system/tokens/services/token.service';
-
-import { JWTDto } from '../models/jwt.model';
 import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { UserAddressEntity } from '../entities/address.entity';
 import { AccountStatusRepository } from '../../library/repositories/accountstatus.repository';
-import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
-import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import {
-  DecodedToken,
-  TokenPair,
-} from '@/modules/system/tokens/types/token.types';
+  ACCOUNT_STATUS_KEYS,
+  AccountStatusKey,
+} from '@/config/statuses.config';
+import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 
 @Injectable()
-export class IdentityService {
+export class UserService {
   public constructor(
-    private readonly tokenSvc: TokenService,
     private readonly userRepo: UserRepository,
     private readonly statusRepo: AccountStatusRepository,
   ) {}
@@ -78,59 +72,6 @@ export class IdentityService {
     return bcrypt.hash(password, 12);
   }
 
-  public async issueTokens(user: UserEntity, res: Response): Promise<JWTDto> {
-    const tokens: TokenPair = await this.tokenSvc.createTokenPair({
-      sub: user.id,
-      email: user.identity.email,
-      version: user.credentials.token_version,
-    });
-
-    const hashedRefreshToken: string = this.tokenSvc.hashToken(
-      tokens.refresh_token,
-    );
-
-    await this.updateRefreshToken(user, hashedRefreshToken);
-
-    const accessToken: DecodedToken = this.tokenSvc.decode(tokens.access_token);
-    const refreshToken: DecodedToken = this.tokenSvc.decode(
-      tokens.refresh_token,
-    );
-
-    res.cookie(
-      getRefreshCookieName(),
-      tokens.refresh_token,
-      getRefreshCookieOptions(),
-    );
-
-    return new JWTDto({
-      refresh: refreshToken.exp,
-      access_token: tokens.access_token,
-      iat: accessToken.iat,
-      exp: accessToken.exp,
-      user,
-    });
-  }
-
-  public async revokeTokens(user: UserEntity, res: Response): Promise<void> {
-    await this.userRepo.incrementTokenVersion(user.id);
-
-    res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
-  }
-
-  private async updateRefreshToken(
-    user: UserEntity,
-    refresh: string,
-  ): Promise<UserEntity> {
-    const updatedUser: UserEntity = this.userRepo.merge(user, {
-      credentials: {
-        ...user.credentials,
-        refresh,
-      },
-    });
-
-    return this.userRepo.save(updatedUser);
-  }
-
   public async deleteAddress(address: UserAddressEntity): Promise<void> {
     await this.userRepo.manager.delete(UserAddressEntity, {
       id: address.id,
@@ -151,14 +92,13 @@ export class IdentityService {
 
   private async getDefaultAccountStatus(): Promise<AccountStatusEntity> {
     const status: AccountStatusEntity | null = await this.statusRepo.findOne({
-      where: { key: ACCOUNT_STATUS_KEYS.ACTIVE },
+      where: { key: ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION },
     });
 
-    if (!status) {
+    if (!status)
       throw new InternalServerErrorException(
         'Default account status is not seeded.',
       );
-    }
 
     return status;
   }
@@ -188,5 +128,27 @@ export class IdentityService {
     });
 
     return this.userRepo.findByIdOrFail(user.id);
+  }
+
+  public async updateUserStatusByKey(
+    user: UserEntity,
+    key: AccountStatusKey,
+  ): Promise<UserEntity> {
+    const status = await this.statusRepo.findOne({
+      where: { key },
+    });
+
+    if (!status)
+      throw new InternalServerErrorException(
+        `Account status "${key}" is not seeded.`,
+      );
+
+    const updated = await this.updateUser(user, {
+      status: { id: status.id },
+    });
+
+    await this.userRepo.incrementTokenVersion(user.id);
+
+    return updated;
   }
 }

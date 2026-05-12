@@ -2,7 +2,7 @@ import { Response } from 'express';
 
 import { BadRequestException, Injectable } from '@nestjs/common';
 
-import { IdentityService } from '@/modules/domain/identity/services/identity.service';
+import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import {
   CreateImageInput,
@@ -15,11 +15,13 @@ import { UpdateAddressDto } from '../models/updateAddress.model';
 import { AddressEntity } from '@/common/entities/address.entity';
 import { DeepPartial } from 'typeorm';
 import { UpdateProfileDto } from '../models/updateProfile.model';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 
 @Injectable()
 export class ProfileApiService {
   public constructor(
-    private readonly svc: IdentityService,
+    private readonly userSvc: UserService,
+    private readonly refreshSvc: RefreshService,
     private readonly imgSvc: ImageService,
   ) {}
 
@@ -28,7 +30,7 @@ export class ProfileApiService {
     dto: UpdateProfileDto,
     res: Response,
   ): Promise<JWTDto> {
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       profile: {
         name: {
           first: dto.first_name,
@@ -44,7 +46,7 @@ export class ProfileApiService {
       },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async uploadAvatar(
@@ -66,11 +68,11 @@ export class ProfileApiService {
         })
       : await this.imgSvc.create(metadata);
 
-    const updated: UserEntity = await this.svc.updateUser(user, {
+    const updated: UserEntity = await this.userSvc.updateUser(user, {
       profile: { avatar: { id: image.id } },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async removeAvatar(user: UserEntity, res: Response): Promise<JWTDto> {
@@ -79,7 +81,7 @@ export class ProfileApiService {
     if (!avatar)
       throw new BadRequestException('User does not have an avatar to remove.');
 
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       profile: {
         avatar: null,
       },
@@ -87,7 +89,7 @@ export class ProfileApiService {
 
     await this.imgSvc.remove(avatar);
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async updateAddress(
@@ -107,11 +109,11 @@ export class ProfileApiService {
       country: { id: dto.country_id },
     };
 
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       profile: { contact: { address: payload } },
     });
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async removeAddress(user: UserEntity, res: Response): Promise<JWTDto> {
@@ -120,12 +122,12 @@ export class ProfileApiService {
     if (!address)
       throw new BadRequestException('User does not have an address to remove.');
 
-    const updated = await this.svc.updateUser(user, {
+    const updated = await this.userSvc.updateUser(user, {
       profile: { contact: { address: null } },
     });
 
-    await this.svc.deleteAddress(address);
+    await this.userSvc.deleteAddress(address);
 
-    return this.svc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res);
   }
 }

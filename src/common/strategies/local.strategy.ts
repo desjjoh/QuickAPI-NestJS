@@ -1,12 +1,12 @@
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { IdentityService } from '@/modules/domain/identity/services/identity.service';
+import { UserService } from '@/modules/domain/identity/services/user.service';
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 
 @Injectable()
 class LocalStrategy extends PassportStrategy(Strategy) {
-  constructor(private service: IdentityService) {
+  constructor(private svc: UserService) {
     super({
       usernameField: 'email',
       passwordField: 'password',
@@ -14,9 +14,9 @@ class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(email: string, password: string): Promise<UserEntity> {
-    const user = await this.service.validateUser(email, password);
+    const user = await this.svc.validateUser(email, password);
 
-    this.service.assertCanAuthenticate(user);
+    this.svc.assertCanAuthenticate(user);
 
     return user;
   }
