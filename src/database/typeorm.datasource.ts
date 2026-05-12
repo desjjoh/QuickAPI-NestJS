@@ -13,6 +13,7 @@ import { UserCredentialsEntity } from '@/modules/domain/identity/entities/creden
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
+import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -37,6 +38,7 @@ const dataSourceOptions: DataSourceOptions = {
     UserCredentialsEntity,
     UserProfileEntity,
     UserEntity,
+    AccountTokenEntity,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   ssl: env.DB_SSL
