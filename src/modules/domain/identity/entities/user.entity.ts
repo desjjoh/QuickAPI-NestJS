@@ -8,6 +8,7 @@ import {
   JoinColumn,
   type Relation,
   ManyToOne,
+  OneToMany,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 
@@ -17,6 +18,7 @@ import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { UserProfileEntity } from './profile.entity';
 import { UserCredentialsEntity } from './credentials.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import { AccountTokenEntity } from './account-token.entity';
 
 class Identity {
   @Column({ type: 'varchar', length: 254, unique: true })
@@ -43,6 +45,12 @@ export class UserEntity extends BaseEntity {
   )
   @JoinColumn({ name: 'credentials_id', referencedColumnName: 'id' })
   public readonly credentials!: Relation<UserCredentialsEntity>;
+
+  @OneToMany(
+    () => AccountTokenEntity,
+    (token: AccountTokenEntity) => token.user,
+  )
+  public readonly account_tokens!: Relation<AccountTokenEntity[]>;
 
   @OneToOne(
     () => UserProfileEntity,
@@ -73,11 +81,15 @@ export class UserEntity extends BaseEntity {
   })
   public readonly roles?: Relation<RoleEntity[]>;
 
-  @ManyToOne(() => AccountStatusEntity, (status) => status.users, {
-    eager: true,
-    nullable: false,
-    onDelete: 'RESTRICT',
-  })
+  @ManyToOne(
+    () => AccountStatusEntity,
+    (status: AccountStatusEntity) => status.users,
+    {
+      eager: true,
+      nullable: false,
+      onDelete: 'RESTRICT',
+    },
+  )
   @JoinColumn({ name: 'status_id', referencedColumnName: 'id' })
-  public status!: Relation<AccountStatusEntity>;
+  public readonly status!: Relation<AccountStatusEntity>;
 }
