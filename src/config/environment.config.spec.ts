@@ -8,6 +8,7 @@ function createValidEnv(
     APP_VERSION: '1.0.0',
 
     PUBLIC_API_URL: 'https://localhost:4000',
+    PUBLIC_WEB_URL: 'https://localhost:5173',
     NODE_ENV: 'development',
     PORT: '4000',
     LOG_LEVEL: 'info',

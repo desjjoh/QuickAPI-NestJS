@@ -7,7 +7,6 @@ import { UserRepository } from '@/modules/domain/identity/repositories/user.repo
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
-import { IdentityService } from '@/modules/domain/identity/services/identity.service';
 
 export interface AccessTokenValidationPayload {
   accessToken: string;
@@ -18,10 +17,7 @@ export interface AccessTokenValidationPayload {
 
 @Injectable()
 class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
-  constructor(
-    private readonly repo: UserRepository,
-    private readonly svc: IdentityService,
-  ) {
+  constructor(private readonly repo: UserRepository) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

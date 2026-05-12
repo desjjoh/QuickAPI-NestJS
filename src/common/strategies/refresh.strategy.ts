@@ -11,13 +11,13 @@ import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
-import { IdentityService } from '@/modules/domain/identity/services/identity.service';
+import { UserService } from '@/modules/domain/identity/services/user.service';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(
     private readonly repo: UserRepository,
-    private readonly svc: IdentityService,
+    private readonly svc: UserService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([

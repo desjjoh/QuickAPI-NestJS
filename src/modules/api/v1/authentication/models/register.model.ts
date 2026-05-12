@@ -109,3 +109,22 @@ export class RegisterMapper {
     };
   }
 }
+
+export class RegistrationPendingDto {
+  @ApiProperty({
+    example: 'Account created. Please verify your email address.',
+    description: 'Human-readable registration result message.',
+  })
+  public readonly message: string;
+
+  @ApiProperty({
+    example: 'jane.doe@example.com',
+    description: 'The email address that must be verified.',
+  })
+  public readonly email: string;
+
+  public constructor(data: RegistrationPendingDto) {
+    this.message = data.message;
+    this.email = data.email;
+  }
+}
