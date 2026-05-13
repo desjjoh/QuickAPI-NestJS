@@ -12,6 +12,9 @@ import { EmailService } from '@/modules/system/email/services/email.service';
 import { EmailVerificationTemplate } from '@/modules/system/email/templates/email-verification.template';
 import { env } from '@/config/environment.config';
 import { UserRepository } from '../repositories/user.repository';
+import { ROLE_KEYS } from '../../library/seeders/role.seeder';
+
+const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
 @Injectable()
 export class EmailVerificationService {
@@ -43,6 +46,8 @@ export class EmailVerificationService {
     if (!user) throw new BadRequestException('Invalid verification token.');
     if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) return;
 
+    await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.ACCOUNT_USER);
+
     await this.userSvc.updateUserStatusByKey(user, ACCOUNT_STATUS_KEYS.ACTIVE);
   }
 
@@ -59,7 +64,7 @@ export class EmailVerificationService {
     const verification = await this.accountTokenSvc.createToken({
       user,
       type: AccountTokenType.EMAIL_VERIFICATION,
-      expiresInMs: 30 * minute,
+      expiresInMs: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES * minute,
     });
 
     const verificationUrl = this.buildVerificationUrl(
@@ -73,7 +78,7 @@ export class EmailVerificationService {
       model: {
         firstName: user.profile.name.first,
         verificationUrl,
-        expiresInMinutes: verification.expires_at,
+        expiresInMinutes: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES,
       },
       metadata: {
         category: 'account',

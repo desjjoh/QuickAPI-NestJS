@@ -24,6 +24,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import { minute } from '@/common/constants/milliseconds.constants';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 
 import { RegisterDto, RegistrationPendingDto } from '../models/register.model';
 import { AuthService } from '../services/authentication.service';
@@ -33,6 +34,11 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { LocalAuthGuard } from '@/common/guards/local.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
+import { PermissionsGuard } from '@/common/guards/permission.guard';
+import {
+  PERMISSION_MATRIX,
+  PermissionDomain,
+} from '@/config/permissions.config';
 
 @ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
@@ -84,7 +90,10 @@ export class AuthApiController {
   @ApiUnauthorizedResponse({
     description: 'Invalid email or password.',
   })
-  @UseGuards(LocalAuthGuard)
+  @UseGuards(LocalAuthGuard, PermissionsGuard)
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].READ_ACCOUNT,
+  )
   async signIn(
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
@@ -132,7 +141,10 @@ export class AuthApiController {
   })
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @ApiBearerAuth('access-token')
-  @UseGuards(CsrfGuard, RefreshTokenGuard)
+  @UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].READ_ACCOUNT,
+  )
   async verifyToken(
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,

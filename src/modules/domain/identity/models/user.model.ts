@@ -182,11 +182,14 @@ export class UserDto extends BaseModel {
   })
   public readonly roles: RoleDto[];
 
+  public readonly status: string;
+
   public constructor(user: UserEntity) {
     super(user);
 
     this.identity = new IdentityDto(user);
     this.profile = new ProfileDto(user);
     this.roles = user.roles?.map((role: RoleEntity) => new RoleDto(role)) ?? [];
+    this.status = user.status.key;
   }
 }

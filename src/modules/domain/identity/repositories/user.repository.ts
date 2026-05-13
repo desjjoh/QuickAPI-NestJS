@@ -1,13 +1,13 @@
-// src/modules/users/repositories/user.repository.ts
-
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, DeepPartial, Repository } from 'typeorm';
+import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
 
 import { Base } from '@/common/models/base.model';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
 import { ImageService } from '../../library/services/image.service';
+import { UserProfileEntity } from '../entities/profile.entity';
+import { UserCredentialsEntity } from '../entities/credentials.entity';
 
 @Injectable()
 export class UserRepository extends Repository<UserEntity> {
@@ -83,10 +83,17 @@ export class UserRepository extends Repository<UserEntity> {
 
   public async removeUser(id: string): Promise<void> {
     const user = await this.findByIdOrFail(id);
+
     const avatar = user.profile.avatar;
+    const profileId = user.profile.id;
+    const credentialsId = user.credentials.id;
 
     if (avatar) await this.imageSvc.remove(avatar);
 
-    await this.remove(user);
+    await this.manager.transaction(async (manager: EntityManager) => {
+      await manager.remove(UserEntity, user);
+      await manager.delete(UserProfileEntity, { id: profileId });
+      await manager.delete(UserCredentialsEntity, { id: credentialsId });
+    });
   }
 }
