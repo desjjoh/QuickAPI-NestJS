@@ -12,6 +12,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { getRefreshCookieName } from '@/config/cookie.config';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -22,7 +23,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (req: Request) => {
-          return req?.cookies?.['refresh_token'] || null;
+          return req?.cookies?.[getRefreshCookieName()] || null;
         },
       ]),
       secretOrKey: env.REFRESH_SECRET_KEY,
@@ -39,7 +40,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     email: string;
     sub: string;
   }> {
-    const refresh = req.cookies?.['refresh_token'];
+    const refresh = req.cookies?.[getRefreshCookieName()];
     if (!refresh) throw new UnauthorizedException('Refresh token missing');
 
     const user = await this.repo.findByIdOrFail(payload.sub);

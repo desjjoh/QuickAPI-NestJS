@@ -29,7 +29,7 @@ export class EmailVerificationService {
     return this.accountTokenSvc.createToken({
       user,
       type: AccountTokenType.EMAIL_VERIFICATION,
-      expiresInMs: 30 * minute,
+      expiresInMs: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES * minute,
     });
   }
 
@@ -72,7 +72,7 @@ export class EmailVerificationService {
       verification.token,
     );
 
-    this.emailSvc.sendEmail({
+    await this.emailSvc.sendEmail({
       to: user.identity.email,
       template: EmailVerificationTemplate,
       model: {

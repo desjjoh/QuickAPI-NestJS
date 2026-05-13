@@ -1,10 +1,5 @@
 import { Body, Controller, Get, Post, Res } from '@nestjs/common';
-import {
-  ApiBody,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger/dist/decorators';
+import { ApiBody, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
 import { minute } from '@/common/constants/milliseconds.constants';
