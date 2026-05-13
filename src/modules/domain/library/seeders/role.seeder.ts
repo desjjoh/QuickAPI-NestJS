@@ -1,4 +1,7 @@
-import { SystemPermissions } from '@/config/permissions.config';
+import {
+  AccountManagementPermissions,
+  SystemPermissions,
+} from '@/config/permissions.config';
 import { PermissionEntity } from '../entities/permission.entity';
 import { RoleEntity } from '../entities/role.entity';
 import { DataSource, In, Repository } from 'typeorm';
@@ -7,8 +10,13 @@ import {
   SeederResult,
 } from '@/modules/system/seeder/types/seeder.types';
 
+export enum ROLE_KEYS {
+  ACCOUNT_USER = 'account_user',
+  SYSTEM_ADMINISTRATOR = 'system-administrator',
+}
+
 export type RoleSeed = {
-  key: string;
+  key: ROLE_KEYS;
   label: string;
   description: string;
   permissions: string[];
@@ -16,11 +24,22 @@ export type RoleSeed = {
 
 export const ROLES_SEED: RoleSeed[] = [
   {
-    key: 'system-administrator',
+    key: ROLE_KEYS.SYSTEM_ADMINISTRATOR,
     label: 'System Administrator',
     description:
       'Full system access. Bypasses all permission checks through override capability.',
     permissions: [SystemPermissions.HAS_ALL_PERMISSIONS],
+  },
+  {
+    key: ROLE_KEYS.ACCOUNT_USER,
+    label: 'Account User',
+    description:
+      'Default role assigned to verified users for managing their own account.',
+    permissions: [
+      AccountManagementPermissions.READ_ACCOUNT,
+      AccountManagementPermissions.UPDATE_ACCOUNT,
+      AccountManagementPermissions.DELETE_ACCOUNT,
+    ],
   },
 ];
 

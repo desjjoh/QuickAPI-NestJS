@@ -23,11 +23,15 @@ import {
   AccountStatusKey,
 } from '@/config/statuses.config';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import { ROLE_KEYS } from '../../library/seeders/role.seeder';
+import { RoleEntity } from '../../library/entities/role.entity';
+import { RoleRepository } from '../../library/repositories/role.repository';
 
 @Injectable()
 export class UserService {
   public constructor(
     private readonly userRepo: UserRepository,
+    private readonly roleRepo: RoleRepository,
     private readonly statusRepo: AccountStatusRepository,
   ) {}
 
@@ -150,5 +154,31 @@ export class UserService {
     await this.userRepo.incrementTokenVersion(user.id);
 
     return updated;
+  }
+
+  public async addUserRoleByKey(
+    user: UserEntity,
+    key: ROLE_KEYS,
+  ): Promise<UserEntity> {
+    const role: RoleEntity | null = await this.roleRepo.findOne({
+      where: { key },
+    });
+
+    if (!role)
+      throw new InternalServerErrorException(`Role "${key}" is not seeded.`);
+
+    const alreadyHasRole: boolean =
+      user.roles?.some((existingRole) => existingRole.key === role.key) ??
+      false;
+
+    if (alreadyHasRole) return user;
+
+    const updatedUser: UserEntity = this.userRepo.merge(user, {
+      roles: [...(user.roles ?? []), role],
+    });
+
+    await this.userRepo.save(updatedUser);
+
+    return this.userRepo.findByIdOrFail(updatedUser.id);
   }
 }

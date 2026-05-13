@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { DynamicModule, Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { isAbsolute, join } from 'node:path';
@@ -23,7 +23,7 @@ function resolveStaticRootPath(staticRootPath: string): string {
     : join(process.cwd(), staticRootPath);
 }
 
-const staticImports = env.STATIC_SERVE_ENABLED
+const staticImports: DynamicModule[] = env.STATIC_SERVE_ENABLED
   ? [
       ServeStaticModule.forRoot({
         rootPath: resolveStaticRootPath(env.STATIC_ROOT_PATH),
