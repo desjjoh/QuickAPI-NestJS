@@ -16,6 +16,7 @@ import { LibraryModule } from '../library/library.module';
 import { RefreshService } from './services/refresh.service';
 import { EmailVerificationService } from './services/email-verification.service';
 import { EmailModule } from '@/modules/system/email/email.module';
+import { PasswordResetService } from './services/password-reset.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -35,6 +36,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     RefreshService,
     AccountTokenService,
     EmailVerificationService,
+    PasswordResetService,
   ],
   exports: [
     UserRepository,
@@ -42,6 +44,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     RefreshService,
     AccountTokenService,
     EmailVerificationService,
+    PasswordResetService,
   ],
 })
 export class IdentityModule {}
