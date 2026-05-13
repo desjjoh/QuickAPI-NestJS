@@ -12,6 +12,16 @@ import {
   VerifyEmailDto,
   VerifyEmailResponseDto,
 } from '../models/verify-email.model';
+
+import { PasswordResetService } from '@/modules/domain/identity/services/password-reset.service';
+import {
+  ConfirmPasswordResetDto,
+  RequestPasswordResetDto,
+} from '../models/password-reset.model';
+import {
+  ConfirmPasswordResetResponseDto,
+  RequestPasswordResetResponseDto,
+} from '@/modules/domain/identity/models/password-reset.model';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @ApiTags('Request Security')
@@ -20,6 +30,7 @@ export class SecurityApiController {
   constructor(
     private readonly svc: SecurityApiService,
     private readonly evSvc: EmailVerificationService,
+    private readonly prSvc: PasswordResetService,
   ) {}
 
   // GET /csrf
@@ -40,9 +51,9 @@ export class SecurityApiController {
     return this.svc.issueCsrf(res);
   }
 
-  // POST /verify-email
+  // POST /verify-email/confirm
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Post('verify-email')
+  @Post('verify-email/confirm')
   @ApiOperation({
     summary: 'Verify a newly registered account email address.',
     description:
@@ -67,9 +78,9 @@ export class SecurityApiController {
     });
   }
 
-  // POST /resend-verification
+  // POST /verify-email/resend
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Post('resend-verification')
+  @Post('verify-email/resend')
   @ApiOperation({
     summary: 'Resend email verification',
     description:
@@ -92,6 +103,53 @@ export class SecurityApiController {
     return new ResendVerificationResponseDto({
       message:
         'If an account exists and requires verification, a verification email will be sent.',
+    });
+  }
+
+  // POST /password-reset/request
+  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Post('password-reset/request')
+  @ApiOperation({
+    summary: 'Request password reset',
+    description:
+      'Requests a password reset email. The response is generic and does not reveal whether the email address exists.',
+  })
+  @ApiOkResponse({
+    type: RequestPasswordResetResponseDto,
+  })
+  public async requestPasswordReset(
+    @Body() dto: RequestPasswordResetDto,
+  ): Promise<RequestPasswordResetResponseDto> {
+    await this.prSvc.requestPasswordReset(dto.email);
+
+    return new RequestPasswordResetResponseDto({
+      message:
+        'If an account exists for this email, a password reset email will be sent.',
+    });
+  }
+
+  // POST /pasword-reset/confirm
+  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Post('password-reset/confirm')
+  @ApiOperation({
+    summary: 'Confirm password reset',
+    description:
+      'Consumes a valid password reset token and updates the account password.',
+  })
+  @ApiOkResponse({
+    type: ConfirmPasswordResetResponseDto,
+  })
+  public async confirmPasswordReset(
+    @Body() dto: ConfirmPasswordResetDto,
+  ): Promise<ConfirmPasswordResetResponseDto> {
+    await this.prSvc.confirmPasswordReset(
+      dto.token_id,
+      dto.token,
+      dto.password,
+    );
+
+    return new ConfirmPasswordResetResponseDto({
+      message: 'Password reset successfully.',
     });
   }
 }

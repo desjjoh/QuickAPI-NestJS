@@ -66,8 +66,12 @@ export class UserService {
       throw new UnauthorizedException('User does not have required permission');
   }
 
+  public canAuthenticate(user: UserEntity): boolean {
+    return user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE;
+  }
+
   public assertCanAuthenticate(user: UserEntity): void {
-    if (user.status.key === ACCOUNT_STATUS_KEYS.ACTIVE) return;
+    if (this.canAuthenticate(user)) return;
 
     throw new ForbiddenException('Account is not active.');
   }

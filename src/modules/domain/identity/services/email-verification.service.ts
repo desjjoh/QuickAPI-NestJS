@@ -44,7 +44,7 @@ export class EmailVerificationService {
     const user: UserEntity = accountToken.user;
 
     if (!user) throw new BadRequestException('Invalid verification token.');
-    if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) return;
+    if (!this.userSvc.canAuthenticate(user)) return;
 
     await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.ACCOUNT_USER);
 
@@ -81,8 +81,8 @@ export class EmailVerificationService {
         expiresInMinutes: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES,
       },
       metadata: {
-        category: 'account',
-        workflow: 'email-verification',
+        userId: user.id,
+        tokenId: verification.id,
       },
     });
   }
@@ -91,7 +91,7 @@ export class EmailVerificationService {
     const user = await this.repo.findByEmail(email);
 
     if (!user) return;
-    if (user.status?.key !== ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION) return;
+    if (!this.userSvc.canAuthenticate(user)) return;
 
     await this.sendVerificationEmail(user);
   }
