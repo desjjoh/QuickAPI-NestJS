@@ -68,8 +68,8 @@ export class ProfileApiController {
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response,
-  ) {
-    this.svc.updateProfile(user, dto, res);
+  ): Promise<JWTDto> {
+    return this.svc.updateProfile(user, dto, res);
   }
 
   // PUT /avatar
