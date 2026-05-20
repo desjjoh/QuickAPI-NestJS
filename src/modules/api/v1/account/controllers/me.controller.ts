@@ -1,11 +1,5 @@
 import type { Response } from 'express';
-import { CsrfGuard } from '@/common/guards/csrf.guard';
-import { PermissionsGuard } from '@/common/guards/permission.guard';
-import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
-import {
-  PERMISSION_MATRIX,
-  PermissionDomain,
-} from '@/config/permissions.config';
+
 import {
   Controller,
   UseGuards,
@@ -15,7 +9,6 @@ import {
   Body,
   Put,
 } from '@nestjs/common';
-import { Permissions } from '@/common/decorators/permissions.decorator';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -24,10 +17,23 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
-import { MeApiService } from '../services/me.service';
-import { CurrentUser } from '@/common/decorators/current-user.decorator';
+
+import {
+  PERMISSION_MATRIX,
+  PermissionDomain,
+} from '@/config/permissions.config';
+
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+
+import { Permissions } from '@/common/decorators/permissions.decorator';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { CsrfGuard } from '@/common/guards/csrf.guard';
+import { PermissionsGuard } from '@/common/guards/permission.guard';
+import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
+
+import { MeApiService } from '../services/me.service';
+
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
