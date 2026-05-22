@@ -12,17 +12,20 @@ export class AccountTokenEntity extends BaseEntity {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'user_id', referencedColumnName: 'id' })
-  public user!: Relation<UserEntity>;
+  public readonly user!: Relation<UserEntity>;
 
   @Column({ type: 'enum', enum: AccountTokenType })
   public readonly type!: AccountTokenType;
 
   @Column({ type: 'varchar', length: 128 })
-  public token_hash!: string;
+  public readonly token_hash!: string;
 
   @Column({ type: 'datetime' })
-  public expires_at!: Date;
+  public readonly expires_at!: Date;
 
   @Column({ type: 'datetime', nullable: true })
-  public consumed_at!: Date | null;
+  public readonly consumed_at!: Date | null;
+
+  @Column({ type: 'json', nullable: true })
+  public readonly metadata!: Record<string, unknown> | null;
 }

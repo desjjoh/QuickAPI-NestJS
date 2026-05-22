@@ -1,10 +1,14 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 
 import { minute } from '@/common/constants/milliseconds.constants';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 
 import { UserEntity } from '../entities/user.entity';
-import { AccountTokenService } from './token.service';
+import { AccountTokenService, CreatedAccountToken } from './token.service';
 import { AccountTokenType } from '@/config/token.config';
 import { UserService } from './user.service';
 import { AccountTokenEntity } from '../entities/account-token.entity';
@@ -16,6 +20,10 @@ import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
+type EmailVerificationMetadata = {
+  newEmail?: string;
+};
+
 @Injectable()
 export class EmailVerificationService {
   public constructor(
@@ -25,12 +33,57 @@ export class EmailVerificationService {
     private readonly emailSvc: EmailService,
   ) {}
 
-  public async createVerificationToken(user: UserEntity) {
-    return this.accountTokenSvc.createToken({
+  public async sendVerificationEmail(user: UserEntity): Promise<void> {
+    const verification: CreatedAccountToken =
+      await this.createVerificationToken(user);
+
+    await this.sendEmail({
       user,
-      type: AccountTokenType.EMAIL_VERIFICATION,
-      expiresInMs: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES * minute,
+      to: user.identity.email,
+      tokenId: verification.id,
+      token: verification.token,
     });
+  }
+
+  public async sendEmailChangeVerification(
+    user: UserEntity,
+    newEmail: string,
+  ): Promise<void> {
+    const normalizedEmail: string = newEmail.trim().toLowerCase();
+
+    if (normalizedEmail === user.identity.email.toLowerCase())
+      throw new BadRequestException(
+        'New email address must be different from the current email address.',
+      );
+
+    const existingUser: UserEntity | null =
+      await this.repo.findByEmail(normalizedEmail);
+
+    if (existingUser && existingUser.id !== user.id)
+      throw new ConflictException(
+        'A user with this email address already exists.',
+      );
+
+    const verification: CreatedAccountToken =
+      await this.createVerificationToken(user, {
+        newEmail: normalizedEmail,
+      });
+
+    await this.sendEmail({
+      user,
+      to: normalizedEmail,
+      tokenId: verification.id,
+      token: verification.token,
+    });
+  }
+
+  public async resendVerificationEmail(email: string): Promise<void> {
+    const user: UserEntity | null = await this.repo.findByEmail(email);
+
+    if (!user) return;
+    if (user.status?.key !== ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION) return;
+
+    await this.sendVerificationEmail(user);
   }
 
   public async verifyEmail(tokenId: string, token: string): Promise<void> {
@@ -41,39 +94,93 @@ export class EmailVerificationService {
         token,
       );
 
-    const user: UserEntity = accountToken.user;
+    const user: UserEntity | undefined = accountToken.user;
 
     if (!user) throw new BadRequestException('Invalid verification token.');
-    if (!this.userSvc.canAuthenticate(user)) return;
 
-    await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.ACCOUNT_USER);
+    const newEmail: string | null = this.getNewEmailFromMetadata(
+      accountToken.metadata,
+    );
 
-    await this.userSvc.updateUserStatusByKey(user, ACCOUNT_STATUS_KEYS.ACTIVE);
+    if (newEmail) {
+      await this.verifyEmailChange(user, newEmail);
+
+      return;
+    }
+
+    await this.verifyInitialEmail(user);
   }
 
-  private buildVerificationUrl(tokenId: string, token: string): string {
-    const url = new URL('/verify-email', env.PUBLIC_WEB_URL);
-
-    url.searchParams.set('token_id', tokenId);
-    url.searchParams.set('token', token);
-
-    return url.toString();
-  }
-
-  public async sendVerificationEmail(user: UserEntity): Promise<void> {
-    const verification = await this.accountTokenSvc.createToken({
+  private async createVerificationToken(
+    user: UserEntity,
+    metadata: EmailVerificationMetadata | null = null,
+  ): Promise<CreatedAccountToken> {
+    return this.accountTokenSvc.createToken({
       user,
       type: AccountTokenType.EMAIL_VERIFICATION,
       expiresInMs: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES * minute,
+      metadata,
     });
+  }
 
-    const verificationUrl = this.buildVerificationUrl(
-      verification.id,
-      verification.token,
+  private async verifyInitialEmail(user: UserEntity): Promise<void> {
+    if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) {
+      await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.ACCOUNT_USER);
+
+      return;
+    }
+
+    if (user.status?.key !== ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION)
+      throw new BadRequestException('Account cannot be verified.');
+
+    const updatedUser: UserEntity = await this.userSvc.updateUserStatusByKey(
+      user,
+      ACCOUNT_STATUS_KEYS.ACTIVE,
     );
 
+    await this.userSvc.addUserRoleByKey(updatedUser, ROLE_KEYS.ACCOUNT_USER);
+  }
+
+  private async verifyEmailChange(
+    user: UserEntity,
+    newEmail: string,
+  ): Promise<void> {
+    if (!this.userSvc.canAuthenticate(user))
+      throw new BadRequestException('Account cannot change email address.');
+
+    const existingUser: UserEntity | null =
+      await this.repo.findByEmail(newEmail);
+
+    if (existingUser && existingUser.id !== user.id)
+      throw new ConflictException(
+        'A user with this email address already exists.',
+      );
+
+    await this.userSvc.updateUser(user, {
+      identity: {
+        ...user.identity,
+        email: newEmail,
+      },
+    });
+
+    await this.repo.incrementTokenVersion(user.id);
+  }
+
+  private async sendEmail({
+    user,
+    to,
+    tokenId,
+    token,
+  }: {
+    user: UserEntity;
+    to: string;
+    tokenId: string;
+    token: string;
+  }): Promise<void> {
+    const verificationUrl: string = this.buildVerificationUrl(tokenId, token);
+
     await this.emailSvc.sendEmail({
-      to: user.identity.email,
+      to,
       template: EmailVerificationTemplate,
       model: {
         firstName: user.profile.name.first,
@@ -82,17 +189,32 @@ export class EmailVerificationService {
       },
       metadata: {
         userId: user.id,
-        tokenId: verification.id,
+        tokenId,
       },
     });
   }
 
-  public async resendVerificationEmail(email: string): Promise<void> {
-    const user = await this.repo.findByEmail(email);
+  private getNewEmailFromMetadata(
+    metadata: Record<string, unknown> | null,
+  ): string | null {
+    if (!metadata) return null;
 
-    if (!user) return;
-    if (!this.userSvc.canAuthenticate(user)) return;
+    const newEmail: unknown = metadata.newEmail;
 
-    await this.sendVerificationEmail(user);
+    if (newEmail === undefined || newEmail === null) return null;
+
+    if (typeof newEmail !== 'string' || !newEmail.trim())
+      throw new BadRequestException('Invalid verification token metadata.');
+
+    return newEmail.trim().toLowerCase();
+  }
+
+  private buildVerificationUrl(tokenId: string, token: string): string {
+    const url: URL = new URL('/verify-email', env.PUBLIC_WEB_URL);
+
+    url.searchParams.set('token_id', tokenId);
+    url.searchParams.set('token', token);
+
+    return url.toString();
   }
 }

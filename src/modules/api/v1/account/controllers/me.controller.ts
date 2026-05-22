@@ -8,6 +8,7 @@ import {
   Res,
   Body,
   Put,
+  Post,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -34,7 +35,10 @@ import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 
 import { MeApiService } from '../services/me.service';
 
-import { UpdateEmailDto } from '../models/updateEmail.model';
+import {
+  UpdateEmailDto,
+  UpdateEmailResponseDto,
+} from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
@@ -72,31 +76,35 @@ export class MeApiController {
     return this.svc.deleteMe(user, dto, res);
   }
 
-  // PATCH /email
-  @Patch('email')
+  // POST /email
+  @Post('email')
   @ApiBody({
     type: UpdateEmailDto,
     description:
-      'Email update payload. Includes the new email address and any required verification fields, such as the current password, needed to confirm the account owner is authorizing the change.',
+      'Email change request payload. Includes the new email address and current password to confirm the account owner is authorizing the change.',
   })
   @ApiOperation({
-    summary: 'Update account email',
+    summary: 'Request account email change',
     description:
-      'Updates the email address used to identify and sign in to the authenticated account.',
+      'Sends a verification email to the requested new email address. The account email is not changed until the verification token is confirmed.',
   })
   @ApiOkResponse({
-    description: 'Account email updated successfully.',
-    type: JWTDto,
+    description: 'Email change verification sent successfully.',
+    type: UpdateEmailResponseDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
-  public async updateEmail(
+  public async sendEmailVerification(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateEmailDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateEmail(user, dto, res);
+  ): Promise<UpdateEmailResponseDto> {
+    await this.svc.updateEmail(user, dto);
+
+    return new UpdateEmailResponseDto({
+      message:
+        'Verification email sent. Please confirm the new email address to complete the change.',
+    });
   }
 
   // PATCH /password

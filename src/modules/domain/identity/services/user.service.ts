@@ -44,7 +44,10 @@ export class UserService {
     if (!user?.identity?.password)
       throw new UnauthorizedException('Invalid credentials');
 
-    const isMatch = await bcrypt.compare(password, user.identity.password);
+    const isMatch: boolean = await bcrypt.compare(
+      password,
+      user.identity.password,
+    );
 
     if (!isMatch) throw new UnauthorizedException('Invalid credentials');
 
@@ -87,7 +90,9 @@ export class UserService {
   }
 
   public async updateUser(user: UserEntity, dto: DeepPartial<UserEntity>) {
-    await this.userRepo.update(user.id, dto);
+    const updatedUser: UserEntity = this.userRepo.merge(user, dto);
+
+    await this.userRepo.save(updatedUser);
 
     return this.userRepo.findByIdOrFail(user.id);
   }
@@ -142,7 +147,7 @@ export class UserService {
     user: UserEntity,
     key: AccountStatusKey,
   ): Promise<UserEntity> {
-    const status = await this.statusRepo.findOne({
+    const status: AccountStatusEntity | null = await this.statusRepo.findOne({
       where: { key },
     });
 
@@ -151,7 +156,7 @@ export class UserService {
         `Account status "${key}" is not seeded.`,
       );
 
-    const updated = await this.updateUser(user, {
+    const updated: UserEntity = await this.updateUser(user, {
       status: { id: status.id },
     });
 
