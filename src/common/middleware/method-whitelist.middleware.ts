@@ -20,7 +20,7 @@ export function methodWhitelistMiddleware(opts: MethodWhitelistOptions) {
 
     // Pre-format allowed list for error messaging
     const allowedList: string | null =
-      allowed.size > 0 ? Array.from(allowed).join(', ') : null;
+      allowed.size > 0 ? Array.from(allowed).join(', ') : 'none';
 
     // Reject methods not explicitly allowed or always permitted
     if (!allowed.has(method) && !ALWAYS_ALLOWED.has(method)) {
