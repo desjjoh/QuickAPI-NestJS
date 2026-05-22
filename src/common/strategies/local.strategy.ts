@@ -4,6 +4,12 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 
+export interface ValidationPayload {
+  userEntity: UserEntity;
+  email: string;
+  sub: string;
+}
+
 @Injectable()
 class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(private svc: UserService) {
@@ -13,12 +19,12 @@ class LocalStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(email: string, password: string): Promise<UserEntity> {
+  async validate(email: string, password: string): Promise<ValidationPayload> {
     const user = await this.svc.validateUser(email, password);
 
     this.svc.assertCanAuthenticate(user);
 
-    return user;
+    return { userEntity: user, email: user.identity.email, sub: user.id };
   }
 }
 

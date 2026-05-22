@@ -7,13 +7,16 @@ import { AccountTokenEntity } from '../entities/account-token.entity';
 import { UserEntity } from '../entities/user.entity';
 import { AccountTokenType } from '@/config/token.config';
 
-type CreateAccountTokenOptions = {
+export type AccountTokenMetadata = Record<string, unknown>;
+
+export type CreateAccountTokenOptions = {
   user: UserEntity;
   type: AccountTokenType;
   expiresInMs: number;
+  metadata?: AccountTokenMetadata | null;
 };
 
-type CreatedAccountToken = {
+export type CreatedAccountToken = {
   id: string;
   token: string;
   expires_at: Date;
@@ -30,6 +33,7 @@ export class AccountTokenService {
     user,
     type,
     expiresInMs,
+    metadata = null,
   }: CreateAccountTokenOptions): Promise<CreatedAccountToken> {
     await this.revokeActiveTokens(user.id, type);
 
@@ -43,6 +47,7 @@ export class AccountTokenService {
       token_hash: tokenHash,
       expires_at: expiresAt,
       consumed_at: null,
+      metadata,
     });
 
     const saved = await this.tokenRepo.save(entity);
@@ -81,9 +86,7 @@ export class AccountTokenService {
 
     if (!isMatch) throw new UnauthorizedException('Invalid or expired token.');
 
-    entity.consumed_at = new Date();
-
-    return this.tokenRepo.save(entity);
+    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
   }
 
   public async revokeActiveTokens(

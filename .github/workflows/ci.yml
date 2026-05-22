@@ -31,7 +31,7 @@ jobs:
         run: npm ci
 
       - name: Run project checks
-        run: npm run test
+        run: npm run check
 
   migration-check:
     name: Migration Check

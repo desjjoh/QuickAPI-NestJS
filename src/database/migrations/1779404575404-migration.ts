@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class Migration1778520634793 implements MigrationInterface {
-  name = 'Migration1778520634793';
+export class Migration1779404575404 implements MigrationInterface {
+  name = 'Migration1779404575404';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
@@ -24,6 +24,9 @@ export class Migration1778520634793 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE TABLE \`account_statuses\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`key\` varchar(64) NOT NULL, \`label\` text NOT NULL, \`description\` text NULL, UNIQUE INDEX \`IDX_3d9c0d5337245d3d44f8079751\` (\`key\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
+    );
+    await queryRunner.query(
+      `CREATE TABLE \`account_tokens\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`type\` enum ('email_verification', 'password_reset') NOT NULL, \`token_hash\` varchar(128) NOT NULL, \`expires_at\` datetime NOT NULL, \`consumed_at\` datetime NULL, \`user_id\` varchar(16) NOT NULL, PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
     );
     await queryRunner.query(
       `CREATE TABLE \`users\` (\`id\` varchar(16) NOT NULL, \`createdAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), \`updatedAt\` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), \`credentials_id\` varchar(16) NOT NULL, \`profile_id\` varchar(16) NOT NULL, \`status_id\` varchar(16) NOT NULL, \`email\` varchar(254) NOT NULL, \`phone_e164\` varchar(20) NULL, \`password\` text NULL, UNIQUE INDEX \`REL_caed45fe7b9ee802ffa015c300\` (\`credentials_id\`), UNIQUE INDEX \`REL_23371445bd80cb3e413089551b\` (\`profile_id\`), INDEX \`IDX_4263ae397e23dff35b72ddfd34\` (\`phone_e164\`), UNIQUE INDEX \`UQ_97672ac88f789774dd47f7c8be3\` (\`email\`), PRIMARY KEY (\`id\`)) ENGINE=InnoDB`,
@@ -51,6 +54,9 @@ export class Migration1778520634793 implements MigrationInterface {
     );
     await queryRunner.query(
       `ALTER TABLE \`user_profiles\` ADD CONSTRAINT \`FK_921e13ecb7520b5bdfc419638fe\` FOREIGN KEY (\`gender_id\`) REFERENCES \`genders\`(\`id\`) ON DELETE RESTRICT ON UPDATE NO ACTION`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE \`account_tokens\` ADD CONSTRAINT \`FK_1b5fea09efc20c7f63c4a09b3d6\` FOREIGN KEY (\`user_id\`) REFERENCES \`users\`(\`id\`) ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE \`users\` ADD CONSTRAINT \`FK_caed45fe7b9ee802ffa015c300f\` FOREIGN KEY (\`credentials_id\`) REFERENCES \`user_credentials\`(\`id\`) ON DELETE NO ACTION ON UPDATE NO ACTION`,
@@ -98,6 +104,9 @@ export class Migration1778520634793 implements MigrationInterface {
       `ALTER TABLE \`users\` DROP FOREIGN KEY \`FK_caed45fe7b9ee802ffa015c300f\``,
     );
     await queryRunner.query(
+      `ALTER TABLE \`account_tokens\` DROP FOREIGN KEY \`FK_1b5fea09efc20c7f63c4a09b3d6\``,
+    );
+    await queryRunner.query(
       `ALTER TABLE \`user_profiles\` DROP FOREIGN KEY \`FK_921e13ecb7520b5bdfc419638fe\``,
     );
     await queryRunner.query(
@@ -109,18 +118,69 @@ export class Migration1778520634793 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE \`profile_addresses\` DROP FOREIGN KEY \`FK_9713871a604cf293846c87eeabf\``,
     );
-
+    await queryRunner.query(
+      `DROP INDEX \`IDX_17022daf3f885f7d35423e9971\` ON \`role_permissions\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`IDX_178199805b901ccd220ab7740e\` ON \`role_permissions\``,
+    );
     await queryRunner.query(`DROP TABLE \`role_permissions\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_b23c65e50a758245a33ee35fda\` ON \`user_roles\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`IDX_87b8888186ca9769c960e92687\` ON \`user_roles\``,
+    );
     await queryRunner.query(`DROP TABLE \`user_roles\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_017943867ed5ceef9c03edd974\` ON \`permissions\``,
+    );
     await queryRunner.query(`DROP TABLE \`permissions\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_a87cf0659c3ac379b339acf36a\` ON \`roles\``,
+    );
     await queryRunner.query(`DROP TABLE \`roles\``);
+    await queryRunner.query(
+      `DROP INDEX \`UQ_97672ac88f789774dd47f7c8be3\` ON \`users\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`IDX_4263ae397e23dff35b72ddfd34\` ON \`users\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`REL_23371445bd80cb3e413089551b\` ON \`users\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`REL_caed45fe7b9ee802ffa015c300\` ON \`users\``,
+    );
     await queryRunner.query(`DROP TABLE \`users\``);
+    await queryRunner.query(`DROP TABLE \`account_tokens\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_3d9c0d5337245d3d44f8079751\` ON \`account_statuses\``,
+    );
     await queryRunner.query(`DROP TABLE \`account_statuses\``);
     await queryRunner.query(`DROP TABLE \`user_credentials\``);
     await queryRunner.query(`DROP TABLE \`user_profiles\``);
+    await queryRunner.query(
+      `DROP INDEX \`REL_56b42e153434fec87f1a7b2730\` ON \`profile_addresses\``,
+    );
     await queryRunner.query(`DROP TABLE \`profile_addresses\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_2425fcf752ffcac4e4e8f90ccf\` ON \`images\``,
+    );
     await queryRunner.query(`DROP TABLE \`images\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_39523689c025976b5c89521ab0\` ON \`genders\``,
+    );
     await queryRunner.query(`DROP TABLE \`genders\``);
+    await queryRunner.query(
+      `DROP INDEX \`IDX_b29f9172f8b660e7834000c424\` ON \`countries\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`IDX_9706e3c52695ce44a202f24c26\` ON \`countries\``,
+    );
+    await queryRunner.query(
+      `DROP INDEX \`IDX_a318337c8cc3824514d3dfe2a6\` ON \`countries\``,
+    );
     await queryRunner.query(`DROP TABLE \`countries\``);
   }
 }

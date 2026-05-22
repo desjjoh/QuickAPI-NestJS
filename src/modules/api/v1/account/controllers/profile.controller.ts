@@ -1,10 +1,5 @@
-import { CsrfGuard } from '@/common/guards/csrf.guard';
-import { PermissionsGuard } from '@/common/guards/permission.guard';
-import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
-import {
-  PERMISSION_MATRIX,
-  PermissionDomain,
-} from '@/config/permissions.config';
+import type { Response } from 'express';
+
 import {
   Controller,
   UseGuards,
@@ -15,7 +10,6 @@ import {
   Body,
   Res,
 } from '@nestjs/common';
-import { Permissions } from '@/common/decorators/permissions.decorator';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -24,17 +18,28 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { FileInterceptor } from '@nestjs/platform-express';
+
+import {
+  PERMISSION_MATRIX,
+  PermissionDomain,
+} from '@/config/permissions.config';
 import { storage } from '@/config/storage.config';
+
+import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+
+import { CsrfGuard } from '@/common/guards/csrf.guard';
+import { PermissionsGuard } from '@/common/guards/permission.guard';
+import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
+import { Permissions } from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
-import { ProfileApiService } from '../services/profile.service';
 import { megabyte } from '@/common/constants/bytes.constants';
-import type { Response } from 'express';
-import { UpdateAddressDto } from '../models/updateAddress.model';
 import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
+
+import { ProfileApiService } from '../services/profile.service';
+import { UpdateAddressDto } from '../models/updateAddress.model';
 import { UpdateProfileDto } from '../models/updateProfile.model';
 
 @ApiTags('Profile Management')
@@ -68,8 +73,8 @@ export class ProfileApiController {
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateProfileDto,
     @Res({ passthrough: true }) res: Response,
-  ) {
-    this.svc.updateProfile(user, dto, res);
+  ): Promise<JWTDto> {
+    return this.svc.updateProfile(user, dto, res);
   }
 
   // PUT /avatar

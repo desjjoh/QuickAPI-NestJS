@@ -11,8 +11,10 @@ import {
   PermissionDomain,
   PermissionsKey,
 } from '@/config/permissions.config';
+
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { hasProp } from '../helpers/object.helper';
 

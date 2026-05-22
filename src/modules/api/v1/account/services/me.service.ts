@@ -11,12 +11,14 @@ import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @Injectable()
 export class MeApiService {
   public constructor(
     private readonly userSvc: UserService,
     private readonly refreshSvc: RefreshService,
+    private readonly evSvc: EmailVerificationService,
   ) {}
 
   public async deleteMe(
@@ -32,15 +34,10 @@ export class MeApiService {
   public async updateEmail(
     user: UserEntity,
     dto: UpdateEmailDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<void> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
-    const updated = await this.userSvc.updateUser(user, {
-      identity: { email: dto.confirm },
-    });
-
-    return this.refreshSvc.issueTokens(updated, res);
+    await this.evSvc.sendEmailChangeVerification(user, dto.confirm);
   }
 
   public async updatePhone(

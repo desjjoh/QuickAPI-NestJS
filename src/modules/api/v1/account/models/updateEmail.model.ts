@@ -28,3 +28,17 @@ export class UpdateEmailDto {
   @IsString()
   public readonly password!: string;
 }
+
+export class UpdateEmailResponseDto {
+  @ApiProperty({
+    example:
+      'Verification email sent. Please confirm the new email address to complete the change.',
+    description:
+      'Human-readable confirmation that the email change verification was sent.',
+  })
+  public readonly message: string;
+
+  public constructor(data: UpdateEmailResponseDto) {
+    this.message = data.message;
+  }
+}
