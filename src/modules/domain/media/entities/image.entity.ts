@@ -4,9 +4,6 @@ import { BaseEntity } from '@/common/entities/base.entity';
 
 @Entity('images')
 export class ImageEntity extends BaseEntity {
-  @Column({ type: 'varchar', length: 255 })
-  public readonly url!: string;
-
   @Index()
   @Column({ type: 'varchar', length: 255 })
   public readonly storage_key!: string;

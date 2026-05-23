@@ -5,9 +5,9 @@ import { Base } from '@/common/models/base.model';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
-import { ImageService } from '../../library/services/image.service';
 import { UserProfileEntity } from '../entities/profile.entity';
 import { UserCredentialsEntity } from '../entities/credentials.entity';
+import { ImageService } from '../../media/services/image.service';
 
 @Injectable()
 export class UserRepository extends Repository<UserEntity> {

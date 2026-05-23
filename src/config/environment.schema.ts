@@ -175,6 +175,15 @@ export const EnvSchema = z
     POSTMARK_MESSAGE_STREAM: z
       .enum(['outbound', 'broadcast'])
       .default('outbound'),
+
+    STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
+
+    R2_ACCOUNT_ID: z.string(),
+    R2_ENDPOINT: z.url(),
+    R2_ACCESS_KEY_ID: z.string(),
+    R2_SECRET_ACCESS_KEY: z.string(),
+    R2_BUCKET_NAME: z.string(),
+    R2_PUBLIC_BASE_URL: z.url(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.DB_SYNC === true) {
