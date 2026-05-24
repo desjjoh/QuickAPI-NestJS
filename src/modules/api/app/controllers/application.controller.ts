@@ -1,4 +1,4 @@
-import { Controller, Get, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Res } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -16,11 +16,16 @@ import {
 } from '../models';
 import { ApplicationControllerService } from '../services/application.service';
 import { metricsRegistry } from '@/config/metrics.config';
+import { TestEmailTemplate } from '@/modules/system/email/templates/test.template';
+import { EmailService } from '@/modules/system/email/services/email.service';
 
 @ApiTags('System Operations')
 @Controller()
 export class ApplicationController {
-  constructor(private readonly svc: ApplicationControllerService) {}
+  constructor(
+    private readonly svc: ApplicationControllerService,
+    private readonly emailSvc: EmailService,
+  ) {}
 
   // GET /
   @Get('')
@@ -31,6 +36,18 @@ export class ApplicationController {
   @ApiOkResponse({ description: 'Greeting message.', type: RootResponseDto })
   async get_root(): Promise<RootResponseDto> {
     return this.svc.get_root('Hello World! Welcome to NestJS');
+  }
+
+  // POST /test
+  @Post('test')
+  public async sendTestEmail(): Promise<void> {
+    await this.emailSvc.sendEmail({
+      to: 'desjjoh@gmail.com',
+      template: TestEmailTemplate,
+      metadata: {
+        source: 'dev-email-test',
+      },
+    });
   }
 
   // GET /health

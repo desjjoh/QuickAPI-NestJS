@@ -12,6 +12,30 @@ import { QueueEventsProvider } from '@/common/providers/queue.provider';
 import { EmailDeadLetterQueueProcessor } from './processors/dlq.processor';
 import { EmailQueueService } from './queues/queue.service';
 import { EMAIL_QUEUE, EMAIL_DLQ } from './queues/queue.tokens';
+import { env } from '@/config/environment.config';
+
+import { BullBoardModule } from '@bull-board/nestjs';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { ExpressAdapter } from '@bull-board/express';
+
+const bullBoardImports = env.BULL_BOARD_ENABLED
+  ? [
+      BullBoardModule.forRoot({
+        route: env.BULL_BOARD_ROUTE,
+        adapter: ExpressAdapter,
+      }),
+      BullBoardModule.forFeature(
+        {
+          name: EMAIL_QUEUE,
+          adapter: BullMQAdapter,
+        },
+        {
+          name: EMAIL_DLQ,
+          adapter: BullMQAdapter,
+        },
+      ),
+    ]
+  : [];
 
 @Module({
   imports: [
@@ -41,6 +65,7 @@ import { EMAIL_QUEUE, EMAIL_DLQ } from './queues/queue.tokens';
         },
       },
     ),
+    ...bullBoardImports,
   ],
   providers: [
     postmarkProvider,

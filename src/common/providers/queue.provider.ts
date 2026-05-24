@@ -6,11 +6,19 @@ import {
 import { ConnectionOptions, Queue, QueueEvents } from 'bullmq';
 
 import { logger } from '@/config/logger.config';
+import { LC } from '../handlers/lifecycle.handler';
 
 interface QueueEventsProviderOptions {
   queueName: string;
   connection: ConnectionOptions;
   deadLetterQueueName?: string;
+}
+
+export class RedisConnectionLostError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'RedisConnectionLostError';
+  }
 }
 
 @Injectable()
@@ -20,6 +28,8 @@ export class QueueEventsProvider
   private readonly queue: Queue;
   private readonly queueEvents: QueueEvents;
   private readonly dlq?: Queue;
+
+  private shutdownTriggered = false;
 
   public constructor(private readonly options: QueueEventsProviderOptions) {
     const { connection, queueName, deadLetterQueueName } = this.options;
@@ -33,6 +43,18 @@ export class QueueEventsProvider
 
   async onModuleInit(): Promise<void> {
     const { deadLetterQueueName } = this.options;
+
+    this.queue.on('error', (error: Error) => {
+      this.handleRedisFailure(error, 'Queue');
+    });
+
+    this.queueEvents.on('error', (error: Error) => {
+      this.handleRedisFailure(error, 'QueueEvents');
+    });
+
+    this.dlq?.on('error', (error: Error) => {
+      this.handleRedisFailure(error, 'DeadLetterQueue');
+    });
 
     this.queueEvents.on('failed', async ({ jobId, failedReason }) => {
       logger.error(`Job ${jobId} failed: ${failedReason}`);
@@ -79,6 +101,19 @@ export class QueueEventsProvider
     });
 
     await this.queueEvents.waitUntilReady();
+  }
+
+  private handleRedisFailure(error: Error, source: string): void {
+    if (this.shutdownTriggered) return;
+
+    const redisError = new RedisConnectionLostError(
+      `Redis connection lost in ${source}. Cause: ${error.message}`,
+    );
+
+    this.shutdownTriggered = true;
+    logger.fatal(redisError.message);
+
+    LC.shutdown();
   }
 
   public async onApplicationShutdown(): Promise<void> {

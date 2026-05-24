@@ -4,9 +4,10 @@ import { ApplicationController } from './controllers/application.controller';
 import { ApplicationControllerService } from './services/application.service';
 
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
+import { EmailModule } from '@/modules/system/email/email.module';
 
 @Module({
-  imports: [],
+  imports: [EmailModule],
   providers: [TypeOrmService, ApplicationControllerService],
   controllers: [ApplicationController],
 })
