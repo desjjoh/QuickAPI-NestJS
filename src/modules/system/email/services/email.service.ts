@@ -1,28 +1,21 @@
-import * as postmark from 'postmark';
-
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
 import { compile } from '@/common/helpers/handlebars.helper';
 
-import { POSTMARK_CLIENT } from '../tokens/client.token';
 import { SendEmailOptions } from '../types/options.types';
+import { EmailQueueService } from '../queues/queue.service';
 
 @Injectable()
 export class EmailService {
   public constructor(
-    @Inject(POSTMARK_CLIENT)
-    private readonly postmarkClient: postmark.ServerClient,
     private readonly configSvc: ConfigService,
+    private readonly emailQueueSvc: EmailQueueService,
   ) {}
 
   public async sendEmail<TModel extends Record<string, unknown>>(
     options: SendEmailOptions<TModel>,
   ): Promise<void> {
-    const from: string = this.configSvc.getOrThrow<string>(
-      'POSTMARK_FROM_EMAIL',
-    );
-
     const messageStream =
       this.configSvc.get<string>('POSTMARK_MESSAGE_STREAM') ?? 'outbound';
 
@@ -38,14 +31,13 @@ export class EmailService {
       ...options.metadata,
     };
 
-    await this.postmarkClient.sendEmail({
-      From: from,
-      To: options.to,
-      Subject: options.template.subject,
-      HtmlBody: htmlBody,
-      MessageStream: messageStream,
-      Tag: options.tag ?? options.template.tag,
-      Metadata: metadata,
+    await this.emailQueueSvc.enqueueEmail({
+      to: options.to,
+      subject: options.template.subject,
+      htmlBody,
+      messageStream,
+      tag: options.tag ?? options.template.tag,
+      metadata,
     });
   }
 }

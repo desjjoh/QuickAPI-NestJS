@@ -184,6 +184,10 @@ export const EnvSchema = z
     R2_SECRET_ACCESS_KEY: z.string(),
     R2_BUCKET_NAME: z.string(),
     R2_PUBLIC_BASE_URL: z.url(),
+
+    REDIS_HOST: z.string().default('127.0.0.1'),
+    REDIS_PORT: z.coerce.number().int().positive().default(6379),
+    REDIS_PASSWORD: z.string().optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.DB_SYNC === true) {

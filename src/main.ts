@@ -3,6 +3,7 @@ import { LC } from '@/common/handlers/lifecycle.handler';
 import { logger } from '@/config/logger.config';
 import { env } from '@/config/environment.config';
 import { mode } from '@/config/environment.schema';
+import { assertRedisAvailable } from './common/helpers/redis.helper';
 
 async function bootstrap(): Promise<void> {
   const env_mode: mode = env.NODE_ENV;
@@ -14,6 +15,10 @@ async function bootstrap(): Promise<void> {
   logger.info(`Booting ${name} v${version} (${env_mode}) — Node.js ${node_v}`);
 
   LC.register([
+    {
+      name: 'remote dictionary server (redis)',
+      start: assertRedisAvailable,
+    },
     {
       name: 'http server (nest)',
       start: startNest,

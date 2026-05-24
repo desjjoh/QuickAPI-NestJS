@@ -14,8 +14,6 @@ import { DomainModule } from '@/modules/domain/domain.module';
 
 import { ApiModule } from './api/api.module';
 import { SystemModule } from './system/system.module';
-import { UserService } from './domain/identity/services/user.service';
-import { UserRepository } from './domain/identity/repositories/user.repository';
 
 function resolveStaticRootPath(staticRootPath: string): string {
   return isAbsolute(staticRootPath)
@@ -50,9 +48,6 @@ const staticImports: DynamicModule[] = env.STATIC_SERVE_ENABLED
   ],
   providers: [
     RequestContext,
-    UserService,
-    UserRepository,
-
     LocalStrategy,
     RefreshTokenStrategy,
     AccessTokenStrategy,
