@@ -35,6 +35,7 @@ export class ProfileApiService {
         name: {
           first: dto.first_name,
           last: dto.last_name,
+          preferred: dto.preferred_name,
         },
         personal: {
           dob: dto.dob,

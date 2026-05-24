@@ -1,7 +1,7 @@
 // src/modules/api/v1/account/dto/update-phone.dto.ts
 
 import { ApiProperty } from '@nestjs/swagger';
-import { Matches, ValidateIf } from 'class-validator';
+import { IsString, Matches, ValidateIf } from 'class-validator';
 
 export class UpdatePhoneDto {
   @ApiProperty({
@@ -14,6 +14,7 @@ export class UpdatePhoneDto {
     pattern: '^\\+[1-9]\\d{1,14}$',
   })
   @ValidateIf((_, value) => value !== null)
+  @IsString()
   @Matches(/^\+[1-9]\d{1,14}$/, {
     message:
       'phoneE164 must be a valid E.164 phone number, including the leading + and country calling code.',

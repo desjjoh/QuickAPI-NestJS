@@ -27,6 +27,18 @@ export class UpdateProfileDto {
   public readonly last_name!: string;
 
   @ApiProperty({
+    example: 'Janey',
+    nullable: true,
+    description:
+      'Optional preferred name used for display when different from the legal first name.',
+    maxLength: 100,
+  })
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(100)
+  public readonly preferred_name!: string | null;
+
+  @ApiProperty({
     example: '1990-01-15',
     description: 'The user’s date of birth in ISO date format.',
   })
@@ -52,12 +64,13 @@ export class UpdateProfileDto {
     example: '+16135550123',
     nullable: true,
     description:
-      'Primary phone number for the authenticated user in E.164 format. Must include the leading + and country calling code.',
+      'Optional alternate phone number for the authenticated user in E.164 format. Must include the leading + and country calling code.',
     minLength: 8,
     maxLength: 16,
     pattern: '^\\+[1-9]\\d{1,14}$',
   })
   @ValidateIf((_, value) => value !== null)
+  @IsString()
   @Matches(/^\+[1-9]\d{1,14}$/, {
     message:
       'phoneE164 must be a valid E.164 phone number, including the leading + and country calling code.',

@@ -49,7 +49,7 @@ import { UpdateProfileDto } from '../models/updateProfile.model';
 export class ProfileApiController {
   public constructor(private readonly svc: ProfileApiService) {}
 
-  // PATCH /
+  // PUT /
   @Put('')
   @ApiBody({
     type: UpdateProfileDto,
