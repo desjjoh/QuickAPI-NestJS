@@ -23,9 +23,10 @@ A modular, production-minded NestJS API template designed for rapid backend serv
 - **Health, readiness, info, system, and metrics endpoints** for deployment and operations
 - **Library/reference-data seeders** for countries, genders, permissions, and roles
 - **Email module** powered by Postmark with typed template support
+- **Async email queueing** using BullMQ + Redis with DLQ handling and Bull Board UI
 - **Profile image upload support** with validation, disk storage, and image metadata handling
 - **Graceful lifecycle orchestration** through a shared lifecycle handler
-- **Docker Compose local infrastructure** with MySQL and API services
+- **Docker Compose local infrastructure** with MySQL, Redis, and API services
 - **GitHub Actions CI** for quality checks, migrations, and E2E readiness verification
 
 ---
@@ -163,13 +164,23 @@ DB_PORT="3306"
 ## Environment Variables (`.env`)
 
 ```bash
+# ============================================================
+# App
+# ============================================================
+
 APP_NAME="quickapi-nestjs"
 APP_VERSION="1.0.0"
-PUBLIC_API_URL="http://localhost:4000"
+PUBLIC_API_URL="https://localhost:4000"
+PUBLIC_WEB_URL="https://localhost:5173"
 
-NODE_ENV="development"
+NODE_ENV="test"
 PORT="4000"
-LOG_LEVEL="info"
+LOG_LEVEL="silent"
+
+
+# ============================================================
+# CORS
+# ============================================================
 
 CORS_ORIGINS="http://localhost:5173"
 CORS_METHODS="GET,POST,PUT,PATCH,DELETE"
@@ -178,9 +189,26 @@ CORS_EXPOSED_HEADERS="Authorization,Set-Cookie"
 CORS_CREDENTIALS="true"
 CORS_MAX_AGE_SECONDS="86400"
 
+
+# ============================================================
+# HTTPS
+#
+# For local development or reverse-proxy TLS termination:
+# HTTPS_ENABLED="false"
+#
+# If the Nest app owns TLS directly:
+# HTTPS_ENABLED="true"
+# HTTPS_KEY_PATH and HTTPS_CERT_PATH must be set.
+# ============================================================
+
 HTTPS_ENABLED="false"
 HTTPS_KEY_PATH="certs/localhost-key.pem"
 HTTPS_CERT_PATH="certs/localhost.pem"
+
+
+# ============================================================
+# Cookies
+# ============================================================
 
 COOKIE_SECURE="false"
 COOKIE_SAME_SITE="strict"
@@ -193,11 +221,26 @@ REFRESH_COOKIE_MAX_AGE_DAYS="7"
 CSRF_COOKIE_NAME="csrf_token"
 CSRF_COOKIE_MAX_AGE_MINUTES="15"
 
+
+# ============================================================
+# Static files
+# ============================================================
+
 STATIC_SERVE_ENABLED="false"
 STATIC_ROOT_PATH="public"
 STATIC_SERVE_ROOT="/"
 
+
+# ============================================================
+# Uploads
+# ============================================================
+
 UPLOAD_TMP_DIR="tmp"
+
+
+# ============================================================
+# Runtime limits
+# ============================================================
 
 RATE_LIMIT_WINDOW_MS="60000"
 RATE_LIMIT_MAX="200"
@@ -215,6 +258,21 @@ ALLOWED_CONTENT_TYPES="application/json,multipart/form-data"
 
 GLOBAL_THROTTLE_TTL_MINUTES="1"
 GLOBAL_THROTTLE_LIMIT="200"
+
+
+# ============================================================
+# Database
+#
+# Local Docker Compose default:
+# DB_HOST="localhost"
+# DB_PORT="3307"
+#
+# GitHub Actions / direct MySQL default:
+# DB_PORT="3306"
+#
+# Production must use DB_SYNC="false".
+# Schema changes should be applied through migrations.
+# ============================================================
 
 DB_HOST="localhost"
 DB_PORT="3307"
@@ -235,6 +293,14 @@ DB_POOL_QUEUE_LIMIT="100"
 DB_CONNECT_TIMEOUT_MS="10000"
 DB_SLOW_QUERY_LOG_MS="1000"
 
+
+# ============================================================
+# Auth / Tokens
+#
+# Replace these in every real environment.
+# Minimum length: 32 characters.
+# ============================================================
+
 JWT_SECRET_KEY="replace-with-at-least-32-characters"
 REFRESH_SECRET_KEY="replace-with-at-least-32-characters"
 CRYPTO_SECRET="replace-with-at-least-32-characters"
@@ -242,9 +308,42 @@ CRYPTO_SECRET="replace-with-at-least-32-characters"
 JWT_EXPIRY_TIME="15m"
 REFRESH_EXPIRY_TIME="7d"
 
+
+# ============================================================
+# Email / Postmark
+# ============================================================
+
 POSTMARK_SERVER_TOKEN="replace-with-postmark-token"
 POSTMARK_FROM_EMAIL="noreply@example.com"
 POSTMARK_MESSAGE_STREAM="outbound"
+
+# ============================================================
+# Storage / Cloudflare R2
+# ============================================================
+
+STORAGE_DRIVER="local"
+
+R2_ACCOUNT_ID="example-account-id"
+R2_ENDPOINT="https://example-account-id.r2.cloudflarestorage.com"
+R2_ACCESS_KEY_ID="example-access-key-id"
+R2_SECRET_ACCESS_KEY="example-secret-access-key"
+R2_BUCKET_NAME="quickapi-dev"
+R2_PUBLIC_BASE_URL="https://pub-example.r2.dev"
+
+# ============================================================
+# Redis
+# ============================================================
+
+REDIS_HOST="127.0.0.1"
+REDIS_PORT="6379"
+REDIS_PASSWORD=""
+
+# ============================================================
+# BullBoard
+# ============================================================
+
+BULL_BOARD_ENABLED=true
+BULL_BOARD_ROUTE="/admin/queues"
 ```
 
 Each variable is validated at startup using Zod. The application exits early with formatted validation errors if the environment is incomplete or invalid.
@@ -288,13 +387,28 @@ PUBLIC_API_URL="https://api.example.com"
 
 ## Local Docker Infrastructure
 
-The local Docker setup provides MySQL and an optional API container.
+The local Docker setup provides **MySQL**, **Redis**, and an optional **API** container.
 
-Start MySQL:
+Start MySQL and Redis:
 
 ```bash
 npm run docker:mysql:up
+npm run docker:redis:up
 npm run docker:status
+```
+
+Tail infrastructure logs as needed:
+
+```bash
+npm run docker:mysql:logs
+npm run docker:redis:logs
+```
+
+Stop infrastructure services:
+
+```bash
+npm run docker:mysql:stop
+npm run docker:redis:stop
 ```
 
 Run migrations against Docker MySQL from the host machine:
@@ -403,6 +517,24 @@ The account and administration APIs rely on the same shared identity/domain laye
 
 ---
 
+## Email Queueing (BullMQ + Redis)
+
+Background email delivery runs through BullMQ-backed queues with Redis transport.
+
+Key points:
+
+- API requests enqueue email work; processors handle delivery asynchronously.
+- Failed jobs are retried based on queue policy and can be moved to a dead-letter flow.
+- Bull Board integration is available for queue inspection in development/operations environments.
+
+If running locally with Docker Compose, ensure Redis is up before queue-dependent flows:
+
+```bash
+npm run docker:redis:up
+```
+
+---
+
 ## Observability & Operations
 
 Built-in operational endpoints include:
@@ -439,12 +571,6 @@ Run E2E tests:
 npm run check:e2e
 ```
 
-Run the full local check:
-
-```bash
-npm run check:full
-```
-
 ---
 
 ## Continuous Integration
@@ -473,29 +599,32 @@ This proves that a fresh CI environment can install the project, validate it, bu
 
 ## Development Scripts
 
-| Script                     | Description                                       |
-| -------------------------- | ------------------------------------------------- |
-| `npm run start`            | Start the Nest application through the Nest CLI   |
-| `npm run start:dev`        | Start development server with watch mode          |
-| `npm run start:debug`      | Start development server with debugger/watch mode |
-| `npm run build`            | Compile the Nest application to `dist/`           |
-| `npm run start:prod`       | Start the compiled application from `dist/main`   |
-| `npm run format`           | Format TypeScript sources using Prettier          |
-| `npm run format:check`     | Check formatting without writing changes          |
-| `npm run lint`             | Run ESLint                                        |
-| `npm run lint:fix`         | Run ESLint with auto-fix                          |
-| `npm run typecheck`        | Run TypeScript without emitting files             |
-| `npm test`                 | Run unit tests                                    |
-| `npm run test:e2e`         | Run E2E tests                                     |
-| `npm run check`            | Run baseline local quality gate                   |
-| `npm run check:e2e`        | Run baseline quality gate and E2E checks          |
-| `npm run migration:show`   | Show TypeORM migration status                     |
-| `npm run migration:run`    | Run pending TypeORM migrations                    |
-| `npm run migration:revert` | Revert the latest TypeORM migration               |
-| `npm run docker:build`     | Build the production Docker image                 |
-| `npm run docker:mysql:up`  | Start local Docker MySQL                          |
-| `npm run docker:api:up`    | Start the API container                           |
-| `npm run docker:status`    | Show Docker Compose service status                |
+| Script                      | Description                                       |
+| --------------------------- | ------------------------------------------------- |
+| `npm run start`             | Start the Nest application through the Nest CLI   |
+| `npm run start:dev`         | Start development server with watch mode          |
+| `npm run start:debug`       | Start development server with debugger/watch mode |
+| `npm run build`             | Compile the Nest application to `dist/`           |
+| `npm run start:prod`        | Start the compiled application from `dist/main`   |
+| `npm run format`            | Format TypeScript sources using Prettier          |
+| `npm run format:check`      | Check formatting without writing changes          |
+| `npm run lint`              | Run ESLint                                        |
+| `npm run lint:fix`          | Run ESLint with auto-fix                          |
+| `npm run typecheck`         | Run TypeScript without emitting files             |
+| `npm test`                  | Run unit tests                                    |
+| `npm run test:e2e`          | Run E2E tests                                     |
+| `npm run check`             | Run baseline local quality gate                   |
+| `npm run check:e2e`         | Run baseline quality gate and E2E checks          |
+| `npm run migration:show`    | Show TypeORM migration status                     |
+| `npm run migration:run`     | Run pending TypeORM migrations                    |
+| `npm run migration:revert`  | Revert the latest TypeORM migration               |
+| `npm run docker:build`      | Build the production Docker image                 |
+| `npm run docker:mysql:up`   | Start local Docker MySQL                          |
+| `npm run docker:api:up`     | Start the API container                           |
+| `npm run docker:redis:up`   | Start local Docker Redis                          |
+| `npm run docker:redis:stop` | Stop local Docker Redis                           |
+| `npm run docker:redis:logs` | Tail local Docker Redis logs                      |
+| `npm run docker:status`     | Show Docker Compose service status                |
 
 ---
 
