@@ -17,8 +17,8 @@ export function outgoingLogger(): RequestHandler {
 
       const code: number = res.statusCode;
 
-      const level: 'error' | 'warn' | 'info' =
-        code >= 500 ? 'error' : code >= 400 ? 'warn' : 'info';
+      const level: 'error' | 'warn' | 'debug' =
+        code >= 500 ? 'error' : code >= 400 ? 'warn' : 'debug';
 
       const pathPadded: string = shortenPath(path, 30).padEnd(32);
       const status: string = String(code).padEnd(3, ' ');

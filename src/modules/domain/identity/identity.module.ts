@@ -17,6 +17,7 @@ import { RefreshService } from './services/refresh.service';
 import { EmailVerificationService } from './services/email-verification.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 import { PasswordResetService } from './services/password-reset.service';
+import { MediaModule } from '../media/media.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -28,6 +29,7 @@ import { PasswordResetService } from './services/password-reset.service';
     ]),
     TokenModule,
     LibraryModule,
+    MediaModule,
     EmailModule,
   ],
   providers: [

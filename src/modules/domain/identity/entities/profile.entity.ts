@@ -9,10 +9,10 @@ import {
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-import { ImageEntity } from '@/modules/domain/library/entities/image.entity';
 
 import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';
+import { ImageEntity } from '../../media/entities/image.entity';
 
 class Name {
   @Column({ type: 'text' })

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ImageEntity } from '../entities/image.entity';
 import { WithBaseModel } from '@/common/models/base.model';
+import { env } from '@/config/environment.config';
 
 export class ImageDto {
   @ApiProperty({
@@ -58,7 +59,7 @@ export class ImageDto {
   public readonly alt_text: string | null;
 
   public constructor(image: ImageEntity) {
-    this.url = image.url;
+    this.url = ImageDto.buildPublicUrl(image.storage_key);
     this.storage_key = image.storage_key;
     this.filename = image.filename;
     this.mime_type = image.mime_type;
@@ -66,6 +67,13 @@ export class ImageDto {
     this.width = image.width;
     this.height = image.height;
     this.alt_text = image.alt_text ?? null;
+  }
+
+  private static buildPublicUrl(storageKey: string): string {
+    const baseUrl = env.R2_PUBLIC_BASE_URL.replace(/\/$/, '');
+    const normalizedKey = storageKey.replace(/^\/+/, '');
+
+    return `${baseUrl}/${normalizedKey}`;
   }
 }
 

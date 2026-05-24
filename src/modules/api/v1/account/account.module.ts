@@ -6,9 +6,10 @@ import { MeApiService } from './services/me.service';
 import { ProfileApiController } from './controllers/profile.controller';
 import { ProfileApiService } from './services/profile.service';
 import { LibraryModule } from '@/modules/domain/library/library.module';
+import { MediaModule } from '@/modules/domain/media/media.module';
 
 @Module({
-  imports: [TokenModule, IdentityModule, LibraryModule],
+  imports: [TokenModule, IdentityModule, LibraryModule, MediaModule],
   providers: [MeApiService, ProfileApiService],
   controllers: [MeApiController, ProfileApiController],
 })

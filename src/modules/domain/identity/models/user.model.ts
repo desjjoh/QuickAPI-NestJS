@@ -7,9 +7,9 @@ import { BaseModel } from '@/common/models/base.model';
 import { AddressDto } from '@/common/models/address.model';
 
 import { UserEntity } from '../entities/user.entity';
-import { ImageDto } from '../../library/models/image.model';
 import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
+import { ImageDto } from '../../media/models/image.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',

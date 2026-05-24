@@ -5,7 +5,6 @@ import { env } from '@/config/environment.config';
 
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-import { ImageEntity } from '@/modules/domain/library/entities/image.entity';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
@@ -14,6 +13,7 @@ import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.en
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
+import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -29,10 +29,11 @@ const dataSourceOptions: DataSourceOptions = {
     // LIBRARY MODULE
     CountryEntity,
     GenderEntity,
-    ImageEntity,
     PermissionEntity,
     RoleEntity,
     AccountStatusEntity,
+    // MEDIA MODULE
+    ImageEntity,
     // IDENTITY MODULE
     UserAddressEntity,
     UserCredentialsEntity,

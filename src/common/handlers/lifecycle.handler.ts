@@ -70,17 +70,14 @@ class LifecycleHandler {
   private static registerInternalHandlers(): void {
     process.on('uncaughtException', (err: unknown) => {
       const error: Error = err instanceof Error ? err : new Error(String(err));
-      logger.error(
-        { stack: error.stack },
-        `Uncaught exception — ${error.message}`,
-      );
+      logger.error({ stack: error.stack }, error.message);
 
       logger.fatal('Fatal error caused by uncaught exception — forcing exit');
       process.exit(1);
     });
 
     process.on('unhandledRejection', (reason: unknown) => {
-      logger.error({ reason }, `Unhandled rejection — ${String(reason)}`);
+      logger.error({ reason }, String(reason));
 
       logger.fatal('Fatal error handling promise rejection — forcing exit');
       process.exit(1);
@@ -129,7 +126,7 @@ class LifecycleHandler {
         const error: Error =
           err instanceof Error ? err : new Error(String(err));
 
-        logger.error({ stack: error.stack }, `Error — ${error.message}`);
+        logger.error({ stack: error.stack }, error.message);
         logger.warn(`Failed to stop service → ${service.name}`);
       }
     }

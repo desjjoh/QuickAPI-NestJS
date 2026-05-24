@@ -4,18 +4,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import {
-  CreateImageInput,
-  ImageService,
-} from '@/modules/domain/library/services/image.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
-import { ImageEntity } from '@/modules/domain/library/entities/image.entity';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { AddressEntity } from '@/common/entities/address.entity';
 import { DeepPartial } from 'typeorm';
 import { UpdateProfileDto } from '../models/updateProfile.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import {
+  CreateImageInput,
+  ImageService,
+} from '@/modules/domain/media/services/image.service';
+import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 
 @Injectable()
 export class ProfileApiService {

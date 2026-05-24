@@ -50,6 +50,10 @@ const booleanFromEnv = z.preprocess((value) => {
 
 export const EnvSchema = z
   .object({
+    // # ============================================================
+    // # App
+    // # ============================================================
+
     APP_NAME: z.string().default(pkg.name),
     APP_VERSION: z
       .string()
@@ -61,6 +65,7 @@ export const EnvSchema = z
 
     PUBLIC_API_URL: z.url(),
     PUBLIC_WEB_URL: z.url(),
+
     NODE_ENV: z.enum(['development', 'test', 'production']),
     PORT: z.coerce.number(),
     LOG_LEVEL: z.enum([
@@ -72,6 +77,10 @@ export const EnvSchema = z
       'trace',
       'silent',
     ]),
+
+    // # ============================================================
+    // # CORS
+    // # ============================================================
 
     CORS_ORIGINS: arrayFromEnv.pipe(z.array(z.url()).min(1)),
     CORS_METHODS: arrayFromEnv.pipe(
@@ -86,9 +95,24 @@ export const EnvSchema = z
     CORS_CREDENTIALS: booleanFromEnv.default(false),
     CORS_MAX_AGE_SECONDS: positiveIntegerFromEnv,
 
+    // # ============================================================
+    // # HTTPS
+    // #
+    // # For local development or reverse-proxy TLS termination:
+    // # HTTPS_ENABLED="false"
+    // #
+    // # If the Nest app owns TLS directly:
+    // # HTTPS_ENABLED="true"
+    // # HTTPS_KEY_PATH and HTTPS_CERT_PATH must be set.
+    // # ============================================================
+
     HTTPS_ENABLED: booleanFromEnv.default(false),
     HTTPS_KEY_PATH: z.string().optional(),
     HTTPS_CERT_PATH: z.string().optional(),
+
+    // # ============================================================
+    // # Cookies
+    // # ============================================================
 
     COOKIE_SECURE: booleanFromEnv.default(false),
     COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).default('strict'),
@@ -104,11 +128,23 @@ export const EnvSchema = z
     CSRF_COOKIE_NAME: z.string().min(1).default('csrf_token'),
     CSRF_COOKIE_MAX_AGE_MINUTES: positiveIntegerFromEnv.default(15),
 
+    // # ============================================================
+    // # Static files
+    // # ============================================================
+
     STATIC_SERVE_ENABLED: booleanFromEnv.default(false),
     STATIC_ROOT_PATH: z.string().min(1).default('public'),
     STATIC_SERVE_ROOT: z.string().min(1).default('/'),
 
+    // # ============================================================
+    // # Uploads
+    // # ============================================================
+
     UPLOAD_TMP_DIR: z.string().min(1).default('tmp'),
+
+    // # ============================================================
+    // # Runtime limits
+    // # ============================================================
 
     ALLOWED_HTTP_METHODS: arrayFromEnv.pipe(
       z
@@ -134,6 +170,20 @@ export const EnvSchema = z
     GLOBAL_THROTTLE_TTL_MINUTES: positiveIntegerFromEnv.default(60),
     GLOBAL_THROTTLE_LIMIT: positiveIntegerFromEnv.default(200),
 
+    // # ============================================================
+    // # Database
+    // #
+    // # Local Docker Compose default:
+    // # DB_HOST="localhost"
+    // # DB_PORT="3307"
+    // #
+    // # GitHub Actions / direct MySQL default:
+    // # DB_PORT="3306"
+    // #
+    // # Production must use DB_SYNC="false".
+    // # Schema changes should be applied through migrations.
+    // # ============================================================
+
     DB_HOST: z.string(),
     DB_PORT: z.coerce.number(),
     DB_USER: z.string(),
@@ -151,6 +201,13 @@ export const EnvSchema = z
     DB_POOL_QUEUE_LIMIT: nonNegativeIntegerFromEnv.default(0),
     DB_CONNECT_TIMEOUT_MS: positiveIntegerFromEnv.default(10_000),
     DB_SLOW_QUERY_LOG_MS: nonNegativeIntegerFromEnv.default(1_000),
+
+    // # ============================================================
+    // # Auth / Tokens
+    // #
+    // # Replace these in every real environment.
+    // # Minimum length: 32 characters.
+    // # ============================================================
 
     JWT_SECRET_KEY: z.string().min(32),
     REFRESH_SECRET_KEY: z.string().min(32),
@@ -170,11 +227,43 @@ export const EnvSchema = z
       },
     ),
 
+    // # ============================================================
+    // # Email / Postmark
+    // # ============================================================
+
     POSTMARK_SERVER_TOKEN: z.string().min(1),
     POSTMARK_FROM_EMAIL: z.email(),
     POSTMARK_MESSAGE_STREAM: z
       .enum(['outbound', 'broadcast'])
       .default('outbound'),
+
+    // # ============================================================
+    // # Storage / Cloudflare R2
+    // # ============================================================
+
+    STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
+
+    R2_ACCOUNT_ID: z.string(),
+    R2_ENDPOINT: z.url(),
+    R2_ACCESS_KEY_ID: z.string(),
+    R2_SECRET_ACCESS_KEY: z.string(),
+    R2_BUCKET_NAME: z.string(),
+    R2_PUBLIC_BASE_URL: z.url(),
+
+    // # ============================================================
+    // # Redis
+    // # ============================================================
+
+    REDIS_HOST: z.string().default('127.0.0.1'),
+    REDIS_PORT: z.coerce.number().int().positive().default(6379),
+    REDIS_PASSWORD: z.string().optional(),
+
+    // # ============================================================
+    // # BullBoard
+    // # ============================================================
+
+    BULL_BOARD_ENABLED: z.coerce.boolean().default(false),
+    BULL_BOARD_ROUTE: z.string().default('/admin/queues'),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && env.DB_SYNC === true) {
@@ -184,7 +273,8 @@ export const EnvSchema = z
         message: 'DB_SYNC must be false in production. Use migrations.',
       });
     }
-
+  })
+  .superRefine((env, ctx) => {
     if (env.HTTPS_ENABLED && !env.HTTPS_KEY_PATH) {
       ctx.addIssue({
         code: 'custom',
