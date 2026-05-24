@@ -273,7 +273,8 @@ export const EnvSchema = z
         message: 'DB_SYNC must be false in production. Use migrations.',
       });
     }
-
+  })
+  .superRefine((env, ctx) => {
     if (env.HTTPS_ENABLED && !env.HTTPS_KEY_PATH) {
       ctx.addIssue({
         code: 'custom',
