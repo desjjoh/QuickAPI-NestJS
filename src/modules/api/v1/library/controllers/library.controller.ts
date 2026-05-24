@@ -4,6 +4,7 @@ import { BaseRoleDto } from '@/modules/domain/library/models/role.model';
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { LibraryService } from '../services/library.service';
+import { BaseAccountStatusDto } from '@/modules/domain/library/models/status.model';
 
 @ApiTags('Reference Data')
 @Controller('')
@@ -53,5 +54,20 @@ export class GenderController {
   })
   public async getRoles(): Promise<BaseRoleDto[]> {
     return this.svc.getRoles();
+  }
+
+  // GET /statuses
+  @Get('statuses')
+  @ApiOperation({
+    summary: 'List account statuses',
+    description:
+      'Returns account status reference data used by administration screens and account lifecycle management views.',
+  })
+  @ApiOkResponse({
+    description: 'Account status reference data returned successfully.',
+    type: [BaseAccountStatusDto],
+  })
+  public async getStatuses(): Promise<BaseAccountStatusDto[]> {
+    return this.svc.getAccountStatuses();
   }
 }

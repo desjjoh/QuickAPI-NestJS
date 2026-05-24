@@ -9,6 +9,9 @@ import { GenderRepository } from '@/modules/domain/library/repositories/gender.r
 import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
 import { BaseRoleDto } from '@/modules/domain/library/models/role.model';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
+import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
+import { BaseAccountStatusDto } from '@/modules/domain/library/models/status.model';
 
 @Injectable()
 export class LibraryService {
@@ -16,6 +19,7 @@ export class LibraryService {
     private readonly countryRepo: CountryRepository,
     private readonly genderRepo: GenderRepository,
     private readonly roleRepo: RoleRepository,
+    private readonly statusRepo: AccountStatusRepository,
   ) {}
 
   public async getCountries(): Promise<BaseCountryDto[]> {
@@ -31,5 +35,12 @@ export class LibraryService {
   public async getRoles(): Promise<BaseRoleDto[]> {
     const roles: RoleEntity[] = await this.roleRepo.findAll();
     return roles.map((role: RoleEntity) => new BaseRoleDto(role));
+  }
+
+  public async getAccountStatuses(): Promise<BaseAccountStatusDto[]> {
+    const statuses: AccountStatusEntity[] = await this.statusRepo.findAll();
+    return statuses.map(
+      (role: AccountStatusEntity) => new BaseAccountStatusDto(role),
+    );
   }
 }
