@@ -83,6 +83,9 @@ services:
 
       COOKIE_SECURE: 'true'
 
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
       NODE_OPTIONS: '--max-old-space-size=384'
 
     volumes:
