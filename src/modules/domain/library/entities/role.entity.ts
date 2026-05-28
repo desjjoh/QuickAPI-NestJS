@@ -21,6 +21,7 @@ export class RoleEntity extends BaseEntity {
   @ManyToMany(
     () => PermissionEntity,
     (permission: PermissionEntity) => permission.roles,
+    { eager: true },
   )
   @JoinTable({
     name: 'role_permissions',
