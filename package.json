@@ -40,7 +40,7 @@
     "docker:redis:restart": "docker compose restart redis",
     "docker:redis:logs": "docker compose logs -f redis",
     "docker:redis:status": "docker compose ps redis",
-    "docker:up": "docker compose up -d",
+    "docker:up": "docker compose up -d --build --force-recreate",
     "docker:stop": "docker compose stop",
     "docker:down": "docker compose down",
     "docker:status": "docker compose ps",
