@@ -2,7 +2,6 @@ import type { Response } from 'express';
 import {
   Body,
   Controller,
-  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -202,8 +201,8 @@ export class AuthApiController {
     return new SignOutResponseDto({ message: 'Signed out successfully.' });
   }
 
-  // GET /refresh
-  @Get('/refresh')
+  // POST /refresh
+  @Post('/refresh')
   @ApiOperation({
     summary: 'Verify and refresh authenticated session',
     description:
