@@ -1,6 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, IntersectionType } from '@nestjs/swagger';
 import { GenderEntity } from '../entities/gender.entity';
-import { WithBaseModel } from '@/common/models/base.model';
+import { BaseModel } from '@/common/models/base.model';
 
 export class GenderDto {
   @ApiProperty({
@@ -22,4 +22,10 @@ export class GenderDto {
   }
 }
 
-export class BaseGenderDto extends WithBaseModel(GenderDto) {}
+export class BaseGenderDto extends IntersectionType(BaseModel, GenderDto) {
+  public constructor(gender: GenderEntity) {
+    super();
+
+    Object.assign(this, new BaseModel(gender), new GenderDto(gender));
+  }
+}

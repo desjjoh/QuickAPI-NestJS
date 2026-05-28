@@ -1,6 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
 import { ImageEntity } from '../entities/image.entity';
-import { WithBaseModel } from '@/common/models/base.model';
+import { BaseModel } from '@/common/models/base.model';
 import { env } from '@/config/environment.config';
 
 export class ImageDto {
@@ -77,4 +81,10 @@ export class ImageDto {
   }
 }
 
-export class BaseImageDto extends WithBaseModel(ImageDto) {}
+export class BaseImageDto extends IntersectionType(BaseModel, ImageDto) {
+  public constructor(image: ImageEntity) {
+    super();
+
+    Object.assign(this, new BaseModel(image), new ImageDto(image));
+  }
+}

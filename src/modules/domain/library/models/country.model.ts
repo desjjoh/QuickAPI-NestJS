@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { CountryEntity } from '../entities/country.entity';
-import { WithBaseModel } from '@/common/models/base.model';
+import { BaseModel } from '@/common/models/base.model';
+import { IntersectionType } from '@nestjs/swagger';
 export class CountryDto {
   @ApiProperty({
     example: 'canada',
@@ -43,4 +44,10 @@ export class CountryDto {
   }
 }
 
-export class BaseCountryDto extends WithBaseModel(CountryDto) {}
+export class BaseCountryDto extends IntersectionType(BaseModel, CountryDto) {
+  public constructor(country: CountryEntity) {
+    super();
+
+    Object.assign(this, new BaseModel(country), new CountryDto(country));
+  }
+}
