@@ -1,7 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
 import { RoleEntity } from '../entities/role.entity';
 import { PermissionEntity } from '../entities/permission.entity';
-import { WithBaseModel } from '@/common/models/base.model';
+import { BaseModel } from '@/common/models/base.model';
 
 export class RoleDto {
   @ApiProperty({
@@ -42,4 +46,10 @@ export class RoleDto {
   }
 }
 
-export class BaseRoleDto extends WithBaseModel(RoleDto) {}
+export class BaseRoleDto extends IntersectionType(BaseModel, RoleDto) {
+  public constructor(role: RoleEntity) {
+    super();
+
+    Object.assign(this, new BaseModel(role), new RoleDto(role));
+  }
+}

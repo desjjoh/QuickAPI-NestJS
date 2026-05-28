@@ -1,6 +1,10 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
 import { AddressEntity } from '../entities/address.entity';
-import { WithBaseModel } from './base.model';
+import { BaseModel } from './base.model';
 
 export class AddressDto {
   @ApiProperty({
@@ -53,4 +57,10 @@ export class AddressDto {
   }
 }
 
-export class BaseAddressDto extends WithBaseModel(AddressDto) {}
+export class BaseAddressDto extends IntersectionType(BaseModel, AddressDto) {
+  public constructor(address: AddressEntity) {
+    super();
+
+    Object.assign(this, new BaseModel(address), new AddressDto(address));
+  }
+}
