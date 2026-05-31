@@ -14,6 +14,7 @@ import { DomainModule } from '@/modules/domain/domain.module';
 
 import { ApiModule } from './api/api.module';
 import { SystemModule } from './system/system.module';
+import { RequestContextModule } from './system/context/context.module';
 
 function resolveStaticRootPath(staticRootPath: string): string {
   return isAbsolute(staticRootPath)
@@ -42,6 +43,7 @@ const staticImports: DynamicModule[] = env.STATIC_SERVE_ENABLED
       ],
     }),
 
+    RequestContextModule,
     SystemModule,
     DomainModule,
     ApiModule,
