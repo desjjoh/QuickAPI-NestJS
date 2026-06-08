@@ -7,7 +7,6 @@ import {
   Patch,
   Res,
   Body,
-  Put,
   Post,
 } from '@nestjs/common';
 import {
@@ -135,7 +134,7 @@ export class MeApiController {
   }
 
   // PATCH /phone
-  @Put('phone')
+  @Patch('phone')
   @ApiOperation({
     summary: 'Update primary phone number',
     description:
