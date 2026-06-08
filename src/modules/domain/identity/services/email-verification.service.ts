@@ -210,7 +210,10 @@ export class EmailVerificationService {
   }
 
   private buildVerificationUrl(tokenId: string, token: string): string {
-    const url: URL = new URL('/verify-email', env.PUBLIC_WEB_URL);
+    const url: URL = new URL(
+      '/authentication/verify-email',
+      env.PUBLIC_WEB_URL,
+    );
 
     url.searchParams.set('token_id', tokenId);
     url.searchParams.set('token', token);
