@@ -18,12 +18,18 @@ import { EmailVerificationService } from './services/email-verification.service'
 import { EmailModule } from '@/modules/system/email/email.module';
 import { PasswordResetService } from './services/password-reset.service';
 import { MediaModule } from '../media/media.module';
+import {
+  UserAlternatePhoneEntity,
+  UserPhoneEntity,
+} from './entities/phone.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       UserEntity,
       UserProfileEntity,
       UserAddressEntity,
+      UserPhoneEntity,
+      UserAlternatePhoneEntity,
       UserCredentialsEntity,
       AccountTokenEntity,
     ]),

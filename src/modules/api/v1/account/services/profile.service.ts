@@ -16,6 +16,9 @@ import {
   ImageService,
 } from '@/modules/domain/media/services/image.service';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+import { UserAlternatePhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
+import { UpdatePhoneDto } from '../models/updatePhone.model';
+import { PhoneEntity } from '@/common/entities/phone.entity';
 
 @Injectable()
 export class ProfileApiService {
@@ -40,9 +43,6 @@ export class ProfileApiService {
         personal: {
           dob: dto.dob,
           gender: { id: dto.gender_id },
-        },
-        contact: {
-          alternate_phone_e164: dto.alternate_phone_e164,
         },
       },
     });
@@ -128,6 +128,56 @@ export class ProfileApiService {
     });
 
     await this.userSvc.deleteAddress(address);
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  public async updateAlternatePhone(
+    user: UserEntity,
+    dto: UpdatePhoneDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const phone: UserAlternatePhoneEntity | null =
+      user.profile.contact.alternate_phone;
+    const payload = this.getPhonePayload(dto, phone);
+
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { contact: { alternate_phone: payload } },
+    });
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  private getPhonePayload(
+    dto: UpdatePhoneDto,
+    phone: PhoneEntity | null,
+  ): DeepPartial<PhoneEntity> {
+    return {
+      ...(phone ? { id: phone.id } : {}),
+      country: { id: dto.phone_country_id },
+      phone_calling_code: dto.phone_calling_code,
+      phone_national_number: dto.phone_national_number,
+      phone_e164: dto.phone_e164,
+    };
+  }
+
+  public async removeAlternatePhone(
+    user: UserEntity,
+    res: Response,
+  ): Promise<JWTDto> {
+    const phone: UserAlternatePhoneEntity | null =
+      user.profile.contact.alternate_phone;
+
+    if (!phone)
+      throw new BadRequestException(
+        'User does not have an alternate phone to remove.',
+      );
+
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { contact: { alternate_phone: null } },
+    });
+
+    await this.userSvc.deletePhone(phone);
 
     return this.refreshSvc.issueTokens(updated, res);
   }

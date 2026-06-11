@@ -13,6 +13,7 @@ import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';
 import { ImageEntity } from '../../media/entities/image.entity';
+import { UserAlternatePhoneEntity } from './phone.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -39,8 +40,16 @@ class Personal {
 }
 
 class Contact {
-  @Column({ type: 'varchar', length: 20, nullable: true, default: null })
-  public readonly alternate_phone_e164!: string | null;
+  @OneToOne(
+    () => UserAlternatePhoneEntity,
+    (phone: UserAlternatePhoneEntity) => phone.profile,
+    {
+      eager: true,
+      cascade: ['insert', 'update'],
+      nullable: true,
+    },
+  )
+  public readonly alternate_phone!: Relation<UserAlternatePhoneEntity | null>;
 
   @OneToOne(
     () => UserAddressEntity,

@@ -62,7 +62,9 @@ export class UserRepository extends Repository<UserEntity> {
   }
 
   public async findByPhone(phone_e164: string): Promise<UserEntity | null> {
-    return this.findOne({ where: { identity: { phone_e164 } } });
+    return this.findOne({
+      where: { identity: { phone: { phone_e164 } } },
+    });
   }
 
   public async findByIdOrFail(id: string): Promise<UserEntity> {

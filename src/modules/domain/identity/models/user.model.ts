@@ -10,6 +10,7 @@ import { UserEntity } from '../entities/user.entity';
 import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { ImageDto } from '../../media/models/image.model';
+import { PhoneDto } from '@/common/models/phone.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',
@@ -39,16 +40,15 @@ export class IdentityDto {
   public readonly email: string;
 
   @ApiPropertyOptional({
-    example: '+16135550123',
-    description:
-      'Primary phone number for the user in E.164 format, when provided.',
+    type: PhoneDto,
+    description: 'Primary phone number details for the user, when provided.',
     nullable: true,
   })
-  public readonly phone_e164: string | null;
+  public readonly phone: PhoneDto | null;
 
   public constructor(user: UserEntity) {
     this.email = user.identity.email;
-    this.phone_e164 = user.identity.phone_e164 ?? null;
+    this.phone = user.identity.phone ? new PhoneDto(user.identity.phone) : null;
   }
 }
 
@@ -102,12 +102,11 @@ export class PersonalDto {
 
 export class ContactDto {
   @ApiPropertyOptional({
-    example: '+16135550999',
-    description:
-      'Alternate phone number for the user in E.164 format, when provided.',
+    type: PhoneDto,
+    description: 'Alternate phone number details for the user, when provided.',
     nullable: true,
   })
-  public readonly alternate_phone_e164: string | null;
+  public readonly alternate_phone: PhoneDto | null;
 
   @ApiPropertyOptional({
     type: AddressDto,
@@ -117,8 +116,9 @@ export class ContactDto {
   public readonly address: AddressDto | null;
 
   public constructor(user: UserEntity) {
-    this.alternate_phone_e164 =
-      user.profile.contact.alternate_phone_e164 ?? null;
+    this.alternate_phone = user.profile.contact.alternate_phone
+      ? new PhoneDto(user.profile.contact.alternate_phone)
+      : null;
 
     this.address = user.profile.contact.address
       ? new AddressDto(user.profile.contact.address)

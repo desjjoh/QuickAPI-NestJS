@@ -26,6 +26,10 @@ import { AccountStatusEntity } from '../../library/entities/accountstatus.entity
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { RoleRepository } from '../../library/repositories/role.repository';
+import {
+  UserPhoneEntity,
+  UserAlternatePhoneEntity,
+} from '../entities/phone.entity';
 
 @Injectable()
 export class UserService {
@@ -189,5 +193,18 @@ export class UserService {
     await this.userRepo.save(updatedUser);
 
     return this.userRepo.findByIdOrFail(updatedUser.id);
+  }
+
+  public async deletePhone(
+    phone: UserPhoneEntity | UserAlternatePhoneEntity,
+  ): Promise<void> {
+    const entity =
+      phone instanceof UserAlternatePhoneEntity
+        ? UserAlternatePhoneEntity
+        : UserPhoneEntity;
+
+    await this.userRepo.manager.delete(entity, {
+      id: phone.id,
+    });
   }
 }
