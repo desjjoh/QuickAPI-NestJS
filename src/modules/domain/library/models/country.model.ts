@@ -35,12 +35,38 @@ export class CountryDto {
   })
   public readonly calling_code: string;
 
+  @ApiProperty({
+    example: '2015550123',
+    description:
+      'Digits-only example national phone number used as a country-specific input placeholder.',
+  })
+  public readonly phone_national_placeholder: string;
+
+  @ApiProperty({
+    example: '^[2-9]\\d{2}[2-9]\\d{6}$',
+    description:
+      'Regular expression used to validate the digits-only national phone number for the selected country.',
+  })
+  public readonly phone_national_pattern: string;
+
+  @ApiProperty({
+    example: [3, 3, 4],
+    type: [Number],
+    description:
+      'Ordered digit group sizes used to format the national phone number for display.',
+  })
+  public readonly phone_format_groups: number[];
+
   public constructor(country: CountryEntity) {
     this.key = country.key;
     this.label = country.label;
     this.iso2 = country.iso2;
     this.iso3 = country.iso3;
     this.calling_code = country.calling_code;
+
+    this.phone_national_placeholder = country.phone_national_placeholder;
+    this.phone_national_pattern = country.phone_national_pattern;
+    this.phone_format_groups = country.phone_format_groups;
   }
 }
 

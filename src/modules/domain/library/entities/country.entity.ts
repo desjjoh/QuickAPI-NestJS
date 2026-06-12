@@ -18,4 +18,13 @@ export class CountryEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 8 })
   public readonly calling_code!: string;
+
+  @Column({ type: 'varchar', length: 32 })
+  public readonly phone_national_placeholder!: string;
+
+  @Column({ type: 'varchar', length: 128 })
+  public readonly phone_national_pattern!: string;
+
+  @Column({ type: 'simple-json' })
+  public readonly phone_format_groups!: number[];
 }

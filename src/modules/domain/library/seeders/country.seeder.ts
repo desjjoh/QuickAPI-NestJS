@@ -12,6 +12,10 @@ type CountrySeed = {
   iso2: string;
   iso3: string;
   calling_code: string;
+
+  phone_national_placeholder: string;
+  phone_national_pattern: string;
+  phone_format_groups: number[];
 };
 
 const COUNTRY_SEEDS: CountrySeed[] = [
@@ -21,6 +25,9 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     iso2: 'CA',
     iso3: 'CAN',
     calling_code: '1',
+    phone_national_placeholder: '2015550123',
+    phone_national_pattern: '^[2-9]\\d{2}[2-9]\\d{6}$',
+    phone_format_groups: [3, 3, 4],
   },
   {
     key: 'australia',
@@ -28,6 +35,9 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     iso2: 'AU',
     iso3: 'AUS',
     calling_code: '61',
+    phone_national_placeholder: '412345678',
+    phone_national_pattern: '^[23478]\\d{8}$',
+    phone_format_groups: [3, 3, 3],
   },
 ];
 

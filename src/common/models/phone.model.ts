@@ -3,11 +3,13 @@ import { PhoneEntity } from '../entities/phone.entity';
 
 export class PhoneDto {
   @ApiProperty({
-    example: 'CA',
-    description:
-      'ISO 3166-1 alpha-2 country code linked to the country reference data.',
+    example: 'SUwDyXR7iSBnyWmr',
+    description: 'The unique NanoID of the selected country reference record.',
+    minLength: 16,
+    maxLength: 16,
+    pattern: '^[0-9A-Za-z]{16}$',
   })
-  public readonly phone_country_code: string;
+  public readonly phone_country_id: string;
 
   @ApiProperty({
     example: '+1',
@@ -29,7 +31,7 @@ export class PhoneDto {
   public readonly phone_e164: string;
 
   public constructor(phone: PhoneEntity) {
-    this.phone_country_code = phone.country.iso2;
+    this.phone_country_id = phone.country.id;
     this.phone_calling_code = phone.phone_calling_code;
     this.phone_national_number = phone.phone_national_number;
     this.phone_e164 = phone.phone_e164;
