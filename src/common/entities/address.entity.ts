@@ -2,6 +2,7 @@ import { Column, Entity, JoinColumn, ManyToOne, type Relation } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
+import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 
 @Entity('addresses')
 export class AddressEntity extends BaseEntity {
@@ -14,8 +15,13 @@ export class AddressEntity extends BaseEntity {
   @Column({ type: 'text' })
   public readonly city!: string;
 
-  @Column({ type: 'text' })
-  public readonly region!: string;
+  @ManyToOne(() => RegionEntity, {
+    eager: true,
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'region_id', referencedColumnName: 'id' })
+  public readonly region!: Relation<RegionEntity>;
 
   @Column({ type: 'text' })
   public readonly postal_code!: string;

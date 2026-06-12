@@ -31,12 +31,13 @@ export class UpdateAddressDto {
   public readonly city!: string;
 
   @ApiProperty({
-    example: 'Ontario',
-    description: 'Province, state, territory, or region for the address.',
+    example: 'W7Kb4TWo3KsqxYdA',
+    description:
+      'Unique identifier of the region selected from the configured country region reference data.',
   })
   @IsString()
   @IsNotEmpty()
-  public readonly region!: string;
+  public readonly region_id!: string;
 
   @ApiProperty({
     example: 'K1A 0B1',

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/swagger';
 import { AddressEntity } from '../entities/address.entity';
 import { BaseModel } from './base.model';
+import { BaseRegionDto } from '@/modules/domain/library/models/region.model';
 
 export class AddressDto {
   @ApiProperty({
@@ -29,10 +30,10 @@ export class AddressDto {
   public readonly city: string;
 
   @ApiProperty({
-    example: 'Ontario',
+    type: BaseRegionDto,
     description: 'Province, state, territory, or region for the address.',
   })
-  public readonly region: string;
+  public readonly region: BaseRegionDto;
 
   @ApiProperty({
     example: 'K1A 0B1',
@@ -51,7 +52,7 @@ export class AddressDto {
     this.address_line_1 = address.address_line_1;
     this.address_line_2 = address.address_line_2 ?? null;
     this.city = address.city;
-    this.region = address.region;
+    this.region = new BaseRegionDto(address.region);
     this.postal_code = address.postal_code;
     this.country = address.country.key;
   }

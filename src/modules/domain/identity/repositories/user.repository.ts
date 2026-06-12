@@ -42,6 +42,7 @@ export class UserRepository extends Repository<UserEntity> {
       .leftJoinAndSelect('profile.avatar', 'avatar')
       .leftJoinAndSelect('profile.personal.gender', 'gender')
       .leftJoinAndSelect('profile.contact.address', 'address')
+      .leftJoinAndSelect('address.region', 'region')
       .leftJoinAndSelect('address.country', 'country')
       .where(
         "user.email like :query OR CONCAT(profile.name.first, ' ', profile.name.last) like :query",

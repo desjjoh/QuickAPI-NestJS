@@ -19,6 +19,8 @@ import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { UserAlternatePhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { PhoneEntity } from '@/common/entities/phone.entity';
+import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
+import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 
 @Injectable()
 export class ProfileApiService {
@@ -26,6 +28,7 @@ export class ProfileApiService {
     private readonly userSvc: UserService,
     private readonly refreshSvc: RefreshService,
     private readonly imgSvc: ImageService,
+    private readonly regionRepo: RegionRepository,
   ) {}
 
   public async updateProfile(
@@ -99,13 +102,20 @@ export class ProfileApiService {
     res: Response,
   ): Promise<JWTDto> {
     const address: UserAddressEntity | null = user.profile.contact.address;
+    const region: RegionEntity | null =
+      await this.regionRepo.findByIdAndCountry(dto.region_id, dto.country_id);
+
+    if (!region)
+      throw new BadRequestException(
+        'Region must belong to the selected country.',
+      );
 
     const payload: DeepPartial<AddressEntity> = {
       ...(address ? { id: address.id } : {}),
       address_line_1: dto.address_line_1,
       address_line_2: dto.address_line_2 ?? null,
       city: dto.city,
-      region: dto.region,
+      region: { id: dto.region_id },
       postal_code: dto.postal_code,
       country: { id: dto.country_id },
     };

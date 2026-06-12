@@ -20,11 +20,15 @@ import { RoleSeeder } from './seeders/role.seeder';
 import { AccountStatusEntity } from './entities/accountstatus.entity';
 import { AccountStatusRepository } from './repositories/accountstatus.repository';
 import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
+import { RegionEntity } from './entities/region.entity';
+import { RegionRepository } from './repositories/region.repository';
+import { RegionSeeder } from './seeders/region.seeder';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       CountryEntity,
+      RegionEntity,
       GenderEntity,
       PermissionEntity,
       RoleEntity,
@@ -33,6 +37,7 @@ import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
     SeedingModule.forFeature([
       new GenderSeeder(),
       new CountrySeeder(),
+      new RegionSeeder(),
       new PermissionSeeder(),
       new RoleSeeder(),
       new AccountStatusSeeder(),
@@ -40,6 +45,7 @@ import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
   ],
   providers: [
     CountryRepository,
+    RegionRepository,
     GenderRepository,
     PermissionRepository,
     RoleRepository,
@@ -47,6 +53,7 @@ import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
   ],
   exports: [
     CountryRepository,
+    RegionRepository,
     GenderRepository,
     PermissionRepository,
     RoleRepository,

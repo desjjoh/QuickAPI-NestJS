@@ -4,6 +4,7 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { env } from '@/config/environment.config';
 
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
+import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
@@ -32,6 +33,7 @@ const dataSourceOptions: DataSourceOptions = {
   entities: [
     // LIBRARY MODULE
     CountryEntity,
+    RegionEntity,
     GenderEntity,
     PermissionEntity,
     RoleEntity,

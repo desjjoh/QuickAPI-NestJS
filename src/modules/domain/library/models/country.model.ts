@@ -2,6 +2,8 @@ import { ApiProperty } from '@nestjs/swagger';
 import { CountryEntity } from '../entities/country.entity';
 import { BaseModel } from '@/common/models/base.model';
 import { IntersectionType } from '@nestjs/swagger';
+import { BaseRegionDto } from './region.model';
+import { RegionEntity } from '../entities/region.entity';
 export class CountryDto {
   @ApiProperty({
     example: 'canada',
@@ -36,6 +38,13 @@ export class CountryDto {
   public readonly calling_code: string;
 
   @ApiProperty({
+    type: [BaseRegionDto],
+    description:
+      'Available provinces, states, or territories for country-specific address forms.',
+  })
+  public readonly regions: BaseRegionDto[];
+
+  @ApiProperty({
     example: '2015550123',
     description:
       'Digits-only example national phone number used as a country-specific input placeholder.',
@@ -57,16 +66,56 @@ export class CountryDto {
   })
   public readonly phone_format_groups: number[];
 
+  @ApiProperty({
+    example: 'K1A0B1',
+    description:
+      'Example postal or ZIP code used as a country-specific input placeholder.',
+  })
+  public readonly postal_code_placeholder: string;
+
+  @ApiProperty({
+    example:
+      '^[ABCEGHJ-NPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ -]?\\d[ABCEGHJ-NPRSTV-Z]\\d$',
+    description:
+      'Regular expression used to validate the postal or ZIP code for the selected country.',
+  })
+  public readonly postal_code_pattern: string;
+
+  @ApiProperty({
+    example: [3, 3],
+    type: [Number],
+    description:
+      'Ordered character group sizes used to format the postal or ZIP code for display.',
+  })
+  public readonly postal_code_format_groups: number[];
+
+  @ApiProperty({
+    example: ' ',
+    description:
+      'Separator inserted between postal or ZIP code format groups for display.',
+  })
+  public readonly postal_code_format_separator: string;
+
   public constructor(country: CountryEntity) {
     this.key = country.key;
     this.label = country.label;
     this.iso2 = country.iso2;
     this.iso3 = country.iso3;
-    this.calling_code = country.calling_code;
 
+    this.regions =
+      country.regions?.map(
+        (region: RegionEntity) => new BaseRegionDto(region),
+      ) ?? [];
+
+    this.calling_code = country.calling_code;
     this.phone_national_placeholder = country.phone_national_placeholder;
     this.phone_national_pattern = country.phone_national_pattern;
     this.phone_format_groups = country.phone_format_groups;
+
+    this.postal_code_placeholder = country.postal_code_placeholder;
+    this.postal_code_pattern = country.postal_code_pattern;
+    this.postal_code_format_groups = country.postal_code_format_groups;
+    this.postal_code_format_separator = country.postal_code_format_separator;
   }
 }
 

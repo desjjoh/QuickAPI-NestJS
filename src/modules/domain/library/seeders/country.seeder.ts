@@ -16,6 +16,11 @@ type CountrySeed = {
   phone_national_placeholder: string;
   phone_national_pattern: string;
   phone_format_groups: number[];
+
+  postal_code_placeholder: string;
+  postal_code_pattern: string;
+  postal_code_format_groups: number[];
+  postal_code_format_separator: string;
 };
 
 const COUNTRY_SEEDS: CountrySeed[] = [
@@ -28,6 +33,11 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     phone_national_placeholder: '2015550123',
     phone_national_pattern: '^[2-9]\\d{2}[2-9]\\d{6}$',
     phone_format_groups: [3, 3, 4],
+    postal_code_placeholder: 'K1A0B1',
+    postal_code_pattern:
+      '^[ABCEGHJ-NPRSTVXY]\\d[ABCEGHJ-NPRSTV-Z][ -]?\\d[ABCEGHJ-NPRSTV-Z]\\d$',
+    postal_code_format_groups: [3, 3],
+    postal_code_format_separator: ' ',
   },
   {
     key: 'australia',
@@ -38,6 +48,10 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     phone_national_placeholder: '412345678',
     phone_national_pattern: '^[23478]\\d{8}$',
     phone_format_groups: [3, 3, 3],
+    postal_code_placeholder: '2000',
+    postal_code_pattern: '^\\d{4}$',
+    postal_code_format_groups: [4],
+    postal_code_format_separator: '',
   },
 ];
 
