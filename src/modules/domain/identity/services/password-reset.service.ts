@@ -72,7 +72,7 @@ export class PasswordResetService {
   }
 
   private buildPasswordResetUrl(tokenId: string, token: string): string {
-    const url = new URL('/reset-password', env.PUBLIC_WEB_URL);
+    const url = new URL('/authentication/reset-password', env.PUBLIC_WEB_URL);
 
     url.searchParams.set('token_id', tokenId);
     url.searchParams.set('token', token);
