@@ -59,7 +59,7 @@ export class AccountTokenService {
     };
   }
 
-  public async consumeToken(
+  public async validateToken(
     tokenId: string,
     type: AccountTokenType,
     token: string,
@@ -85,6 +85,16 @@ export class AccountTokenService {
     const isMatch = this.compareTokenHashes(entity.token_hash, tokenHash);
 
     if (!isMatch) throw new UnauthorizedException('Invalid or expired token.');
+
+    return entity;
+  }
+
+  public async consumeToken(
+    tokenId: string,
+    type: AccountTokenType,
+    token: string,
+  ): Promise<AccountTokenEntity> {
+    const entity = await this.validateToken(tokenId, type, token);
 
     return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
   }

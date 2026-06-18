@@ -22,3 +22,16 @@ export class ConfirmPasswordResetResponseDto {
     this.message = data.message;
   }
 }
+
+export class ValidatePasswordResetTokenResponseDto {
+  @ApiProperty({
+    example: true,
+    description:
+      'Indicates the password reset token exists, has not expired, has not been consumed, and matches the provided token value.',
+  })
+  public readonly valid: boolean;
+
+  public constructor(data: ValidatePasswordResetTokenResponseDto) {
+    this.valid = data.valid;
+  }
+}

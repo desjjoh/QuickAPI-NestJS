@@ -22,7 +22,7 @@ export class RequestPasswordResetDto {
   public readonly email!: string;
 }
 
-export class ConfirmPasswordResetDto {
+export class ValidatePasswordResetTokenDto {
   @ApiProperty({
     example: 'V8nYk2QpL4sR7xZa',
     description: 'The unique NanoID of the password reset token record.',
@@ -42,7 +42,9 @@ export class ConfirmPasswordResetDto {
   @IsString()
   @IsNotEmpty()
   public readonly token!: string;
+}
 
+export class ConfirmPasswordResetDto extends ValidatePasswordResetTokenDto {
   @ApiProperty({
     example: 'NJccb2-OaJ0{bs;-',
     description:

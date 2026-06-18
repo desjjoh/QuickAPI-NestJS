@@ -71,6 +71,17 @@ export class PasswordResetService {
     await this.userRepo.incrementTokenVersion(user.id);
   }
 
+  public async validatePasswordResetToken(
+    tokenId: string,
+    token: string,
+  ): Promise<void> {
+    await this.accountTokenSvc.validateToken(
+      tokenId,
+      AccountTokenType.PASSWORD_RESET,
+      token,
+    );
+  }
+
   private buildPasswordResetUrl(tokenId: string, token: string): string {
     const url = new URL('/authentication/reset-password', env.PUBLIC_WEB_URL);
 

@@ -9,17 +9,19 @@ import { CsrfDto } from '../models/csrf.model';
 import {
   RequestPasswordResetResponseDto,
   ConfirmPasswordResetResponseDto,
+  ValidatePasswordResetTokenResponseDto,
 } from '@/modules/domain/identity/models/password-reset.model';
 import {
   RequestPasswordResetDto,
   ConfirmPasswordResetDto,
-} from '../../authentication/models/password-reset.model';
+  ValidatePasswordResetTokenDto,
+} from '../models/password-reset.model';
 import {
   VerifyEmailDto,
   VerifyEmailResponseDto,
   ResendVerificationDto,
   ResendVerificationResponseDto,
-} from '../../authentication/models/verify-email.model';
+} from '../models/verify-email.model';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { PasswordResetService } from '@/modules/domain/identity/services/password-reset.service';
 
@@ -125,6 +127,30 @@ export class SecurityApiController {
       message:
         'If an account exists for this email, a password reset email will be sent.',
     });
+  }
+
+  // POST /password-reset/validate
+  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Post('password-reset/validate')
+  @ApiOperation({
+    summary: 'Validate password reset token',
+    description:
+      'Checks whether a password reset token is valid without consuming it, allowing clients to render the reset form only for valid links.',
+  })
+  @ApiBody({
+    type: ValidatePasswordResetTokenDto,
+    description:
+      'The password reset token ID and raw token from the reset link.',
+  })
+  @ApiOkResponse({
+    type: ValidatePasswordResetTokenResponseDto,
+  })
+  public async validatePasswordResetToken(
+    @Body() dto: ValidatePasswordResetTokenDto,
+  ): Promise<ValidatePasswordResetTokenResponseDto> {
+    await this.prSvc.validatePasswordResetToken(dto.token_id, dto.token);
+
+    return new ValidatePasswordResetTokenResponseDto({ valid: true });
   }
 
   // POST /pasword-reset/confirm
