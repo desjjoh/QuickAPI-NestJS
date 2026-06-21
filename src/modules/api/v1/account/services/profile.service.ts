@@ -16,7 +16,10 @@ import {
   ImageService,
 } from '@/modules/domain/media/services/image.service';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
-import { UserAlternatePhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
+import {
+  UserAlternatePhoneEntity,
+  UserPhoneEntity,
+} from '@/modules/domain/identity/entities/phone.entity';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { PhoneEntity } from '@/common/entities/phone.entity';
 import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
@@ -46,6 +49,7 @@ export class ProfileApiService {
         personal: {
           dob: dto.dob,
           gender: { id: dto.gender_id },
+          bio: dto.bio,
         },
       },
     });
@@ -58,7 +62,9 @@ export class ProfileApiService {
     file: Express.Multer.File,
     res: Response,
   ): Promise<JWTDto> {
-    const existingAvatar: ImageEntity | null = user.profile?.avatar ?? null;
+    const existingAvatar: ImageEntity | null =
+      user.profile.media.avatar ?? null;
+
     const metadata: CreateImageInput = {
       file,
       alt_text: `Profile avatar for user id#${user.id}`,
@@ -73,21 +79,23 @@ export class ProfileApiService {
       : await this.imgSvc.create(metadata);
 
     const updated: UserEntity = await this.userSvc.updateUser(user, {
-      profile: { avatar: { id: image.id } },
+      profile: { media: { avatar: { id: image.id } } },
     });
 
     return this.refreshSvc.issueTokens(updated, res);
   }
 
   public async removeAvatar(user: UserEntity, res: Response): Promise<JWTDto> {
-    const avatar: ImageEntity | null = user.profile.avatar;
+    const avatar: ImageEntity | null = user.profile.media.avatar;
 
     if (!avatar)
       throw new BadRequestException('User does not have an avatar to remove.');
 
     const updated = await this.userSvc.updateUser(user, {
       profile: {
-        avatar: null,
+        media: {
+          avatar: null,
+        },
       },
     });
 
@@ -138,6 +146,36 @@ export class ProfileApiService {
     });
 
     await this.userSvc.deleteAddress(address);
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  public async updatePhone(
+    user: UserEntity,
+    dto: UpdatePhoneDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const phone: UserPhoneEntity | null = user.profile.contact.phone;
+    const payload = this.getPhonePayload(dto, phone);
+
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { contact: { phone: payload } },
+    });
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  public async removePhone(user: UserEntity, res: Response): Promise<JWTDto> {
+    const phone: UserPhoneEntity | null = user.profile.contact.phone;
+
+    if (!phone)
+      throw new BadRequestException('User does not have a phone to remove.');
+
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { contact: { phone: null } },
+    });
+
+    await this.userSvc.deletePhone(phone);
 
     return this.refreshSvc.issueTokens(updated, res);
   }

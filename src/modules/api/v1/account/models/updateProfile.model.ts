@@ -59,4 +59,16 @@ export class UpdateProfileDto {
     message: 'Gender ID must contain only letters and numbers.',
   })
   public readonly gender_id!: string;
+
+  @ApiProperty({
+    example:
+      'Builder, tester, and lifelong API tinkerer. Usually ships before coffee gets cold.',
+    nullable: true,
+    description: 'Optional plain-text profile bio.',
+    maxLength: 255,
+  })
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(255)
+  public readonly bio!: string | null;
 }

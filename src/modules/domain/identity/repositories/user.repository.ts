@@ -37,13 +37,18 @@ export class UserRepository extends Repository<UserEntity> {
     const { sort, search, order, take, skip } = pageOptions;
     return this.createQueryBuilder('user')
       .leftJoinAndSelect('user.profile', 'profile')
+      .leftJoinAndSelect('user.status', 'status')
       .leftJoinAndSelect('user.roles', 'roles')
       .leftJoinAndSelect('roles.permissions', 'permissions')
-      .leftJoinAndSelect('profile.avatar', 'avatar')
+      .leftJoinAndSelect('profile.media.avatar', 'avatar')
       .leftJoinAndSelect('profile.personal.gender', 'gender')
+      .leftJoinAndSelect('profile.contact.phone', 'phone')
+      .leftJoinAndSelect('phone.country', 'phoneCountry')
+      .leftJoinAndSelect('profile.contact.alternate_phone', 'alternatePhone')
+      .leftJoinAndSelect('alternatePhone.country', 'alternatePhoneCountry')
       .leftJoinAndSelect('profile.contact.address', 'address')
       .leftJoinAndSelect('address.region', 'region')
-      .leftJoinAndSelect('address.country', 'country')
+      .leftJoinAndSelect('address.country', 'addressCountry')
       .where(
         "user.email like :query OR CONCAT(profile.name.first, ' ', profile.name.last) like :query",
         { query: `%${search}%` },
@@ -64,7 +69,7 @@ export class UserRepository extends Repository<UserEntity> {
 
   public async findByPhone(phone_e164: string): Promise<UserEntity | null> {
     return this.findOne({
-      where: { identity: { phone: { phone_e164 } } },
+      where: { profile: { contact: { phone: { phone_e164 } } } },
     });
   }
 
@@ -87,7 +92,7 @@ export class UserRepository extends Repository<UserEntity> {
   public async removeUser(id: string): Promise<void> {
     const user = await this.findByIdOrFail(id);
 
-    const avatar = user.profile.avatar;
+    const avatar = user.profile.media.avatar;
     const profileId = user.profile.id;
     const credentialsId = user.credentials.id;
 

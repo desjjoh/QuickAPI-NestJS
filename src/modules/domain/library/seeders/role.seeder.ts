@@ -11,7 +11,7 @@ import {
 } from '@/modules/system/seeder/types/seeder.types';
 
 export enum ROLE_KEYS {
-  ACCOUNT_USER = 'account_user',
+  VERIFIED_USER = 'verified_user',
   SYSTEM_ADMINISTRATOR = 'system-administrator',
 }
 
@@ -31,10 +31,10 @@ export const ROLES_SEED: RoleSeed[] = [
     permissions: [SystemPermissions.HAS_ALL_PERMISSIONS],
   },
   {
-    key: ROLE_KEYS.ACCOUNT_USER,
-    label: 'Account User',
+    key: ROLE_KEYS.VERIFIED_USER,
+    label: 'Verified User',
     description:
-      'Default role assigned to verified users for managing their own account.',
+      'Default role assigned after email verification for managing the user’s own account.',
     permissions: [
       AccountManagementPermissions.READ_ACCOUNT,
       AccountManagementPermissions.UPDATE_ACCOUNT,

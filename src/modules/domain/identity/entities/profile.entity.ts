@@ -13,7 +13,7 @@ import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';
 import { ImageEntity } from '../../media/entities/image.entity';
-import { UserAlternatePhoneEntity } from './phone.entity';
+import { UserAlternatePhoneEntity, UserPhoneEntity } from './phone.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -26,7 +26,20 @@ class Name {
   public readonly preferred!: string | null;
 }
 
+class Media {
+  @ManyToOne(() => ImageEntity, {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
+  public readonly avatar!: Relation<ImageEntity | null>;
+}
+
 class Personal {
+  @Column({ type: 'varchar', length: 255, nullable: true, default: null })
+  public readonly bio!: string | null;
+
   @Column({ type: 'date' })
   public readonly dob!: string;
 
@@ -40,6 +53,13 @@ class Personal {
 }
 
 class Contact {
+  @OneToOne(() => UserPhoneEntity, (phone: UserPhoneEntity) => phone.profile, {
+    eager: true,
+    cascade: ['insert', 'update'],
+    nullable: true,
+  })
+  public readonly phone!: Relation<UserPhoneEntity | null>;
+
   @OneToOne(
     () => UserAlternatePhoneEntity,
     (phone: UserAlternatePhoneEntity) => phone.profile,
@@ -79,11 +99,6 @@ export class UserProfileEntity extends BaseEntity {
   @Column(() => Contact, { prefix: false })
   public readonly contact!: Contact;
 
-  @ManyToOne(() => ImageEntity, {
-    eager: true,
-    nullable: true,
-    onDelete: 'SET NULL',
-  })
-  @JoinColumn({ name: 'avatar_id', referencedColumnName: 'id' })
-  public readonly avatar!: Relation<ImageEntity | null>;
+  @Column(() => Media, { prefix: false })
+  public readonly media!: Media;
 }

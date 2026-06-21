@@ -125,7 +125,7 @@ export class EmailVerificationService {
 
   private async verifyInitialEmail(user: UserEntity): Promise<void> {
     if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) {
-      await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.ACCOUNT_USER);
+      await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.VERIFIED_USER);
 
       return;
     }
@@ -138,7 +138,7 @@ export class EmailVerificationService {
       ACCOUNT_STATUS_KEYS.ACTIVE,
     );
 
-    await this.userSvc.addUserRoleByKey(updatedUser, ROLE_KEYS.ACCOUNT_USER);
+    await this.userSvc.addUserRoleByKey(updatedUser, ROLE_KEYS.VERIFIED_USER);
   }
 
   private async verifyEmailChange(

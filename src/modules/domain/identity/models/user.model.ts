@@ -39,16 +39,8 @@ export class IdentityDto {
   })
   public readonly email: string;
 
-  @ApiPropertyOptional({
-    type: PhoneDto,
-    description: 'Primary phone number details for the user, when provided.',
-    nullable: true,
-  })
-  public readonly phone: PhoneDto | null;
-
   public constructor(user: UserEntity) {
     this.email = user.identity.email;
-    this.phone = user.identity.phone ? new PhoneDto(user.identity.phone) : null;
   }
 }
 
@@ -81,6 +73,14 @@ export class NameDto {
 }
 
 export class PersonalDto {
+  @ApiPropertyOptional({
+    example: 'Builder, tester, and lifelong API tinkerer.',
+    description: 'Plain-text profile bio.',
+    nullable: true,
+    maxLength: 255,
+  })
+  public readonly bio: string | null;
+
   @ApiProperty({
     example: '1990-01-15',
     description: 'The user’s date of birth in ISO date format.',
@@ -95,12 +95,20 @@ export class PersonalDto {
   public readonly gender: string;
 
   public constructor(user: UserEntity) {
+    this.bio = user.profile.personal.bio ?? null;
     this.dob = user.profile.personal.dob;
     this.gender = user.profile.personal.gender.key;
   }
 }
 
 export class ContactDto {
+  @ApiPropertyOptional({
+    type: PhoneDto,
+    description: 'Primary phone number details for the user, when provided.',
+    nullable: true,
+  })
+  public readonly phone: PhoneDto | null;
+
   @ApiPropertyOptional({
     type: PhoneDto,
     description: 'Alternate phone number details for the user, when provided.',
@@ -116,12 +124,31 @@ export class ContactDto {
   public readonly address: AddressDto | null;
 
   public constructor(user: UserEntity) {
+    this.phone = user.profile.contact.phone
+      ? new PhoneDto(user.profile.contact.phone)
+      : null;
+
     this.alternate_phone = user.profile.contact.alternate_phone
       ? new PhoneDto(user.profile.contact.alternate_phone)
       : null;
 
     this.address = user.profile.contact.address
       ? new AddressDto(user.profile.contact.address)
+      : null;
+  }
+}
+
+export class MediaDto {
+  @ApiPropertyOptional({
+    type: ImageDto,
+    description: 'Optional avatar image associated with the user profile.',
+    nullable: true,
+  })
+  public readonly avatar: ImageDto | null;
+
+  public constructor(user: UserEntity) {
+    this.avatar = user.profile.media.avatar
+      ? new ImageDto(user.profile.media.avatar)
       : null;
   }
 }
@@ -145,20 +172,10 @@ export class ProfileDto {
   })
   public readonly contact: ContactDto;
 
-  @ApiPropertyOptional({
-    type: ImageDto,
-    description: 'Optional avatar image associated with the user profile.',
-    nullable: true,
-  })
-  public readonly avatar: ImageDto | null;
-
   public constructor(user: UserEntity) {
     this.name = new NameDto(user);
     this.personal = new PersonalDto(user);
     this.contact = new ContactDto(user);
-    this.avatar = user.profile.avatar
-      ? new ImageDto(user.profile.avatar)
-      : null;
   }
 }
 

@@ -100,8 +100,10 @@ export class RegisterMapper {
         name: {
           first: dto.first_name,
           last: dto.last_name,
+          preferred: null,
         },
         personal: {
+          bio: null,
           dob: dto.dob,
           gender: { id: dto.gender_id },
         },

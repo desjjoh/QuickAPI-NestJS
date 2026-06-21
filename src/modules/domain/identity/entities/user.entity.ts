@@ -18,18 +18,10 @@ import { UserProfileEntity } from './profile.entity';
 import { UserCredentialsEntity } from './credentials.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { AccountTokenEntity } from './account-token.entity';
-import { UserPhoneEntity } from './phone.entity';
 
 class Identity {
   @Column({ type: 'varchar', length: 254, unique: true })
   public readonly email!: string;
-
-  @OneToOne(() => UserPhoneEntity, (phone: UserPhoneEntity) => phone.user, {
-    eager: true,
-    cascade: ['insert', 'update'],
-    nullable: true,
-  })
-  public readonly phone!: Relation<UserPhoneEntity | null>;
 
   @Exclude()
   @Column({ type: 'text', nullable: true, default: null })
