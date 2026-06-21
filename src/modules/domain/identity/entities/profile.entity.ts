@@ -85,6 +85,13 @@ class Contact {
 
 @Entity('user_profiles')
 export class UserProfileEntity extends BaseEntity {
+  public constructor() {
+    super();
+
+    this.contact = new Contact();
+    this.media = new Media();
+  }
+
   @OneToOne(() => UserEntity, (user: UserEntity) => user.profile, {
     onDelete: 'CASCADE',
   })
