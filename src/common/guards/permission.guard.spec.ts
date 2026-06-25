@@ -23,9 +23,6 @@ type MockExecutionContext = ExecutionContext & {
   handler: () => void;
 };
 
-const ACCOUNT_READ =
-  PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].READ_ACCOUNT;
-
 const ACCOUNT_UPDATE =
   PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT;
 
@@ -177,7 +174,7 @@ describe('PermissionsGuard', () => {
     const guard = new PermissionsGuard(asReflector(reflector));
 
     const context = createExecutionContext({
-      user: createUserWithPermissions([ACCOUNT_READ]),
+      user: createUserWithPermissions([ACCOUNT_DELETE]),
     });
 
     await expect(guard.canActivate(context)).rejects.toThrow(

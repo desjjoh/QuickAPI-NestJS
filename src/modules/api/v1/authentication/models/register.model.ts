@@ -171,17 +171,6 @@ export class ResendRegistrationDto {
 
 export class ValidateRegistrationTokenDto {
   @ApiProperty({
-    example: 'V8nYk2QpL4sR7xZa',
-    description: 'The unique NanoID of the registration token record.',
-    minLength: 16,
-    maxLength: 16,
-    pattern: '^[0-9A-Za-z]{16}$',
-  })
-  @IsString()
-  @Length(16, 16)
-  public readonly token_id!: string;
-
-  @ApiProperty({
     example: 'A9x4bW8rN2Yp7sQmL6zT0cF3vH1jK5uDqE8iRoP',
     description:
       'The raw one-time registration token sent to the user. The API hashes this value before comparison.',
