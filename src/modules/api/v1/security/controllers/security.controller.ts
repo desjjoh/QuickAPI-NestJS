@@ -16,13 +16,7 @@ import {
   ConfirmPasswordResetDto,
   ValidatePasswordResetTokenDto,
 } from '../models/password-reset.model';
-import {
-  VerifyEmailDto,
-  VerifyEmailResponseDto,
-  ResendVerificationDto,
-  ResendVerificationResponseDto,
-} from '../models/verify-email.model';
-import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+
 import { PasswordResetService } from '@/modules/domain/identity/services/password-reset.service';
 
 @ApiTags('Request Security')
@@ -30,7 +24,7 @@ import { PasswordResetService } from '@/modules/domain/identity/services/passwor
 export class SecurityApiController {
   constructor(
     private readonly svc: SecurityApiService,
-    private readonly evSvc: EmailVerificationService,
+
     private readonly prSvc: PasswordResetService,
   ) {}
 
@@ -50,61 +44,6 @@ export class SecurityApiController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<CsrfDto> {
     return this.svc.issueCsrf(res);
-  }
-
-  // POST /email-verification/confirm
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Post('email-verification/confirm')
-  @ApiOperation({
-    summary: 'Verify a newly registered account email address.',
-    description:
-      'Consumes a one-time email verification token and activates the account when the token is valid.',
-  })
-  @ApiBody({
-    type: VerifyEmailDto,
-    description:
-      'The email verification token ID and raw token from the verification link.',
-  })
-  @ApiOkResponse({
-    type: VerifyEmailResponseDto,
-    description: 'The email address was verified successfully.',
-  })
-  public async verifyEmail(
-    @Body() dto: VerifyEmailDto,
-  ): Promise<VerifyEmailResponseDto> {
-    await this.evSvc.verifyEmail(dto.token_id, dto.token);
-
-    return new VerifyEmailResponseDto({
-      message: 'Email address verified successfully.',
-    });
-  }
-
-  // POST /email-verification/resend
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Post('email-verification/resend')
-  @ApiOperation({
-    summary: 'Resend email verification',
-    description:
-      'Requests a new email verification message for an account that still requires verification.',
-  })
-  @ApiBody({
-    type: ResendVerificationDto,
-    description: 'The email address that should receive a verification email.',
-  })
-  @ApiOkResponse({
-    type: ResendVerificationResponseDto,
-    description:
-      'A generic confirmation response. The response does not reveal whether the email address is registered.',
-  })
-  public async resendVerification(
-    @Body() dto: ResendVerificationDto,
-  ): Promise<ResendVerificationResponseDto> {
-    await this.evSvc.resendVerificationEmail(dto.email);
-
-    return new ResendVerificationResponseDto({
-      message:
-        'If an account exists and requires verification, a verification email will be sent.',
-    });
   }
 
   // POST /password-reset/request

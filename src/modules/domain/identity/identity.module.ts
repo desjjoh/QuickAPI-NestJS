@@ -11,6 +11,7 @@ import { UserRepository } from './repositories/user.repository';
 import { UserService } from './services/user.service';
 import { AccountTokenEntity } from './entities/account-token.entity';
 import { AccountTokenService } from './services/token.service';
+import { RegistrationTokenEntity } from './entities/registration-token.entity';
 
 import { LibraryModule } from '../library/library.module';
 import { RefreshService } from './services/refresh.service';
@@ -22,6 +23,8 @@ import {
   UserAlternatePhoneEntity,
   UserPhoneEntity,
 } from './entities/phone.entity';
+import { RegistrationTokenService } from './services/registration-token.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -32,6 +35,7 @@ import {
       UserAlternatePhoneEntity,
       UserCredentialsEntity,
       AccountTokenEntity,
+      RegistrationTokenEntity,
     ]),
     TokenModule,
     LibraryModule,
@@ -44,6 +48,7 @@ import {
     RefreshService,
     AccountTokenService,
     EmailVerificationService,
+    RegistrationTokenService,
     PasswordResetService,
   ],
   exports: [
@@ -51,6 +56,7 @@ import {
     UserService,
     RefreshService,
     AccountTokenService,
+    RegistrationTokenService,
     EmailVerificationService,
     PasswordResetService,
   ],

@@ -19,6 +19,7 @@ import {
   UserAlternatePhoneEntity,
   UserPhoneEntity,
 } from '@/modules/domain/identity/entities/phone.entity';
+import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -49,6 +50,7 @@ const dataSourceOptions: DataSourceOptions = {
     UserProfileEntity,
     UserEntity,
     AccountTokenEntity,
+    RegistrationTokenEntity,
   ],
   migrations: ['src/database/migrations/*{.ts,.js}'],
   ssl: env.DB_SSL

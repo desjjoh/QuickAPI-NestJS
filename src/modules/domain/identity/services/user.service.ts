@@ -109,15 +109,28 @@ export class UserService {
 
   private async getDefaultAccountStatus(): Promise<AccountStatusEntity> {
     const status: AccountStatusEntity | null = await this.statusRepo.findOne({
-      where: { key: ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION },
+      where: { key: ACCOUNT_STATUS_KEYS.ACTIVE },
     });
 
     if (!status)
       throw new InternalServerErrorException(
-        'Default account status is not seeded.',
+        'Default active account status is not seeded.',
       );
 
     return status;
+  }
+
+  private async getDefaultUserRole(): Promise<RoleEntity> {
+    const role: RoleEntity | null = await this.roleRepo.findOne({
+      where: { key: ROLE_KEYS.USER },
+    });
+
+    if (!role)
+      throw new InternalServerErrorException(
+        'Default user role is not seeded.',
+      );
+
+    return role;
   }
 
   public async createUser(input: DeepPartial<UserEntity>): Promise<UserEntity> {
@@ -135,6 +148,7 @@ export class UserService {
       throw new ConflictException('A user with this email already exists.');
 
     const status: AccountStatusEntity = await this.getDefaultAccountStatus();
+    const role: RoleEntity = await this.getDefaultUserRole();
     const user: UserEntity = await this.userRepo.createUser({
       ...input,
       credentials: {
@@ -142,6 +156,7 @@ export class UserService {
         token_version: 0,
       },
       status: { id: status.id },
+      roles: [role],
     });
 
     return this.userRepo.findByIdOrFail(user.id);

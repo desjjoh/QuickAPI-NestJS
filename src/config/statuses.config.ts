@@ -1,5 +1,4 @@
 export const ACCOUNT_STATUS_KEYS = {
-  PENDING_VERIFICATION: 'pending_verification',
   ACTIVE: 'active',
   DISABLED: 'disabled',
   LOCKED: 'locked',
@@ -19,12 +18,6 @@ export const ACCOUNT_STATUSES: AccountStatusSeed[] = [
     key: ACCOUNT_STATUS_KEYS.ACTIVE,
     label: 'Active',
     description: 'The account is active and may authenticate normally.',
-  },
-  {
-    key: ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION,
-    label: 'Pending Verification',
-    description:
-      'The account has been created but still requires email verification.',
   },
   {
     key: ACCOUNT_STATUS_KEYS.DISABLED,

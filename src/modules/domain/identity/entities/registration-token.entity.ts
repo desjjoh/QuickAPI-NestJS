@@ -1,0 +1,42 @@
+import { Column, Entity } from 'typeorm';
+
+import { BaseEntity } from '@/common/entities/base.entity';
+
+export type RegistrationTokenMetadata = {
+  email: string;
+  password: string;
+  profile: {
+    name: {
+      first: string;
+      last: string;
+      preferred: null;
+    };
+    personal: {
+      bio: null;
+      dob: string;
+      gender: { id: string };
+    };
+  };
+  credentials: {
+    refresh: null;
+    token_version: 0;
+  };
+};
+
+@Entity('registration_tokens')
+export class RegistrationTokenEntity extends BaseEntity {
+  @Column({ type: 'varchar', length: 254 })
+  public readonly email!: string;
+
+  @Column({ type: 'varchar', length: 128 })
+  public readonly token_hash!: string;
+
+  @Column({ type: 'datetime' })
+  public readonly expires_at!: Date;
+
+  @Column({ type: 'datetime', nullable: true })
+  public readonly consumed_at!: Date | null;
+
+  @Column({ type: 'json' })
+  public readonly metadata!: RegistrationTokenMetadata;
+}

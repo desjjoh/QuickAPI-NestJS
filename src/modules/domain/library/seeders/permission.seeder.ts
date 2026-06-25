@@ -27,12 +27,6 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
 
   // ACCOUNT MANAGEMENT
   {
-    key: String(AccountManagementPermissions.READ_ACCOUNT),
-    label: 'Read account',
-    description:
-      'Allows the user to view their own profile and account details.',
-  },
-  {
     key: String(AccountManagementPermissions.UPDATE_ACCOUNT),
     label: 'Update account',
     description:

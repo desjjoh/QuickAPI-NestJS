@@ -136,6 +136,49 @@ export class ProfileApiController {
     return this.svc.removeAvatar(user, res);
   }
 
+  // PUT /phone
+  @Put('phone')
+  @ApiOperation({
+    summary: 'Set primary phone number',
+    description:
+      'Creates or updates the authenticated user’s primary phone number with full country and dialing details.',
+  })
+  @ApiOkResponse({
+    description:
+      'The primary phone number was created or updated successfully.',
+    type: JWTDto,
+  })
+  @ApiBody({
+    type: UpdatePhoneDto,
+    description:
+      'Complete phone payload used to create or replace the authenticated user’s primary phone number.',
+  })
+  public async updatePrimaryPhone(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdatePhoneDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updatePhone(user, dto, res);
+  }
+
+  // DELETE /phone
+  @Delete('phone')
+  @ApiOperation({
+    summary: 'Remove primary phone number',
+    description:
+      'Removes the authenticated user’s primary phone number record. If no primary phone exists, the request fails.',
+  })
+  @ApiOkResponse({
+    description: 'The primary phone number was removed successfully.',
+    type: JWTDto,
+  })
+  public async removePrimaryPhone(
+    @CurrentUser() user: UserEntity,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.removePhone(user, res);
+  }
+
   // PUT /address
   @Put('address')
   @ApiOperation({
@@ -184,98 +227,5 @@ export class ProfileApiController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     return this.svc.removeAddress(user, res);
-  }
-
-  // PUT /phone
-  @Put('phone')
-  @ApiOperation({
-    summary: 'Set primary phone number',
-    description:
-      'Creates or updates the authenticated user’s primary phone number with full country and dialing details.',
-  })
-  @ApiOkResponse({
-    description:
-      'The primary phone number was created or updated successfully.',
-    type: JWTDto,
-  })
-  @ApiBody({
-    type: UpdatePhoneDto,
-    description:
-      'Complete phone payload used to create or replace the authenticated user’s primary phone number.',
-  })
-  public async updatePrimaryPhone(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdatePhoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updatePhone(user, dto, res);
-  }
-
-  // DELETE /phone
-  @Delete('phone')
-  @ApiOperation({
-    summary: 'Remove primary phone number',
-    description:
-      'Removes the authenticated user’s primary phone number record. If no primary phone exists, the request fails.',
-  })
-  @ApiOkResponse({
-    description: 'The primary phone number was removed successfully.',
-    type: JWTDto,
-  })
-  public async removePrimaryPhone(
-    @CurrentUser() user: UserEntity,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.removePhone(user, res);
-  }
-
-  // PUT /alt-phone
-  @Put('alt-phone')
-  @ApiOperation({
-    summary: 'Set alternate profile phone number',
-    description:
-      'Creates or updates the authenticated user’s alternate profile phone number with full country and dialing details.',
-  })
-  @ApiBody({
-    type: UpdatePhoneDto,
-    description:
-      'Complete phone payload used to create or replace the authenticated user’s alternate profile phone number.',
-  })
-  @ApiOkResponse({
-    description:
-      'Alternate profile phone number created or updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
-  })
-  @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
-  )
-  public async updateAlternatePhone(
-    @CurrentUser() user: UserEntity,
-    @Body() dto: UpdatePhoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateAlternatePhone(user, dto, res);
-  }
-
-  // DELETE /alt-phone
-  @Delete('alt-phone')
-  @ApiOperation({
-    summary: 'Remove alternate profile phone number',
-    description:
-      'Removes the authenticated user’s alternate profile phone number record. If no alternate phone exists, the request fails.',
-  })
-  @ApiOkResponse({
-    description:
-      'Alternate profile phone number removed successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
-  })
-  @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
-  )
-  public async removeAlternatePhone(
-    @CurrentUser() user: UserEntity,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.removeAlternatePhone(user, res);
   }
 }

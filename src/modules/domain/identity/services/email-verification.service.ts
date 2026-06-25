@@ -17,6 +17,8 @@ import { EmailVerificationTemplate } from '@/modules/system/email/templates/emai
 import { env } from '@/config/environment.config';
 import { UserRepository } from '../repositories/user.repository';
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
+import { RegistrationTokenMetadata } from '../entities/registration-token.entity';
+import { RegistrationTokenService } from './registration-token.service';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -29,6 +31,7 @@ export class EmailVerificationService {
   public constructor(
     private readonly repo: UserRepository,
     private readonly accountTokenSvc: AccountTokenService,
+    private readonly registrationTokenSvc: RegistrationTokenService,
     private readonly userSvc: UserService,
     private readonly emailSvc: EmailService,
   ) {}
@@ -77,13 +80,28 @@ export class EmailVerificationService {
     });
   }
 
-  public async resendVerificationEmail(email: string): Promise<void> {
-    const user: UserEntity | null = await this.repo.findByEmail(email);
+  public async sendRegistrationVerificationEmail(
+    email: string,
+    metadata: RegistrationTokenMetadata,
+  ): Promise<void> {
+    const verification: CreatedAccountToken =
+      await this.registrationTokenSvc.createToken({
+        email,
+        expiresInMs: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES * minute,
+        metadata,
+      });
 
-    if (!user) return;
-    if (user.status?.key !== ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION) return;
-
-    await this.sendVerificationEmail(user);
+    await this.sendEmail({
+      firstName: metadata.profile.name.first,
+      to: email,
+      tokenId: verification.id,
+      token: verification.token,
+      verificationPath: '/authentication/confirm-registration',
+      metadata: {
+        email,
+        tokenId: verification.id,
+      },
+    });
   }
 
   public async verifyEmail(tokenId: string, token: string): Promise<void> {
@@ -122,23 +140,49 @@ export class EmailVerificationService {
       metadata,
     });
   }
+  public async verifyRegistrationToken(
+    tokenId: string,
+    token: string,
+  ): Promise<void> {
+    const registrationToken = await this.registrationTokenSvc.consumeToken(
+      tokenId,
+      token,
+    );
+
+    await this.verifyRegistration(registrationToken.metadata);
+  }
+
+  private async verifyRegistration(
+    metadata: RegistrationTokenMetadata,
+  ): Promise<void> {
+    const existingUser: UserEntity | null = await this.repo.findByEmail(
+      metadata.email,
+    );
+
+    if (existingUser)
+      throw new ConflictException(
+        'A user with this email address already exists.',
+      );
+
+    const user: UserEntity = await this.userSvc.createUser({
+      identity: {
+        email: metadata.email,
+        password: metadata.password,
+      },
+      profile: metadata.profile,
+    });
+
+    await this.verifyInitialEmail(user);
+  }
 
   private async verifyInitialEmail(user: UserEntity): Promise<void> {
     if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) {
-      await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.VERIFIED_USER);
+      await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.USER);
 
       return;
     }
 
-    if (user.status?.key !== ACCOUNT_STATUS_KEYS.PENDING_VERIFICATION)
-      throw new BadRequestException('Account cannot be verified.');
-
-    const updatedUser: UserEntity = await this.userSvc.updateUserStatusByKey(
-      user,
-      ACCOUNT_STATUS_KEYS.ACTIVE,
-    );
-
-    await this.userSvc.addUserRoleByKey(updatedUser, ROLE_KEYS.VERIFIED_USER);
+    throw new BadRequestException('Account cannot be verified.');
   }
 
   private async verifyEmailChange(
@@ -168,27 +212,37 @@ export class EmailVerificationService {
 
   private async sendEmail({
     user,
+    firstName = user?.profile.name.first ?? '',
     to,
     tokenId,
     token,
+    metadata,
+    verificationPath = '/authentication/verify-email',
   }: {
-    user: UserEntity;
+    user?: UserEntity;
+    firstName?: string;
     to: string;
     tokenId: string;
     token: string;
+    metadata?: Record<string, string>;
+    verificationPath?: string;
   }): Promise<void> {
-    const verificationUrl: string = this.buildVerificationUrl(tokenId, token);
+    const verificationUrl: string = this.buildVerificationUrl(
+      tokenId,
+      token,
+      verificationPath,
+    );
 
     await this.emailSvc.sendEmail({
       to,
       template: EmailVerificationTemplate,
       model: {
-        firstName: user.profile.name.first,
+        firstName,
         verificationUrl,
         expiresInMinutes: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES,
       },
-      metadata: {
-        userId: user.id,
+      metadata: metadata ?? {
+        userId: user?.id ?? '',
         tokenId,
       },
     });
@@ -209,11 +263,12 @@ export class EmailVerificationService {
     return newEmail.trim().toLowerCase();
   }
 
-  private buildVerificationUrl(tokenId: string, token: string): string {
-    const url: URL = new URL(
-      '/authentication/verify-email',
-      env.PUBLIC_WEB_URL,
-    );
+  private buildVerificationUrl(
+    tokenId: string,
+    token: string,
+    path: string,
+  ): string {
+    const url: URL = new URL(path, env.PUBLIC_WEB_URL);
 
     url.searchParams.set('token_id', tokenId);
     url.searchParams.set('token', token);

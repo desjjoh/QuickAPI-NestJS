@@ -24,7 +24,12 @@ import { minute } from '@/common/constants/milliseconds.constants';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 
-import { RegisterDto, RegistrationPendingDto } from '../models/register.model';
+import {
+  RegisterDto,
+  RegistrationPendingDto,
+  VerifyRegistrationDto,
+  VerifyRegistrationResponseDto,
+} from '../models/register.model';
 import { AuthService } from '../services/authentication.service';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { SignInDto } from '../models/signin.model';
@@ -32,11 +37,6 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { LocalAuthGuard } from '@/common/guards/local.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
-import { PermissionsGuard } from '@/common/guards/permission.guard';
-import {
-  PERMISSION_MATRIX,
-  PermissionDomain,
-} from '@/config/permissions.config';
 import { SignOutResponseDto } from '../models/sign-out.model';
 
 @ApiTags('Identity & Sessions')
@@ -57,10 +57,10 @@ export class AuthApiController {
   @ApiOperation({
     summary: 'Register a new user',
     description:
-      'Creates a new user account, sets a refresh token cookie, and returns an access token with the authenticated user.',
+      'Creates a pending registration token and sends a verification email before creating the user account.',
   })
   @ApiCreatedResponse({
-    description: 'The user account was created successfully.',
+    description: 'The registration request is pending email verification.',
     type: RegistrationPendingDto,
   })
   @ApiConflictResponse({
@@ -68,6 +68,34 @@ export class AuthApiController {
   })
   async register(@Body() input: RegisterDto): Promise<RegistrationPendingDto> {
     return this.svc.register(input);
+  }
+
+  // POST /register/confirm
+  @Post('register/confirm')
+  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @ApiBody({
+    type: VerifyRegistrationDto,
+    description:
+      'The registration token ID and raw token from the registration verification link.',
+  })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify a pending registration',
+    description:
+      'Consumes a one-time registration token and creates the user account when the token is valid.',
+  })
+  @ApiOkResponse({
+    description: 'The pending registration was verified successfully.',
+    type: VerifyRegistrationResponseDto,
+  })
+  async verifyRegistration(
+    @Body() input: VerifyRegistrationDto,
+  ): Promise<VerifyRegistrationResponseDto> {
+    await this.svc.verifyRegistration(input.token_id, input.token);
+
+    return new VerifyRegistrationResponseDto({
+      message: 'Registration verified successfully.',
+    });
   }
 
   // POST /sign-in
@@ -89,10 +117,7 @@ export class AuthApiController {
   @ApiUnauthorizedResponse({
     description: 'Invalid email or password.',
   })
-  @UseGuards(LocalAuthGuard, PermissionsGuard)
-  @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].READ_ACCOUNT,
-  )
+  @UseGuards(LocalAuthGuard)
   async signIn(
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
@@ -143,10 +168,7 @@ export class AuthApiController {
   })
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @ApiBearerAuth('access-token')
-  @UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
-  @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].READ_ACCOUNT,
-  )
+  @UseGuards(CsrfGuard, RefreshTokenGuard)
   async verifyToken(
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,

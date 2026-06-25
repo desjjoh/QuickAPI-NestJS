@@ -20,12 +20,6 @@ export const ACCOUNT_STATUS_SEEDS: AccountStatusSeed[] = [
     description: 'The account is active and may authenticate normally.',
   },
   {
-    key: 'pending_verification',
-    label: 'Pending Verification',
-    description:
-      'The account has been created but still requires email verification.',
-  },
-  {
     key: 'disabled',
     label: 'Disabled',
     description:

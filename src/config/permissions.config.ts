@@ -11,7 +11,6 @@ export enum SystemPermissions {
 
 // MANAGE ACCOUNT
 export enum AccountManagementPermissions {
-  READ_ACCOUNT = 'read_account',
   UPDATE_ACCOUNT = 'update_account',
   DELETE_ACCOUNT = 'delete_account',
 }

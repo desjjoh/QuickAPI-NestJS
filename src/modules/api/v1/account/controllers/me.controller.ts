@@ -40,13 +40,23 @@ import {
 } from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
+import { Throttle } from '@nestjs/throttler';
+import { minute } from '@/common/constants/milliseconds.constants';
+import {
+  VerifyEmailDto,
+  VerifyEmailResponseDto,
+} from '../models/verify-email.model';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
-@Controller('me')
+@Controller('')
 @UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
 export class MeApiController {
-  public constructor(private readonly svc: MeApiService) {}
+  public constructor(
+    private readonly svc: MeApiService,
+    private readonly evSvc: EmailVerificationService,
+  ) {}
 
   // DELETE /
   @Delete('')
@@ -102,6 +112,33 @@ export class MeApiController {
     return new UpdateEmailResponseDto({
       message:
         'Verification email sent. Please confirm the new email address to complete the change.',
+    });
+  }
+
+  // POST /email/confirm
+  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Post('email/confirm')
+  @ApiOperation({
+    summary: 'Verify a newly registered account email address.',
+    description:
+      'Consumes a one-time email verification token and activates the account when the token is valid.',
+  })
+  @ApiBody({
+    type: VerifyEmailDto,
+    description:
+      'The email verification token ID and raw token from the verification link.',
+  })
+  @ApiOkResponse({
+    type: VerifyEmailResponseDto,
+    description: 'The email address was verified successfully.',
+  })
+  public async verifyEmail(
+    @Body() dto: VerifyEmailDto,
+  ): Promise<VerifyEmailResponseDto> {
+    await this.evSvc.verifyEmail(dto.token_id, dto.token);
+
+    return new VerifyEmailResponseDto({
+      message: 'Email address verified successfully.',
     });
   }
 

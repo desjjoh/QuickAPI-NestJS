@@ -1,4 +1,5 @@
 import { Base } from '@/common/models/base.model';
+import { RegistrationTokenMetadata } from '@/modules/domain/identity/entities/registration-token.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import {
@@ -110,11 +111,37 @@ export class RegisterMapper {
       },
     };
   }
+
+  public static toRegistrationTokenMetadata(
+    dto: RegisterDto,
+    password: string,
+  ): RegistrationTokenMetadata {
+    return {
+      email: dto.email,
+      password,
+      profile: {
+        name: {
+          first: dto.first_name,
+          last: dto.last_name,
+          preferred: null,
+        },
+        personal: {
+          bio: null,
+          dob: dto.dob,
+          gender: { id: dto.gender_id },
+        },
+      },
+      credentials: {
+        refresh: null,
+        token_version: 0,
+      },
+    };
+  }
 }
 
 export class RegistrationPendingDto {
   @ApiProperty({
-    example: 'Account created. Please verify your email address.',
+    example: 'Registration pending. Please verify your email address.',
     description: 'Human-readable registration result message.',
   })
   public readonly message: string;
@@ -128,5 +155,39 @@ export class RegistrationPendingDto {
   public constructor(data: RegistrationPendingDto) {
     this.message = data.message;
     this.email = data.email;
+  }
+}
+
+export class VerifyRegistrationDto {
+  @ApiProperty({
+    example: 'V8nYk2QpL4sR7xZa',
+    description: 'The unique NanoID of the registration token record.',
+    minLength: 16,
+    maxLength: 16,
+    pattern: '^[0-9A-Za-z]{16}$',
+  })
+  @IsString()
+  @Length(16, 16)
+  public readonly token_id!: string;
+
+  @ApiProperty({
+    example: 'A9x4bW8rN2Yp7sQmL6zT0cF3vH1jK5uDqE8iRoP',
+    description:
+      'The raw one-time registration token sent to the user. The API hashes this value before comparison.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  public readonly token!: string;
+}
+
+export class VerifyRegistrationResponseDto {
+  @ApiProperty({
+    example: 'Registration verified successfully.',
+    description: 'Human-readable confirmation message.',
+  })
+  public readonly message: string;
+
+  public constructor(data: VerifyRegistrationResponseDto) {
+    this.message = data.message;
   }
 }
