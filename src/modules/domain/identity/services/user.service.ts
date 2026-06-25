@@ -14,7 +14,7 @@ import {
   getRefreshCookieName,
 } from '@/config/cookie.config';
 
-import { UserEntity } from '../entities/user.entity';
+import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { UserAddressEntity } from '../entities/address.entity';
 import { AccountStatusRepository } from '../../library/repositories/accountstatus.repository';
@@ -26,10 +26,7 @@ import { AccountStatusEntity } from '../../library/entities/accountstatus.entity
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { RoleRepository } from '../../library/repositories/role.repository';
-import {
-  UserPhoneEntity,
-  UserAlternatePhoneEntity,
-} from '../entities/phone.entity';
+import { UserPhoneEntity } from '../entities/phone.entity';
 
 @Injectable()
 export class UserService {
@@ -101,6 +98,36 @@ export class UserService {
     return this.userRepo.findByIdOrFail(user.id);
   }
 
+  public async updateMetadata(
+    user: UserEntity,
+    metadata: Partial<UserEntity['metadata']>,
+  ): Promise<UserEntity> {
+    const current = await this.userRepo.findByIdOrFail(user.id);
+
+    return this.updateUser(current, {
+      metadata: createUserMetadata({
+        ...current.metadata,
+        ...metadata,
+      }),
+    });
+  }
+
+  public async recordSignIn(user: UserEntity): Promise<UserEntity> {
+    return this.updateMetadata(user, { last_sign_in: new Date() });
+  }
+
+  public async recordEmailChanged(user: UserEntity): Promise<UserEntity> {
+    return this.updateMetadata(user, {
+      last_changed_email: new Date(),
+    });
+  }
+
+  public async recordPasswordChanged(user: UserEntity): Promise<UserEntity> {
+    return this.updateMetadata(user, {
+      last_changed_password: new Date(),
+    });
+  }
+
   public async deleteUser(user: UserEntity, res: Response): Promise<void> {
     await this.userRepo.removeUser(user.id);
 
@@ -157,6 +184,7 @@ export class UserService {
       },
       status: { id: status.id },
       roles: [role],
+      metadata: createUserMetadata(),
     });
 
     return this.userRepo.findByIdOrFail(user.id);
@@ -210,15 +238,8 @@ export class UserService {
     return this.userRepo.findByIdOrFail(updatedUser.id);
   }
 
-  public async deletePhone(
-    phone: UserPhoneEntity | UserAlternatePhoneEntity,
-  ): Promise<void> {
-    const entity =
-      phone instanceof UserAlternatePhoneEntity
-        ? UserAlternatePhoneEntity
-        : UserPhoneEntity;
-
-    await this.userRepo.manager.delete(entity, {
+  public async deletePhone(phone: UserPhoneEntity): Promise<void> {
+    await this.userRepo.manager.delete(UserPhoneEntity, {
       id: phone.id,
     });
   }

@@ -6,7 +6,7 @@ import { PaginationOptions } from '@/common/models/pagination.model';
 import { BaseModel } from '@/common/models/base.model';
 import { AddressDto } from '@/common/models/address.model';
 
-import { UserEntity } from '../entities/user.entity';
+import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { ImageDto } from '../../media/models/image.model';
@@ -110,13 +110,6 @@ export class ContactDto {
   public readonly phone: PhoneDto | null;
 
   @ApiPropertyOptional({
-    type: PhoneDto,
-    description: 'Alternate phone number details for the user, when provided.',
-    nullable: true,
-  })
-  public readonly alternate_phone: PhoneDto | null;
-
-  @ApiPropertyOptional({
     type: AddressDto,
     description: 'Optional mailing or contact address for the user.',
     nullable: true,
@@ -126,10 +119,6 @@ export class ContactDto {
   public constructor(user: UserEntity) {
     this.phone = user.profile.contact.phone
       ? new PhoneDto(user.profile.contact.phone)
-      : null;
-
-    this.alternate_phone = user.profile.contact.alternate_phone
-      ? new PhoneDto(user.profile.contact.alternate_phone)
       : null;
 
     this.address = user.profile.contact.address
@@ -179,6 +168,40 @@ export class ProfileDto {
   }
 }
 
+export class MetadataDto {
+  @ApiPropertyOptional({
+    example: '2026-06-25T14:30:00.000Z',
+    description:
+      'Most recent successful sign-in timestamp, in ISO 8601 format.',
+    nullable: true,
+  })
+  public readonly lastSignIn: string | null;
+
+  @ApiPropertyOptional({
+    example: '2026-06-25T14:30:00.000Z',
+    description:
+      'Most recent confirmed email change timestamp, in ISO 8601 format.',
+    nullable: true,
+  })
+  public readonly lastChangedEmail: string | null;
+
+  @ApiPropertyOptional({
+    example: '2026-06-25T14:30:00.000Z',
+    description: 'Most recent password change timestamp, in ISO 8601 format.',
+    nullable: true,
+  })
+  public readonly lastChangedPassword: string | null;
+
+  public constructor(user: UserEntity) {
+    const metadata = createUserMetadata(user.metadata);
+
+    this.lastSignIn = metadata.last_sign_in?.toISOString() ?? null;
+    this.lastChangedEmail = metadata.last_changed_email?.toISOString() ?? null;
+    this.lastChangedPassword =
+      metadata.last_changed_password?.toISOString() ?? null;
+  }
+}
+
 export class UserDto extends BaseModel {
   @ApiProperty({
     type: IdentityDto,
@@ -191,6 +214,12 @@ export class UserDto extends BaseModel {
     description: 'Profile information associated with the user account.',
   })
   public readonly profile: ProfileDto;
+
+  @ApiProperty({
+    type: MetadataDto,
+    description: 'Account activity and security metadata timestamps.',
+  })
+  public readonly metadata: MetadataDto;
 
   @ApiProperty({
     example: [RoleDto],
@@ -207,6 +236,7 @@ export class UserDto extends BaseModel {
     this.identity = new IdentityDto(user);
     this.profile = new ProfileDto(user);
     this.roles = user.roles?.map((role: RoleEntity) => new RoleDto(role)) ?? [];
+    this.metadata = new MetadataDto(user);
     this.status = user.status.key;
   }
 }

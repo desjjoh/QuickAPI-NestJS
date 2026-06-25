@@ -15,10 +15,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
-import {
-  UserAlternatePhoneEntity,
-  UserPhoneEntity,
-} from '@/modules/domain/identity/entities/phone.entity';
+import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 
 const dataSourceOptions: DataSourceOptions = {
@@ -44,7 +41,6 @@ const dataSourceOptions: DataSourceOptions = {
     // IDENTITY MODULE
     UserAddressEntity,
     UserPhoneEntity,
-    UserAlternatePhoneEntity,
 
     UserCredentialsEntity,
     UserProfileEntity,

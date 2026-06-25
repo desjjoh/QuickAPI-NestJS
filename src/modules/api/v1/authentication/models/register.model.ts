@@ -158,7 +158,18 @@ export class RegistrationPendingDto {
   }
 }
 
-export class VerifyRegistrationDto {
+export class ResendRegistrationDto {
+  @ApiProperty({
+    example: 'example@domain.com',
+    description: 'The email address for the pending registration to resend.',
+    maxLength: 254,
+  })
+  @IsEmail()
+  @MaxLength(254)
+  public readonly email!: string;
+}
+
+export class ValidateRegistrationTokenDto {
   @ApiProperty({
     example: 'V8nYk2QpL4sR7xZa',
     description: 'The unique NanoID of the registration token record.',
@@ -178,6 +189,35 @@ export class VerifyRegistrationDto {
   @IsString()
   @IsNotEmpty()
   public readonly token!: string;
+}
+
+export class VerifyRegistrationDto extends ValidateRegistrationTokenDto {
+  @ApiProperty({
+    example: '123456',
+    description:
+      'The 6-digit verification code included in the registration email.',
+    minLength: 6,
+    maxLength: 6,
+    pattern: '^\\d{6}$',
+  })
+  @IsString()
+  @Matches(/^\d{6}$/, {
+    message: 'Verification code must be exactly 6 digits.',
+  })
+  public readonly code!: string;
+}
+
+export class ValidateRegistrationTokenResponseDto {
+  @ApiProperty({
+    example: true,
+    description:
+      'Indicates the registration token exists, has not expired, has not been consumed, and matches the provided token value.',
+  })
+  public readonly valid: boolean;
+
+  public constructor(data: ValidateRegistrationTokenResponseDto) {
+    this.valid = data.valid;
+  }
 }
 
 export class VerifyRegistrationResponseDto {

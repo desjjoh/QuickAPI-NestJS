@@ -1,26 +1,26 @@
 import { EmailTemplate } from '../models/template.model';
 
-export interface EmailVerificationTemplateContext {
+export interface RegistrationVerificationTemplateContext {
   firstName: string;
   verificationUrl: string;
   expiresInMinutes: number;
   mfaCode: string;
 }
 
-export const EmailVerificationTemplate = new EmailTemplate({
-  key: 'email-verification',
-  subject: 'Confirm your new email address',
-  tag: 'email-change-verification',
+export const RegistrationVerificationTemplate = new EmailTemplate({
+  key: 'registration-verification',
+  subject: 'Complete your registration',
+  tag: 'registration-verification',
   metadata: {
     category: 'account',
-    workflow: 'email-change-verification',
+    workflow: 'registration-verification',
   },
   html: `
       <!doctype html>
       <html lang="en">
         <head>
           <meta charset="utf-8" />
-          <title>Confirm your new email address</title>
+          <title>Complete your registration</title>
         </head>
 
         <body style="margin:0;padding:0;background-color:#f6f7f9;font-family:Arial,Helvetica,sans-serif;color:#1f2933;">
@@ -31,7 +31,7 @@ export const EmailVerificationTemplate = new EmailTemplate({
                   <tr>
                     <td style="padding:32px 32px 16px 32px;">
                       <h1 style="margin:0;font-size:24px;line-height:1.3;color:#111827;">
-                        Confirm your new email address
+                        Complete your registration
                       </h1>
                     </td>
                   </tr>
@@ -43,7 +43,7 @@ export const EmailVerificationTemplate = new EmailTemplate({
                       </p>
 
                       <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;">
-                        We received a request to change the email address for your account. Please confirm this email address and enter the 6-digit verification code to complete the change.
+                        Thanks for creating an account. Please confirm your email address and enter the 6-digit verification code to complete registration.
                       </p>
 
                       <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">
@@ -68,7 +68,7 @@ export const EmailVerificationTemplate = new EmailTemplate({
                   <tr>
                     <td align="center" style="padding:8px 32px 32px 32px;">
                       <a href="{{verificationUrl}}" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;padding:14px 22px;border-radius:8px;">
-                        Confirm email change
+                        Complete registration
                       </a>
                     </td>
                   </tr>
@@ -90,7 +90,7 @@ export const EmailVerificationTemplate = new EmailTemplate({
                   <tr>
                     <td style="padding:24px 32px;background-color:#f9fafb;border-top:1px solid #e5e7eb;">
                       <p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280;">
-                        If you did not request this email change, you can safely ignore this email.
+                        If you did not create this account, you can safely ignore this email.
                       </p>
                     </td>
                   </tr>

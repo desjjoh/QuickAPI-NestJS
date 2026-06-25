@@ -14,6 +14,7 @@ export type CreateAccountTokenOptions = {
   type: AccountTokenType;
   expiresInMs: number;
   metadata?: AccountTokenMetadata | null;
+  mfaCodeHash?: string | null;
 };
 
 export type CreatedAccountToken = {
@@ -34,6 +35,7 @@ export class AccountTokenService {
     type,
     expiresInMs,
     metadata = null,
+    mfaCodeHash = null,
   }: CreateAccountTokenOptions): Promise<CreatedAccountToken> {
     await this.revokeActiveTokens(user.id, type);
 
@@ -47,6 +49,7 @@ export class AccountTokenService {
       token_hash: tokenHash,
       expires_at: expiresAt,
       consumed_at: null,
+      mfa_code_hash: mfaCodeHash,
       metadata,
     });
 

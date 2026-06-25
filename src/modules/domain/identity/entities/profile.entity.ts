@@ -13,7 +13,7 @@ import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';
 import { ImageEntity } from '../../media/entities/image.entity';
-import { UserAlternatePhoneEntity, UserPhoneEntity } from './phone.entity';
+import { UserPhoneEntity } from './phone.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -59,17 +59,6 @@ class Contact {
     nullable: true,
   })
   public readonly phone!: Relation<UserPhoneEntity | null>;
-
-  @OneToOne(
-    () => UserAlternatePhoneEntity,
-    (phone: UserAlternatePhoneEntity) => phone.profile,
-    {
-      eager: true,
-      cascade: ['insert', 'update'],
-      nullable: true,
-    },
-  )
-  public readonly alternate_phone!: Relation<UserAlternatePhoneEntity | null>;
 
   @OneToOne(
     () => UserAddressEntity,

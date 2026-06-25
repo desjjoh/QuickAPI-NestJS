@@ -19,6 +19,28 @@ import { UserCredentialsEntity } from './credentials.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { AccountTokenEntity } from './account-token.entity';
 
+class Metadata {
+  @Column({ type: 'datetime', nullable: true })
+  public readonly last_sign_in!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  public readonly last_changed_email!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  public readonly last_changed_password!: Date | null;
+}
+
+export type UserMetadata = Metadata;
+
+export const createUserMetadata = (
+  overrides: Partial<UserMetadata> = {},
+): UserMetadata => ({
+  last_sign_in: null,
+  last_changed_email: null,
+  last_changed_password: null,
+  ...overrides,
+});
+
 class Identity {
   @Column({ type: 'varchar', length: 254, unique: true })
   public readonly email!: string;
@@ -75,6 +97,9 @@ export class UserEntity extends BaseEntity {
     },
   })
   public readonly roles?: Relation<RoleEntity[]>;
+
+  @Column(() => Metadata, { prefix: false })
+  public readonly metadata!: UserMetadata;
 
   @ManyToOne(
     () => AccountStatusEntity,

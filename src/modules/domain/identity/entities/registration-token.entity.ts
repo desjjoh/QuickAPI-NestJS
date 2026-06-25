@@ -37,6 +37,9 @@ export class RegistrationTokenEntity extends BaseEntity {
   @Column({ type: 'datetime', nullable: true })
   public readonly consumed_at!: Date | null;
 
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public readonly mfa_code_hash!: string | null;
+
   @Column({ type: 'json' })
   public readonly metadata!: RegistrationTokenMetadata;
 }

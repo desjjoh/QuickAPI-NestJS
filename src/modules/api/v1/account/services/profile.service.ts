@@ -16,10 +16,7 @@ import {
   ImageService,
 } from '@/modules/domain/media/services/image.service';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
-import {
-  UserAlternatePhoneEntity,
-  UserPhoneEntity,
-} from '@/modules/domain/identity/entities/phone.entity';
+import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { PhoneEntity } from '@/common/entities/phone.entity';
 import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
@@ -180,22 +177,6 @@ export class ProfileApiService {
     return this.refreshSvc.issueTokens(updated, res);
   }
 
-  public async updateAlternatePhone(
-    user: UserEntity,
-    dto: UpdatePhoneDto,
-    res: Response,
-  ): Promise<JWTDto> {
-    const phone: UserAlternatePhoneEntity | null =
-      user.profile.contact.alternate_phone;
-    const payload = this.getPhonePayload(dto, phone);
-
-    const updated = await this.userSvc.updateUser(user, {
-      profile: { contact: { alternate_phone: payload } },
-    });
-
-    return this.refreshSvc.issueTokens(updated, res);
-  }
-
   private getPhonePayload(
     dto: UpdatePhoneDto,
     phone: PhoneEntity | null,
@@ -207,26 +188,5 @@ export class ProfileApiService {
       phone_national_number: dto.phone_national_number,
       phone_e164: dto.phone_e164,
     };
-  }
-
-  public async removeAlternatePhone(
-    user: UserEntity,
-    res: Response,
-  ): Promise<JWTDto> {
-    const phone: UserAlternatePhoneEntity | null =
-      user.profile.contact.alternate_phone;
-
-    if (!phone)
-      throw new BadRequestException(
-        'User does not have an alternate phone to remove.',
-      );
-
-    const updated = await this.userSvc.updateUser(user, {
-      profile: { contact: { alternate_phone: null } },
-    });
-
-    await this.userSvc.deletePhone(phone);
-
-    return this.refreshSvc.issueTokens(updated, res);
   }
 }

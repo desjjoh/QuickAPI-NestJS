@@ -8,6 +8,7 @@ import {
   Res,
   Body,
   Post,
+  Get,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -43,6 +44,8 @@ import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { Throttle } from '@nestjs/throttler';
 import { minute } from '@/common/constants/milliseconds.constants';
 import {
+  ValidateEmailChangeTokenDto,
+  ValidateEmailChangeTokenResponseDto,
   VerifyEmailDto,
   VerifyEmailResponseDto,
 } from '../models/verify-email.model';
@@ -84,8 +87,8 @@ export class MeApiController {
     return this.svc.deleteMe(user, dto, res);
   }
 
-  // POST /email
-  @Post('email')
+  // POST /email/request
+  @Post('email/request')
   @ApiBody({
     type: UpdateEmailDto,
     description:
@@ -115,27 +118,52 @@ export class MeApiController {
     });
   }
 
-  // POST /email/confirm
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Post('email/confirm')
+  // GET /email/validate
+  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Get('email/validate')
   @ApiOperation({
-    summary: 'Verify a newly registered account email address.',
+    summary: 'Validate email change token',
     description:
-      'Consumes a one-time email verification token and activates the account when the token is valid.',
+      'Checks whether an email change token is valid without consuming it, allowing clients to render the email change confirmation form only for valid links.',
+  })
+  @ApiBody({
+    type: ValidateEmailChangeTokenDto,
+    description:
+      'The email change token ID and raw token from the verification link.',
+  })
+  @ApiOkResponse({
+    type: ValidateEmailChangeTokenResponseDto,
+    description: 'The email change token is valid.',
+  })
+  public async validateEmailChangeToken(
+    @Body() dto: ValidateEmailChangeTokenDto,
+  ): Promise<ValidateEmailChangeTokenResponseDto> {
+    await this.evSvc.validateEmailChangeToken(dto.token_id, dto.token);
+
+    return new ValidateEmailChangeTokenResponseDto({ valid: true });
+  }
+
+  // PATCH /email/confirm
+  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Patch('email/confirm')
+  @ApiOperation({
+    summary: 'Confirm account email change.',
+    description:
+      'Consumes a one-time email change token and updates the account email when the token and verification code are valid.',
   })
   @ApiBody({
     type: VerifyEmailDto,
     description:
-      'The email verification token ID and raw token from the verification link.',
+      'The email verification token ID, raw token, and 6-digit verification code from the verification email.',
   })
   @ApiOkResponse({
     type: VerifyEmailResponseDto,
-    description: 'The email address was verified successfully.',
+    description: 'The email address change was verified successfully.',
   })
   public async verifyEmail(
     @Body() dto: VerifyEmailDto,
   ): Promise<VerifyEmailResponseDto> {
-    await this.evSvc.verifyEmail(dto.token_id, dto.token);
+    await this.evSvc.verifyEmail(dto.token_id, dto.token, dto.code);
 
     return new VerifyEmailResponseDto({
       message: 'Email address verified successfully.',

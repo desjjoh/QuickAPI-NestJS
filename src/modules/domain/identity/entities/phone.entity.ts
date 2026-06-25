@@ -13,13 +13,3 @@ export class UserPhoneEntity extends PhoneEntity {
   @JoinColumn({ name: 'profile_id', referencedColumnName: 'id' })
   public readonly profile!: Relation<UserProfileEntity>;
 }
-
-@Entity('profile_alternate_phones')
-export class UserAlternatePhoneEntity extends PhoneEntity {
-  @OneToOne(() => UserProfileEntity, {
-    nullable: false,
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({ name: 'profile_id', referencedColumnName: 'id' })
-  public readonly profile!: Relation<UserProfileEntity>;
-}

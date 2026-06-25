@@ -19,10 +19,7 @@ import { EmailVerificationService } from './services/email-verification.service'
 import { EmailModule } from '@/modules/system/email/email.module';
 import { PasswordResetService } from './services/password-reset.service';
 import { MediaModule } from '../media/media.module';
-import {
-  UserAlternatePhoneEntity,
-  UserPhoneEntity,
-} from './entities/phone.entity';
+import { UserPhoneEntity } from './entities/phone.entity';
 import { RegistrationTokenService } from './services/registration-token.service';
 
 @Module({
@@ -32,7 +29,6 @@ import { RegistrationTokenService } from './services/registration-token.service'
       UserProfileEntity,
       UserAddressEntity,
       UserPhoneEntity,
-      UserAlternatePhoneEntity,
       UserCredentialsEntity,
       AccountTokenEntity,
       RegistrationTokenEntity,

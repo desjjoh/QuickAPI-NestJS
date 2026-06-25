@@ -13,6 +13,7 @@ export type CreateRegistrationTokenOptions = {
   email: string;
   expiresInMs: number;
   metadata: RegistrationTokenMetadata;
+  mfaCodeHash?: string | null;
 };
 
 @Injectable()
@@ -26,6 +27,7 @@ export class RegistrationTokenService {
     email,
     expiresInMs,
     metadata,
+    mfaCodeHash = null,
   }: CreateRegistrationTokenOptions): Promise<CreatedAccountToken> {
     await this.revokeActiveTokens(email);
 
@@ -38,6 +40,7 @@ export class RegistrationTokenService {
       token_hash: tokenHash,
       expires_at: expiresAt,
       consumed_at: null,
+      mfa_code_hash: mfaCodeHash,
       metadata,
     });
 
@@ -50,7 +53,19 @@ export class RegistrationTokenService {
     };
   }
 
-  public async consumeToken(
+  public async findPendingByEmail(
+    email: string,
+  ): Promise<RegistrationTokenEntity | null> {
+    return this.tokenRepo.findOne({
+      where: {
+        email,
+        consumed_at: IsNull(),
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  public async validateToken(
     tokenId: string,
     token: string,
   ): Promise<RegistrationTokenEntity> {
@@ -71,6 +86,15 @@ export class RegistrationTokenService {
     const isMatch = this.compareTokenHashes(entity.token_hash, tokenHash);
 
     if (!isMatch) throw new UnauthorizedException('Invalid or expired token.');
+
+    return entity;
+  }
+
+  public async consumeToken(
+    tokenId: string,
+    token: string,
+  ): Promise<RegistrationTokenEntity> {
+    const entity = await this.validateToken(tokenId, token);
 
     return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
   }

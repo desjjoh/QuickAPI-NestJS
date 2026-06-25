@@ -47,9 +47,11 @@ export class MeApiService {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
     const hashed = await this.userSvc.hashPassword(dto.confirm);
-    const updated = await this.userSvc.updateUser(user, {
+    await this.userSvc.updateUser(user, {
       identity: { password: hashed },
     });
+
+    const updated = await this.userSvc.recordPasswordChanged(user);
 
     return this.refreshSvc.issueTokens(updated, res);
   }
