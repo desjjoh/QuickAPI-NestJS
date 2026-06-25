@@ -34,10 +34,7 @@ import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 
 import { MeApiService } from '../services/me.service';
 
-import {
-  UpdateEmailDto,
-  UpdateEmailResponseDto,
-} from '../models/updateEmail.model';
+import { UpdateEmailDto } from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 
@@ -87,8 +84,9 @@ export class MeApiController {
       'Sends a verification email to the requested new email address. The account email is not changed until the verification token is confirmed.',
   })
   @ApiOkResponse({
-    description: 'Email change verification sent successfully.',
-    type: UpdateEmailResponseDto,
+    description:
+      'Email change verification sent successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -96,13 +94,9 @@ export class MeApiController {
   public async sendEmailVerification(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateEmailDto,
-  ): Promise<UpdateEmailResponseDto> {
-    await this.svc.updateEmail(user, dto);
-
-    return new UpdateEmailResponseDto({
-      message:
-        'Verification email sent. Please confirm the new email address to complete the change.',
-    });
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updateEmail(user, dto, res);
   }
 
   // PATCH /password

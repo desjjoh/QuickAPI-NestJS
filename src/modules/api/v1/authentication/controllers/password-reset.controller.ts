@@ -3,15 +3,15 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBody,
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -28,6 +28,7 @@ import {
   RequestPasswordResetDto,
   ValidatePasswordResetTokenDto,
 } from '../models/password-reset.model';
+import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 
 @ApiTags('Password Reset')
 @Controller('password-reset')
@@ -53,9 +54,9 @@ export class PasswordResetApiController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @Post(':token_id/validate')
+  @Post('validate')
   @HttpCode(HttpStatus.OK)
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the password reset token record.',
   })
@@ -70,7 +71,7 @@ export class PasswordResetApiController {
   })
   @ApiOkResponse({ type: ValidatePasswordResetTokenResponseDto })
   public async validatePasswordResetToken(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() dto: ValidatePasswordResetTokenDto,
   ): Promise<ValidatePasswordResetTokenResponseDto> {
     await this.prSvc.validatePasswordResetToken(tokenId, dto.token);
@@ -78,9 +79,9 @@ export class PasswordResetApiController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @Patch(':token_id/confirm')
+  @Patch('confirm')
   @HttpCode(HttpStatus.OK)
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the password reset token record.',
   })
@@ -91,7 +92,7 @@ export class PasswordResetApiController {
   })
   @ApiOkResponse({ type: ConfirmPasswordResetResponseDto })
   public async confirmPasswordReset(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() dto: ConfirmPasswordResetDto,
   ): Promise<ConfirmPasswordResetResponseDto> {
     await this.prSvc.confirmPasswordReset(tokenId, dto.token, dto.password);

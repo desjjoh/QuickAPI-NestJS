@@ -33,10 +33,12 @@ export class MeApiService {
   public async updateEmail(
     user: UserEntity,
     dto: UpdateEmailDto,
-  ): Promise<void> {
+    res: Response,
+  ): Promise<JWTDto> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
-
     await this.evSvc.sendEmailChangeVerification(user, dto.confirm);
+
+    return this.refreshSvc.issueTokens(user, res);
   }
 
   public async updatePassword(

@@ -3,9 +3,8 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  Param,
-  Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -14,7 +13,7 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -31,6 +30,7 @@ import {
   VerifyRegistrationResponseDto,
 } from '../models/register.model';
 import { RegistrationService } from '../services/registration.service';
+import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 
 @ApiTags('Registration')
 @UseGuards(CsrfGuard)
@@ -90,9 +90,9 @@ export class RegistrationApiController {
     return this.svc.resendRegistration(input.email);
   }
 
-  @Post(':token_id/validate')
+  @Post('validate')
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the registration token record.',
   })
@@ -111,16 +111,16 @@ export class RegistrationApiController {
     type: ValidateRegistrationTokenResponseDto,
   })
   public async validateRegistration(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() input: ValidateRegistrationTokenDto,
   ): Promise<ValidateRegistrationTokenResponseDto> {
     await this.svc.validateRegistration(tokenId, input.token);
     return new ValidateRegistrationTokenResponseDto({ valid: true });
   }
 
-  @Patch(':token_id/confirm')
+  @Post('confirm')
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the registration token record.',
   })
@@ -140,7 +140,7 @@ export class RegistrationApiController {
     type: VerifyRegistrationResponseDto,
   })
   public async verifyRegistration(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() input: VerifyRegistrationDto,
   ): Promise<VerifyRegistrationResponseDto> {
     await this.svc.verifyRegistration(tokenId, input.token, input.code);

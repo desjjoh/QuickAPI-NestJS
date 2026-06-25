@@ -3,15 +3,15 @@ import {
   Controller,
   HttpCode,
   HttpStatus,
-  Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBody,
   ApiOkResponse,
   ApiOperation,
-  ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -24,6 +24,7 @@ import {
   VerifyEmailDto,
   VerifyEmailResponseDto,
 } from '../models/verify-email.model';
+import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 
 @ApiTags('Email Verification')
 @Controller('email-verification')
@@ -31,9 +32,9 @@ export class EmailVerificationApiController {
   public constructor(private readonly evSvc: EmailVerificationService) {}
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @Post(':token_id/validate')
+  @Post('validate')
   @HttpCode(HttpStatus.OK)
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the email verification token record.',
   })
@@ -51,17 +52,18 @@ export class EmailVerificationApiController {
     description: 'The email change token is valid.',
   })
   public async validateEmailChangeToken(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() dto: ValidateEmailChangeTokenDto,
   ): Promise<ValidateEmailChangeTokenResponseDto> {
     await this.evSvc.validateEmailChangeToken(tokenId, dto.token);
+
     return new ValidateEmailChangeTokenResponseDto({ valid: true });
   }
 
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @Patch(':token_id/confirm')
+  @Patch('confirm')
   @HttpCode(HttpStatus.OK)
-  @ApiParam({
+  @ApiQuery({
     name: 'token_id',
     description: 'The unique NanoID of the email verification token record.',
   })
@@ -80,10 +82,11 @@ export class EmailVerificationApiController {
     description: 'The email address change was verified successfully.',
   })
   public async verifyEmail(
-    @Param('token_id') tokenId: string,
+    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() dto: VerifyEmailDto,
   ): Promise<VerifyEmailResponseDto> {
     await this.evSvc.verifyEmail(tokenId, dto.token, dto.code);
+
     return new VerifyEmailResponseDto({
       message: 'Email address verified successfully.',
     });
