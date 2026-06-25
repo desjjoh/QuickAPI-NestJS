@@ -21,7 +21,6 @@ import { Throttle } from '@nestjs/throttler';
 
 import { minute } from '@/common/constants/milliseconds.constants';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
-import { AuthService } from '../services/authentication.service';
 import {
   RegisterDto,
   RegistrationPendingDto,
@@ -31,12 +30,13 @@ import {
   VerifyRegistrationDto,
   VerifyRegistrationResponseDto,
 } from '../models/register.model';
+import { RegistrationService } from '../services/registration.service';
 
 @ApiTags('Registration')
 @UseGuards(CsrfGuard)
 @Controller('registration')
 export class RegistrationApiController {
-  public constructor(private readonly svc: AuthService) {}
+  public constructor(private readonly svc: RegistrationService) {}
 
   @Post('request')
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })

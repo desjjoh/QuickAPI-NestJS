@@ -9,10 +9,11 @@ import { EmailVerificationApiController } from './controllers/email-verification
 
 import { AuthService } from './services/authentication.service';
 import { LibraryModule } from '@/modules/domain/library/library.module';
+import { RegistrationService } from './services/registration.service';
 
 @Module({
   imports: [IdentityModule, TokenModule, LibraryModule],
-  providers: [AuthService],
+  providers: [AuthService, RegistrationService],
   controllers: [
     AuthApiController,
     RegistrationApiController,
