@@ -4,6 +4,7 @@ import { BaseModel } from '@/common/models/base.model';
 import { IntersectionType } from '@nestjs/swagger';
 import { BaseRegionDto } from './region.model';
 import { RegionEntity } from '../entities/region.entity';
+import { env } from '@/config/environment.config';
 export class CountryDto {
   @ApiProperty({
     example: 'canada',
@@ -29,6 +30,13 @@ export class CountryDto {
     description: 'Three-letter ISO 3166-1 alpha-3 country code.',
   })
   public readonly iso3: string;
+
+  @ApiProperty({
+    example: 'https://api.example.com/flags/ca.svg',
+    description:
+      'Absolute URL for the static country flag image served with the application assets.',
+  })
+  public readonly flag_url: string;
 
   @ApiProperty({
     example: '1',
@@ -101,6 +109,7 @@ export class CountryDto {
     this.label = country.label;
     this.iso2 = country.iso2;
     this.iso3 = country.iso3;
+    this.flag_url = CountryDto.buildFlagUrl(country.flag_url);
 
     this.regions =
       country.regions?.map(
@@ -116,6 +125,10 @@ export class CountryDto {
     this.postal_code_pattern = country.postal_code_pattern;
     this.postal_code_format_groups = country.postal_code_format_groups;
     this.postal_code_format_separator = country.postal_code_format_separator;
+  }
+
+  private static buildFlagUrl(flagPath: string): string {
+    return new URL(flagPath, env.PUBLIC_API_URL).toString();
   }
 }
 

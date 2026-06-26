@@ -11,6 +11,7 @@ type CountrySeed = {
   label: string;
   iso2: string;
   iso3: string;
+  flag_url: string;
   calling_code: string;
 
   phone_national_placeholder: string;
@@ -29,6 +30,7 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     label: 'Canada',
     iso2: 'CA',
     iso3: 'CAN',
+    flag_url: '/flags/canada.svg',
     calling_code: '1',
     phone_national_placeholder: '2015550123',
     phone_national_pattern: '^[2-9]\\d{2}[2-9]\\d{6}$',
@@ -44,6 +46,7 @@ const COUNTRY_SEEDS: CountrySeed[] = [
     label: 'Australia',
     iso2: 'AU',
     iso3: 'AUS',
+    flag_url: '/flags/australia.svg',
     calling_code: '61',
     phone_national_placeholder: '412345678',
     phone_national_pattern: '^[23478]\\d{8}$',

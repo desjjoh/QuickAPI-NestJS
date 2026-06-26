@@ -17,6 +17,9 @@ export class CountryEntity extends BaseEntity {
   @Column({ type: 'char', length: 3, unique: true })
   public readonly iso3!: string;
 
+  @Column({ type: 'varchar', length: 255 })
+  public readonly flag_url!: string;
+
   @Column({ type: 'varchar', length: 8 })
   public readonly calling_code!: string;
 
