@@ -72,3 +72,20 @@ export class UpdateProfileDto {
   @MaxLength(255)
   public readonly bio!: string | null;
 }
+
+export class UpdateProfileRegionDto {
+  @ApiProperty({
+    example: 'SUwDyXR7iSBnyWmr',
+    description: 'The unique NanoID of the selected country reference record.',
+    minLength: 16,
+    maxLength: 16,
+    pattern: '^[0-9A-Za-z]{16}$',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Length(16, 16)
+  @Matches(/^[0-9A-Za-z]{16}$/, {
+    message: 'Country ID must contain only letters and numbers.',
+  })
+  public readonly country_id!: string;
+}

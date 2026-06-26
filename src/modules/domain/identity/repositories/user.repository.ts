@@ -42,6 +42,7 @@ export class UserRepository extends Repository<UserEntity> {
       .leftJoinAndSelect('roles.permissions', 'permissions')
       .leftJoinAndSelect('profile.media.avatar', 'avatar')
       .leftJoinAndSelect('profile.personal.gender', 'gender')
+      .leftJoinAndSelect('profile.region.country', 'profileCountry')
       .leftJoinAndSelect('profile.contact.phone', 'phone')
       .leftJoinAndSelect('phone.country', 'phoneCountry')
       .leftJoinAndSelect('profile.contact.address', 'address')

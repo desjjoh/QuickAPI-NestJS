@@ -14,6 +14,7 @@ import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';
 import { ImageEntity } from '../../media/entities/image.entity';
 import { UserPhoneEntity } from './phone.entity';
+import { CountryEntity } from '../../library/entities/country.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -52,6 +53,16 @@ class Personal {
   public readonly gender!: Relation<GenderEntity>;
 }
 
+class Region {
+  @ManyToOne(() => CountryEntity, {
+    eager: true,
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'country_id', referencedColumnName: 'id' })
+  public readonly country!: Relation<CountryEntity>;
+}
+
 class Contact {
   @OneToOne(() => UserPhoneEntity, (phone: UserPhoneEntity) => phone.profile, {
     eager: true,
@@ -79,6 +90,7 @@ export class UserProfileEntity extends BaseEntity {
 
     this.contact = new Contact();
     this.media = new Media();
+    this.region = new Region();
   }
 
   @OneToOne(() => UserEntity, (user: UserEntity) => user.profile, {
@@ -94,6 +106,9 @@ export class UserProfileEntity extends BaseEntity {
 
   @Column(() => Contact, { prefix: false })
   public readonly contact!: Contact;
+
+  @Column(() => Region, { prefix: false })
+  public readonly region!: Region;
 
   @Column(() => Media, { prefix: false })
   public readonly media!: Media;

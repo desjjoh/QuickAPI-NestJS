@@ -9,7 +9,10 @@ import { UserAddressEntity } from '@/modules/domain/identity/entities/address.en
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { AddressEntity } from '@/common/entities/address.entity';
 import { DeepPartial } from 'typeorm';
-import { UpdateProfileDto } from '../models/updateProfile.model';
+import {
+  UpdateProfileDto,
+  UpdateProfileRegionDto,
+} from '../models/updateProfile.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import {
   CreateImageInput,
@@ -49,6 +52,18 @@ export class ProfileApiService {
           bio: dto.bio,
         },
       },
+    });
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  public async updateRegion(
+    user: UserEntity,
+    dto: UpdateProfileRegionDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { region: { country: { id: dto.country_id } } },
     });
 
     return this.refreshSvc.issueTokens(updated, res);

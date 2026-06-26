@@ -36,7 +36,7 @@ export class MeApiService {
     res: Response,
   ): Promise<JWTDto> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
-    await this.evSvc.sendEmailChangeVerification(user, dto.confirm);
+    await this.evSvc.sendEmailChangeVerification(user, dto.email);
 
     return this.refreshSvc.issueTokens(user, res);
   }

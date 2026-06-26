@@ -16,6 +16,9 @@ export type RegistrationTokenMetadata = {
       dob: string;
       gender: { id: string };
     };
+    region: {
+      country: { id: string };
+    };
   };
   credentials: {
     refresh: null;

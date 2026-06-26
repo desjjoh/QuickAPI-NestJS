@@ -85,6 +85,21 @@ export class RegisterDto {
     message: 'Gender ID must contain only letters and numbers.',
   })
   public readonly gender_id!: string;
+
+  @ApiProperty({
+    example: 'SUwDyXR7iSBnyWmr',
+    description: 'The unique NanoID of the selected country reference record.',
+    minLength: 16,
+    maxLength: 16,
+    pattern: '^[0-9A-Za-z]{16}$',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @Length(16, 16)
+  @Matches(/^[0-9A-Za-z]{16}$/, {
+    message: 'Country ID must contain only letters and numbers.',
+  })
+  public readonly country_id!: string;
 }
 
 export class RegisterMapper {
@@ -108,6 +123,9 @@ export class RegisterMapper {
           dob: dto.dob,
           gender: { id: dto.gender_id },
         },
+        region: {
+          country: { id: dto.country_id },
+        },
       },
     };
   }
@@ -129,6 +147,9 @@ export class RegisterMapper {
           bio: null,
           dob: dto.dob,
           gender: { id: dto.gender_id },
+        },
+        region: {
+          country: { id: dto.country_id },
         },
       },
       credentials: {

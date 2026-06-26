@@ -11,6 +11,7 @@ import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { ImageDto } from '../../media/models/image.model';
 import { PhoneDto } from '@/common/models/phone.model';
+import { BaseCountryDto } from '../../library/models/country.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',
@@ -127,6 +128,18 @@ export class ContactDto {
   }
 }
 
+export class RegionDto {
+  @ApiProperty({
+    type: BaseCountryDto,
+    description: 'Country associated with the user profile region.',
+  })
+  public readonly country: BaseCountryDto;
+
+  public constructor(user: UserEntity) {
+    this.country = new BaseCountryDto(user.profile.region.country);
+  }
+}
+
 export class MediaDto {
   @ApiPropertyOptional({
     type: ImageDto,
@@ -161,10 +174,18 @@ export class ProfileDto {
   })
   public readonly contact: ContactDto;
 
+  @ApiProperty({
+    type: RegionDto,
+    description:
+      'Regional country information associated with the user profile.',
+  })
+  public readonly region: RegionDto;
+
   public constructor(user: UserEntity) {
     this.name = new NameDto(user);
     this.personal = new PersonalDto(user);
     this.contact = new ContactDto(user);
+    this.region = new RegionDto(user);
   }
 }
 

@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -25,8 +26,10 @@ import {
   VerifyEmailResponseDto,
 } from '../models/verify-email.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
+import { CsrfGuard } from '@/common/guards/csrf.guard';
 
 @ApiTags('Email Verification')
+@UseGuards(CsrfGuard)
 @Controller('email-verification')
 export class EmailVerificationApiController {
   public constructor(private readonly evSvc: EmailVerificationService) {}

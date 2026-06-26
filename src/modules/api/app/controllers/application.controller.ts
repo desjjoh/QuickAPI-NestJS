@@ -4,7 +4,8 @@ import {
   ApiOperation,
   ApiProduces,
   ApiTags,
-} from '@nestjs/swagger/dist/decorators';
+} from '@nestjs/swagger';
+
 import type { Response } from 'express';
 
 import {
@@ -16,15 +17,11 @@ import {
 } from '../models';
 import { ApplicationControllerService } from '../services/application.service';
 import { metricsRegistry } from '@/config/metrics.config';
-import { EmailService } from '@/modules/system/email/services/email.service';
 
 @ApiTags('System Operations')
 @Controller()
 export class ApplicationController {
-  constructor(
-    private readonly svc: ApplicationControllerService,
-    private readonly emailSvc: EmailService,
-  ) {}
+  constructor(private readonly svc: ApplicationControllerService) {}
 
   // GET /
   @Get('')

@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -29,8 +30,10 @@ import {
   ValidatePasswordResetTokenDto,
 } from '../models/password-reset.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
+import { CsrfGuard } from '@/common/guards/csrf.guard';
 
 @ApiTags('Password Reset')
+@UseGuards(CsrfGuard)
 @Controller('password-reset')
 export class PasswordResetApiController {
   public constructor(private readonly prSvc: PasswordResetService) {}

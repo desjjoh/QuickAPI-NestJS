@@ -40,7 +40,10 @@ import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
 
 import { ProfileApiService } from '../services/profile.service';
 import { UpdateAddressDto } from '../models/updateAddress.model';
-import { UpdateProfileDto } from '../models/updateProfile.model';
+import {
+  UpdateProfileDto,
+  UpdateProfileRegionDto,
+} from '../models/updateProfile.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 
 @ApiTags('Profile Management')
@@ -76,6 +79,33 @@ export class ProfileApiController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     return this.svc.updateProfile(user, dto, res);
+  }
+
+  // PUT /country
+  @Put('country')
+  @ApiOperation({
+    summary: 'Update profile region',
+    description:
+      'Updates the authenticated user’s required profile country using a country reference ID.',
+  })
+  @ApiBody({
+    type: UpdateProfileRegionDto,
+    description: 'Country reference payload used to update the profile region.',
+  })
+  @ApiOkResponse({
+    description:
+      'Profile region updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
+  })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async updateRegion(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateProfileRegionDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updateRegion(user, dto, res);
   }
 
   // PUT /avatar
