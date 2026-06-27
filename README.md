@@ -21,7 +21,7 @@ A modular, production-minded NestJS API template designed for rapid backend serv
 - **Centralized error handling** through global exception and not-found filters
 - **Security middleware** for CORS, rate limiting, content type checks, body limits, header limits, header sanitization, allowed HTTP methods, and security headers
 - **Health, readiness, info, system, and metrics endpoints** for deployment and operations
-- **Library/reference-data seeders** for countries, genders, permissions, and roles
+- **Library/reference-data seeders** for countries, country regions, time zones, genders, account statuses, permissions, and roles
 - **Email module** powered by Postmark with typed template support
 - **Async email queueing** using BullMQ + Redis with DLQ handling and Bull Board UI
 - **Profile image upload support** with validation, disk storage, and image metadata handling
@@ -65,7 +65,7 @@ src/
 │   │       └── security/      # CSRF/security endpoints
 │   ├── domain/                # Business/domain modules
 │   │   ├── identity/          # Users, credentials, profiles, addresses, auth models, repository, service
-│   │   └── library/           # Countries, genders, roles, permissions, images, repositories, seeders
+│   │   └── library/           # Countries, regions, time zones, genders, account statuses, roles, permissions
 │   └── system/                # Infrastructure modules
 │       ├── configuration/     # Global Nest config module and typed env provider
 │       ├── database/          # TypeORM module and database status service
@@ -99,9 +99,9 @@ Routes are composed in layers:
 
 /api/v1/security          # CSRF and browser request-security endpoints
 /api/v1/authentication    # Registration, sign-in, sign-out, refresh
-/api/v1/account           # Current-user account and profile management
+/api/v1/account           # Current-user account, profile, country, timezone, address, phone, and avatar management
 /api/v1/administration    # Admin/platform user-management endpoints
-/api/v1/library           # Countries, genders, roles, permissions, and reference data
+/api/v1/library           # Countries, time zones, genders, statuses, roles, permissions, and reference data
 ```
 
 Swagger UI is available at:
@@ -115,6 +115,18 @@ OpenAPI JSON is available at:
 ```bash
 https://localhost:8080/docs-json
 ```
+
+### Reference Data Endpoints
+
+Public reference data endpoints live under `/api/v1/library` and are intended for front-end form options and shared client/server keys.
+
+| Endpoint                        | Purpose                                                                                                         |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/library/countries` | Countries with available country-specific regions and validation metadata for addresses and phones.             |
+| `GET /api/v1/library/timezones` | IANA time zone reference records seeded from JavaScript `Intl`; each record uses the IANA key as its stable ID. |
+| `GET /api/v1/library/genders`   | Gender reference options for registration and profile forms.                                                    |
+| `GET /api/v1/library/statuses`  | Account status reference data for account lifecycle displays.                                                   |
+| `GET /api/v1/library/roles`     | Role reference data for administration and access-management screens.                                           |
 
 ---
 
@@ -492,10 +504,14 @@ QuickAPI-NestJS uses **TypeORM + MySQL** with auto-loaded entities. Domain modul
 
 Reference data is seeded through the shared seeding infrastructure and feature seeders for:
 
-- Countries
+- Countries and country-specific regions
+- Time zones from the JavaScript `Intl` API
 - Genders
+- Account statuses
 - Permissions
 - Roles
+
+Time zone records use the IANA key the stable `key` value, for example `America/Toronto`. The seed data also stores English display labels, long and short time zone names, GMT offset metadata, top-level region, and exemplar city so developers and clients have useful context while still referencing one canonical key.
 
 Seeding is controlled by the `DB_SEED` environment variable.
 

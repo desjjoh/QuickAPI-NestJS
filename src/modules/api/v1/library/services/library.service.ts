@@ -12,6 +12,9 @@ import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { BaseAccountStatusDto } from '@/modules/domain/library/models/status.model';
+import { TimezoneRepository } from '@/modules/domain/library/repositories/time-zone.repository';
+import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
+import { BaseTimezoneDto } from '@/modules/domain/library/models/time-zone.model';
 
 @Injectable()
 export class LibraryService {
@@ -20,11 +23,17 @@ export class LibraryService {
     private readonly genderRepo: GenderRepository,
     private readonly roleRepo: RoleRepository,
     private readonly statusRepo: AccountStatusRepository,
+    private readonly timezoneRepo: TimezoneRepository,
   ) {}
 
   public async getCountries(): Promise<BaseCountryDto[]> {
     const countries: CountryEntity[] = await this.countryRepo.findAll();
     return countries.map((e: CountryEntity) => new BaseCountryDto(e));
+  }
+
+  public async getTimezones(): Promise<BaseTimezoneDto[]> {
+    const timezones: TimezoneEntity[] = await this.timezoneRepo.findAll();
+    return timezones.map((e: TimezoneEntity) => new BaseTimezoneDto(e));
   }
 
   public async getGenders(): Promise<BaseGenderDto[]> {

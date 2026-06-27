@@ -10,8 +10,9 @@ import { UpdateAddressDto } from '../models/updateAddress.model';
 import { AddressEntity } from '@/common/entities/address.entity';
 import { DeepPartial } from 'typeorm';
 import {
+  UpdateProfileCountryDto,
   UpdateProfileDto,
-  UpdateProfileRegionDto,
+  UpdateProfileTimezoneDto,
 } from '../models/updateProfile.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import {
@@ -57,13 +58,25 @@ export class ProfileApiService {
     return this.refreshSvc.issueTokens(updated, res);
   }
 
-  public async updateRegion(
+  public async updateCountry(
     user: UserEntity,
-    dto: UpdateProfileRegionDto,
+    dto: UpdateProfileCountryDto,
     res: Response,
   ): Promise<JWTDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: { region: { country: { id: dto.country_id } } },
+    });
+
+    return this.refreshSvc.issueTokens(updated, res);
+  }
+
+  public async updateTimezone(
+    user: UserEntity,
+    dto: UpdateProfileTimezoneDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const updated = await this.userSvc.updateUser(user, {
+      profile: { region: { timezone: { id: dto.timezone_id } } },
     });
 
     return this.refreshSvc.issueTokens(updated, res);

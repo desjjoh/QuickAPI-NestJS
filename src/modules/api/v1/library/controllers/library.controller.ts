@@ -5,6 +5,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { LibraryService } from '../services/library.service';
 import { BaseAccountStatusDto } from '@/modules/domain/library/models/status.model';
+import { BaseTimezoneDto } from '@/modules/domain/library/models/time-zone.model';
 
 @ApiTags('Reference Data')
 @Controller('')
@@ -69,5 +70,20 @@ export class GenderController {
   })
   public async getStatuses(): Promise<BaseAccountStatusDto[]> {
     return this.svc.getAccountStatuses();
+  }
+
+  // GET /timezones
+  @Get('timezones')
+  @ApiOperation({
+    summary: 'List time zones',
+    description:
+      'Returns public IANA time zone reference data used by registration and profile region forms.',
+  })
+  @ApiOkResponse({
+    description: 'Time zone reference data returned successfully.',
+    type: [BaseTimezoneDto],
+  })
+  public async getTimezones(): Promise<BaseTimezoneDto[]> {
+    return this.svc.getTimezones();
   }
 }

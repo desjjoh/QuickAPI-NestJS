@@ -12,6 +12,7 @@ import { RoleEntity } from '../../library/entities/role.entity';
 import { ImageDto } from '../../media/models/image.model';
 import { PhoneDto } from '@/common/models/phone.model';
 import { BaseCountryDto } from '../../library/models/country.model';
+import { BaseTimezoneDto } from '../../library/models/time-zone.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',
@@ -135,8 +136,15 @@ export class RegionDto {
   })
   public readonly country: BaseCountryDto;
 
+  @ApiProperty({
+    type: BaseTimezoneDto,
+    description: 'Time zone associated with the user profile region.',
+  })
+  public readonly timezone: BaseTimezoneDto;
+
   public constructor(user: UserEntity) {
     this.country = new BaseCountryDto(user.profile.region.country);
+    this.timezone = new BaseTimezoneDto(user.profile.region.timezone);
   }
 }
 

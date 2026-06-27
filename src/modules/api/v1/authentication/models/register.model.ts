@@ -100,6 +100,17 @@ export class RegisterDto {
     message: 'Country ID must contain only letters and numbers.',
   })
   public readonly country_id!: string;
+
+  @ApiProperty({
+    example: 'America/Toronto',
+    description:
+      'Stable IANA time zone key selected from the configured time zone reference data.',
+    maxLength: 64,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  public readonly timezone_id!: string;
 }
 
 export class RegisterMapper {
@@ -125,6 +136,7 @@ export class RegisterMapper {
         },
         region: {
           country: { id: dto.country_id },
+          timezone: { id: dto.timezone_id },
         },
       },
     };
@@ -150,6 +162,7 @@ export class RegisterMapper {
         },
         region: {
           country: { id: dto.country_id },
+          timezone: { id: dto.timezone_id },
         },
       },
       credentials: {

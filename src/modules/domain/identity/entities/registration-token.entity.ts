@@ -18,6 +18,7 @@ export type RegistrationTokenMetadata = {
     };
     region: {
       country: { id: string };
+      timezone: { id: string };
     };
   };
   credentials: {

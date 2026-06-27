@@ -23,6 +23,9 @@ import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
 import { RegionEntity } from './entities/region.entity';
 import { RegionRepository } from './repositories/region.repository';
 import { RegionSeeder } from './seeders/region.seeder';
+import { TimezoneEntity } from './entities/time-zone.entity';
+import { TimezoneRepository } from './repositories/time-zone.repository';
+import { TimezoneSeeder } from './seeders/time-zone.seeder';
 
 @Module({
   imports: [
@@ -31,6 +34,7 @@ import { RegionSeeder } from './seeders/region.seeder';
       RegionEntity,
       GenderEntity,
       PermissionEntity,
+      TimezoneEntity,
       RoleEntity,
       AccountStatusEntity,
     ]),
@@ -38,6 +42,7 @@ import { RegionSeeder } from './seeders/region.seeder';
       new GenderSeeder(),
       new CountrySeeder(),
       new RegionSeeder(),
+      new TimezoneSeeder(),
       new PermissionSeeder(),
       new RoleSeeder(),
       new AccountStatusSeeder(),
@@ -46,6 +51,7 @@ import { RegionSeeder } from './seeders/region.seeder';
   providers: [
     CountryRepository,
     RegionRepository,
+    TimezoneRepository,
     GenderRepository,
     PermissionRepository,
     RoleRepository,
@@ -54,6 +60,7 @@ import { RegionSeeder } from './seeders/region.seeder';
   exports: [
     CountryRepository,
     RegionRepository,
+    TimezoneRepository,
     GenderRepository,
     PermissionRepository,
     RoleRepository,

@@ -15,6 +15,7 @@ import { UserAddressEntity } from './address.entity';
 import { ImageEntity } from '../../media/entities/image.entity';
 import { UserPhoneEntity } from './phone.entity';
 import { CountryEntity } from '../../library/entities/country.entity';
+import { TimezoneEntity } from '../../library/entities/time-zone.entity';
 
 class Name {
   @Column({ type: 'text' })
@@ -61,6 +62,14 @@ class Region {
   })
   @JoinColumn({ name: 'country_id', referencedColumnName: 'id' })
   public readonly country!: Relation<CountryEntity>;
+
+  @ManyToOne(() => TimezoneEntity, {
+    eager: true,
+    nullable: false,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'timezone_id', referencedColumnName: 'id' })
+  public readonly timezone!: Relation<TimezoneEntity>;
 }
 
 class Contact {

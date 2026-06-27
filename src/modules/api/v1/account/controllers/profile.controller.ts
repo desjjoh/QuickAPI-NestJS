@@ -41,8 +41,9 @@ import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
 import { ProfileApiService } from '../services/profile.service';
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import {
+  UpdateProfileCountryDto,
   UpdateProfileDto,
-  UpdateProfileRegionDto,
+  UpdateProfileTimezoneDto,
 } from '../models/updateProfile.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 
@@ -84,28 +85,57 @@ export class ProfileApiController {
   // PUT /country
   @Put('country')
   @ApiOperation({
-    summary: 'Update profile region',
+    summary: 'Update profile country',
     description:
       'Updates the authenticated user’s required profile country using a country reference ID.',
   })
   @ApiBody({
-    type: UpdateProfileRegionDto,
-    description: 'Country reference payload used to update the profile region.',
+    type: UpdateProfileCountryDto,
+    description:
+      'Country reference payload used to update the profile country.',
   })
   @ApiOkResponse({
     description:
-      'Profile region updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
+      'Profile country updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
     type: JWTDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
-  public async updateRegion(
+  public async updateCountry(
     @CurrentUser() user: UserEntity,
-    @Body() dto: UpdateProfileRegionDto,
+    @Body() dto: UpdateProfileCountryDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.svc.updateRegion(user, dto, res);
+    return this.svc.updateCountry(user, dto, res);
+  }
+
+  // PUT /timezone
+  @Put('timezone')
+  @ApiOperation({
+    summary: 'Update profile timezone',
+    description:
+      'Updates the authenticated user’s profile timezone using a time zone reference key.',
+  })
+  @ApiBody({
+    type: UpdateProfileTimezoneDto,
+    description:
+      'Time zone reference payload used to update the profile timezone.',
+  })
+  @ApiOkResponse({
+    description:
+      'Profile timezone updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
+    type: JWTDto,
+  })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async updateTimezone(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateProfileTimezoneDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.updateTimezone(user, dto, res);
   }
 
   // PUT /avatar

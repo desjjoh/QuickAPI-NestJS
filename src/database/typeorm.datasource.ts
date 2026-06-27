@@ -17,6 +17,7 @@ import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-t
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
+import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -32,6 +33,7 @@ const dataSourceOptions: DataSourceOptions = {
     // LIBRARY MODULE
     CountryEntity,
     RegionEntity,
+    TimezoneEntity,
     GenderEntity,
     PermissionEntity,
     RoleEntity,

@@ -73,7 +73,7 @@ export class UpdateProfileDto {
   public readonly bio!: string | null;
 }
 
-export class UpdateProfileRegionDto {
+export class UpdateProfileCountryDto {
   @ApiProperty({
     example: 'SUwDyXR7iSBnyWmr',
     description: 'The unique NanoID of the selected country reference record.',
@@ -88,4 +88,17 @@ export class UpdateProfileRegionDto {
     message: 'Country ID must contain only letters and numbers.',
   })
   public readonly country_id!: string;
+}
+
+export class UpdateProfileTimezoneDto {
+  @ApiProperty({
+    example: 'America/Toronto',
+    description:
+      'Stable IANA time zone key selected from the configured time zone reference data.',
+    maxLength: 64,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  public readonly timezone_id!: string;
 }
