@@ -21,6 +21,8 @@ import { RegistrationTokenMetadata } from '../entities/registration-token.entity
 import { RegistrationTokenService } from './registration-token.service';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { RegistrationVerificationTemplate } from '@/modules/system/email/templates/registration-verification.template';
+import { RegistrationSuccessTemplate } from '@/modules/system/email/templates/registration-success.template';
+import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/email-changed.template';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -102,7 +104,7 @@ export class EmailVerificationService {
       });
 
     await this.sendEmail({
-      firstName: metadata.profile.name.first,
+      firstName: metadata.profile.name.preferred ?? metadata.profile.name.first,
       to: email,
       tokenId: verification.id,
       token: verification.token,
@@ -180,6 +182,7 @@ export class EmailVerificationService {
       mfaCodeHash,
     });
   }
+
   public async verifyRegistrationToken(
     tokenId: string,
     token: string,
@@ -218,6 +221,17 @@ export class EmailVerificationService {
     });
 
     await this.verifyInitialEmail(user);
+
+    await this.emailSvc.sendEmail({
+      to: user.identity.email,
+      template: RegistrationSuccessTemplate,
+      model: {
+        firstName: user.profile.name.preferred ?? user.profile.name.first,
+      },
+      metadata: {
+        userId: user.id,
+      },
+    });
   }
 
   private async verifyInitialEmail(user: UserEntity): Promise<void> {
@@ -245,21 +259,36 @@ export class EmailVerificationService {
         'A user with this email address already exists.',
       );
 
-    await this.userSvc.updateUser(user, {
+    const previousEmail: string = user.identity.email;
+    const updatedUser: UserEntity = await this.userSvc.updateUser(user, {
       identity: {
         ...user.identity,
         email: newEmail,
       },
     });
 
-    await this.userSvc.recordEmailChanged(user);
+    const changedUser: UserEntity =
+      await this.userSvc.recordEmailChanged(updatedUser);
 
-    await this.repo.incrementTokenVersion(user.id);
+    await this.repo.incrementTokenVersion(changedUser.id);
+
+    await this.emailSvc.sendEmail({
+      to: previousEmail,
+      template: EmailChangeSuccessTemplate,
+      model: {
+        firstName:
+          changedUser.profile.name.preferred ?? changedUser.profile.name.first,
+        email: changedUser.identity.email,
+      },
+      metadata: {
+        userId: changedUser.id,
+      },
+    });
   }
 
   private async sendEmail({
     user,
-    firstName = user?.profile.name.first ?? '',
+    firstName = user?.profile.name.preferred ?? user?.profile.name.first ?? '',
     to,
     tokenId,
     token,

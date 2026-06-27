@@ -11,6 +11,8 @@ import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+import { EmailService } from '@/modules/system/email/services/email.service';
+import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 
 @Injectable()
 export class MeApiService {
@@ -18,6 +20,7 @@ export class MeApiService {
     private readonly userSvc: UserService,
     private readonly refreshSvc: RefreshService,
     private readonly evSvc: EmailVerificationService,
+    private readonly emailSvc: EmailService,
   ) {}
 
   public async deleteMe(
@@ -54,6 +57,17 @@ export class MeApiService {
     });
 
     const updated = await this.userSvc.recordPasswordChanged(user);
+
+    await this.emailSvc.sendEmail({
+      to: updated.identity.email,
+      template: AccountPasswordChangedTemplate,
+      model: {
+        firstName: updated.profile.name.preferred ?? updated.profile.name.first,
+      },
+      metadata: {
+        userId: updated.id,
+      },
+    });
 
     return this.refreshSvc.issueTokens(updated, res);
   }

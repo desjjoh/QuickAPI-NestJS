@@ -7,9 +7,16 @@ import { ProfileApiController } from './controllers/profile.controller';
 import { ProfileApiService } from './services/profile.service';
 import { LibraryModule } from '@/modules/domain/library/library.module';
 import { MediaModule } from '@/modules/domain/media/media.module';
+import { EmailModule } from '@/modules/system/email/email.module';
 
 @Module({
-  imports: [TokenModule, IdentityModule, LibraryModule, MediaModule],
+  imports: [
+    TokenModule,
+    IdentityModule,
+    LibraryModule,
+    MediaModule,
+    EmailModule,
+  ],
   providers: [MeApiService, ProfileApiService],
   controllers: [MeApiController, ProfileApiController],
 })

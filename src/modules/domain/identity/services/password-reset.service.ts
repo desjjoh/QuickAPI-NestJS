@@ -10,6 +10,7 @@ import { UserRepository } from '../repositories/user.repository';
 import { UserService } from './user.service';
 import { AccountTokenService } from './token.service';
 import { AccountTokenType } from '@/config/token.config';
+import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 
 const PASSWORD_RESET_EXPIRES_IN_MINUTES = 30;
 
@@ -40,7 +41,7 @@ export class PasswordResetService {
       to: user.identity.email,
       template: PasswordResetTemplate,
       model: {
-        firstName: user.profile.name.first,
+        firstName: user.profile.name.preferred ?? user.profile.name.first,
         resetUrl,
         expiresInMinutes: PASSWORD_RESET_EXPIRES_IN_MINUTES,
       },
@@ -67,10 +68,19 @@ export class PasswordResetService {
     const hashed: string = await this.userSvc.hashPassword(password);
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
-
     await this.userSvc.recordPasswordChanged(user);
-
     await this.userRepo.incrementTokenVersion(user.id);
+
+    await this.emailSvc.sendEmail({
+      to: user.identity.email,
+      template: AccountPasswordChangedTemplate,
+      model: {
+        firstName: user.profile.name.preferred ?? user.profile.name.first,
+      },
+      metadata: {
+        userId: user.id,
+      },
+    });
   }
 
   public async validatePasswordResetToken(
