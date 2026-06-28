@@ -1,5 +1,31 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 
+const PUBLIC_ASSET_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.avif',
+  '.bmp',
+  '.css',
+  '.gif',
+  '.ico',
+  '.jpeg',
+  '.jpg',
+  '.js',
+  '.json',
+  '.map',
+  '.png',
+  '.svg',
+  '.webp',
+  '.woff',
+  '.woff2',
+]);
+
+function isPublicAssetPath(path: string): boolean {
+  const pathname: string = path.split(/[?#]/, 1)[0]?.toLowerCase() ?? '';
+
+  return [...PUBLIC_ASSET_EXTENSIONS].some((extension) =>
+    pathname.endsWith(extension),
+  );
+}
+
 export function securityHeadersMiddleware(): RequestHandler {
   return function securityHeaders(
     req: Request,
@@ -30,6 +56,10 @@ export function securityHeadersMiddleware(): RequestHandler {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader(
+      'Cross-Origin-Resource-Policy',
+      isPublicAssetPath(path) ? 'cross-origin' : 'same-origin',
+    );
 
     // Permissions policy
     res.setHeader(
