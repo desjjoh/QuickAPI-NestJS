@@ -13,15 +13,6 @@ export class TimezoneEntity extends BaseEntity {
   public readonly long_name!: string;
 
   @Column({ type: 'varchar', length: 32 })
-  public readonly short_name!: string;
-
-  @Column({ type: 'smallint' })
-  public readonly offset_minutes!: number;
-
-  @Column({ type: 'varchar', length: 16 })
-  public readonly offset_label!: string;
-
-  @Column({ type: 'varchar', length: 32 })
   public readonly region!: string;
 
   @Column({ type: 'varchar', length: 64 })

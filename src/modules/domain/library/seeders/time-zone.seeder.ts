@@ -10,56 +10,16 @@ type TimezoneSeed = {
   key: string;
   label: string;
   long_name: string;
-  short_name: string;
-  offset_minutes: number;
-  offset_label: string;
   region: string;
   exemplar_city: string;
 };
 
-const DEFAULT_LOCALE = 'en-US';
-const DEFAULT_OFFSET_DATE = new Date('2026-01-01T12:00:00.000Z');
-
-const formatOffsetLabel = (offsetMinutes: number): string => {
-  const sign = offsetMinutes >= 0 ? '+' : '-';
-  const absoluteMinutes = Math.abs(offsetMinutes);
-  const hours = Math.floor(absoluteMinutes / 60)
-    .toString()
-    .padStart(2, '0');
-  const minutes = (absoluteMinutes % 60).toString().padStart(2, '0');
-
-  return `GMT${sign}${hours}:${minutes}`;
-};
-
-const getOffsetMinutes = (timeZone: string): number => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(DEFAULT_OFFSET_DATE);
-  const values = Object.fromEntries(
-    parts.map((part: Intl.DateTimeFormatPart) => [part.type, part.value]),
-  );
-  const utcTimestamp = Date.UTC(
-    Number(values.year),
-    Number(values.month) - 1,
-    Number(values.day),
-    Number(values.hour),
-    Number(values.minute),
-    Number(values.second),
-  );
-
-  return Math.round((utcTimestamp - DEFAULT_OFFSET_DATE.getTime()) / 60000);
-};
+const DEFAULT_LOCALE = 'en-CA';
+const DEFAULT_OFFSET_DATE = new Date('1970-01-01T12:00:00.000Z');
 
 const getTimeZoneName = (
   timeZone: string,
-  timeZoneName: 'long' | 'short',
+  timeZoneName: 'longGeneric' | 'short',
 ): string => {
   const formatter = new Intl.DateTimeFormat(DEFAULT_LOCALE, {
     timeZone,
@@ -88,18 +48,12 @@ const buildTimezoneSeeds = (): TimezoneSeed[] => {
     : ['UTC', ...supportedValues];
 
   return keys.map((key: string): TimezoneSeed => {
-    const offsetMinutes = getOffsetMinutes(key);
-    const offsetLabel = formatOffsetLabel(offsetMinutes);
-    const longName = getTimeZoneName(key, 'long');
-    const shortName = getTimeZoneName(key, 'short');
+    const longName = getTimeZoneName(key, 'longGeneric');
 
     return {
       key,
-      label: `(${offsetLabel}) ${longName} - ${key}`,
+      label: `${longName} - ${getExemplarCity(key)}`,
       long_name: longName,
-      short_name: shortName,
-      offset_minutes: offsetMinutes,
-      offset_label: offsetLabel,
       region: key.split('/')[0] ?? key,
       exemplar_city: getExemplarCity(key),
     };

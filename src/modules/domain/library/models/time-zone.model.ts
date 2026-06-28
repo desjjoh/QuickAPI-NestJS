@@ -20,15 +20,6 @@ export class TimezoneDto {
   @ApiProperty({ example: 'Eastern Standard Time' })
   public readonly long_name: string;
 
-  @ApiProperty({ example: 'EST' })
-  public readonly short_name: string;
-
-  @ApiProperty({ example: -300 })
-  public readonly offset_minutes: number;
-
-  @ApiProperty({ example: 'GMT-05:00' })
-  public readonly offset_label: string;
-
   @ApiProperty({ example: 'America' })
   public readonly region: string;
 
@@ -39,9 +30,7 @@ export class TimezoneDto {
     this.key = timezone.key;
     this.label = timezone.label;
     this.long_name = timezone.long_name;
-    this.short_name = timezone.short_name;
-    this.offset_minutes = timezone.offset_minutes;
-    this.offset_label = timezone.offset_label;
+
     this.region = timezone.region;
     this.exemplar_city = timezone.exemplar_city;
   }
