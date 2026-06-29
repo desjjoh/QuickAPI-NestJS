@@ -7,5 +7,5 @@ export const redisConnection: ConnectionOptions = {
   port: env.REDIS_PORT,
   password: env.REDIS_PASSWORD || undefined,
   enableReadyCheck: true,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
 };
