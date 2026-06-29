@@ -87,6 +87,8 @@ export class EmailVerificationService {
       tokenId: verification.id,
       token: verification.token,
       mfaCode,
+      verificationPath: '/authentication/verity-email',
+      verificationType: 'email-change',
     });
   }
 
@@ -109,7 +111,9 @@ export class EmailVerificationService {
       tokenId: verification.id,
       token: verification.token,
       mfaCode,
-      verificationPath: '/authentication/confirm-registration',
+      verificationPath: '/authentication/verity-email',
+      verificationType: 'register',
+
       template: RegistrationVerificationTemplate,
       metadata: {
         email,
@@ -295,6 +299,7 @@ export class EmailVerificationService {
     mfaCode,
     metadata,
     verificationPath = '/authentication/verify-email',
+    verificationType,
     template = EmailVerificationTemplate,
   }: {
     user?: UserEntity;
@@ -305,12 +310,14 @@ export class EmailVerificationService {
     mfaCode: string;
     metadata?: Record<string, string>;
     verificationPath?: string;
+    verificationType?: 'register' | 'email-change';
     template?: typeof EmailVerificationTemplate;
   }): Promise<void> {
     const verificationUrl: string = this.buildVerificationUrl(
       tokenId,
       token,
       verificationPath,
+      verificationType,
     );
 
     await this.emailSvc.sendEmail({
@@ -385,11 +392,14 @@ export class EmailVerificationService {
     tokenId: string,
     token: string,
     path: string,
+    type?: 'register' | 'email-change',
   ): string {
     const url: URL = new URL(path, env.PUBLIC_WEB_URL);
 
     url.searchParams.set('token_id', tokenId);
     url.searchParams.set('token', token);
+
+    if (type) url.searchParams.set('type', type);
 
     return url.toString();
   }
