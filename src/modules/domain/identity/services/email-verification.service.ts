@@ -87,7 +87,7 @@ export class EmailVerificationService {
       tokenId: verification.id,
       token: verification.token,
       mfaCode,
-      verificationPath: '/authentication/verity-email',
+      verificationPath: '/authentication/verify-email',
       verificationType: 'email-change',
     });
   }
@@ -111,7 +111,7 @@ export class EmailVerificationService {
       tokenId: verification.id,
       token: verification.token,
       mfaCode,
-      verificationPath: '/authentication/verity-email',
+      verificationPath: '/authentication/verify-email',
       verificationType: 'register',
 
       template: RegistrationVerificationTemplate,

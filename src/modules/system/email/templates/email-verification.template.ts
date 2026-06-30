@@ -27,7 +27,7 @@ export const EmailVerificationTemplate = new EmailTemplate({
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f6f7f9;padding:32px 16px;">
             <tr>
               <td align="center">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
                   <tr>
                     <td style="padding:32px 32px 16px 32px;">
                       <h1 style="margin:0;font-size:24px;line-height:1.3;color:#111827;">
@@ -52,24 +52,32 @@ export const EmailVerificationTemplate = new EmailTemplate({
                     </td>
                   </tr>
 
-
                   <tr>
-                    <td align="center" style="padding:0 32px 24px 32px;">
-                      <p style="margin:0 0 8px 0;font-size:14px;line-height:1.6;color:#4b5563;">
-                        Your verification code is:
-                      </p>
-
-                      <p style="margin:0;font-size:32px;letter-spacing:8px;font-weight:bold;color:#111827;">
-                        {{mfaCode}}
-                      </p>
+                    <td align="center" style="padding:0 32px 24px 32px;text-align:center;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto;text-align:center;">
+                        <tr>
+                          <td align="center" style="padding:0 0 8px 0;text-align:center;font-size:14px;line-height:1.6;color:#4b5563;">
+                            Your verification code is:
+                          </td>
+                        </tr>
+                        <tr>
+                          <td align="center" style="padding:0;text-align:center;font-size:32px;line-height:1.2;letter-spacing:8px;padding-left:8px;font-weight:bold;color:#111827;">
+                            {{mfaCode}}
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
 
                   <tr>
-                    <td align="center" style="padding:8px 32px 32px 32px;">
-                      <a href="{{verificationUrl}}" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;padding:14px 22px;border-radius:8px;">
-                        Confirm email change
-                      </a>
+                    <td align="center" style="padding:8px 32px 32px 32px;text-align:center;">
+                      <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto;">
+                        <tr>
+                          <td align="center" bgcolor="#111827" style="border-radius:8px;text-align:center;">
+                            <a href="{{verificationUrl}}" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;padding:14px 22px;border-radius:8px;">Confirm email change</a>
+                          </td>
+                        </tr>
+                      </table>
                     </td>
                   </tr>
 

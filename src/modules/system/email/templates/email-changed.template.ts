@@ -25,7 +25,7 @@ export const EmailChangeSuccessTemplate = new EmailTemplate({
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f6f7f9;padding:32px 16px;">
             <tr>
               <td align="center">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb;">
                   <tr>
                     <td style="padding:32px 32px 16px 32px;">
                       <h1 style="margin:0;font-size:24px;line-height:1.3;color:#111827;">
