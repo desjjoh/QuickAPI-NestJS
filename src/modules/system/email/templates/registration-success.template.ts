@@ -42,10 +42,6 @@ export const RegistrationSuccessTemplate = new EmailTemplate({
                       <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;">
                         Your email has been verified and your account has been created successfully.
                       </p>
-
-                      <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">
-                        You can now return to the app and sign in from the authentication modal when prompted.
-                      </p>
                     </td>
                   </tr>
                 </table>
