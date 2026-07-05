@@ -90,6 +90,10 @@ export class UserService {
     });
   }
 
+  public async findByIdOrFail(id: string): Promise<UserEntity> {
+    return this.userRepo.findByIdOrFail(id);
+  }
+
   public async updateUser(user: UserEntity, dto: DeepPartial<UserEntity>) {
     const updatedUser: UserEntity = this.userRepo.merge(user, dto);
 

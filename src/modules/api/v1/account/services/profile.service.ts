@@ -166,11 +166,9 @@ export class ProfileApiService {
     if (!address)
       throw new BadRequestException('User does not have an address to remove.');
 
-    const updated = await this.userSvc.updateUser(user, {
-      profile: { contact: { address: null } },
-    });
-
     await this.userSvc.deleteAddress(address);
+
+    const updated = await this.userSvc.findByIdOrFail(user.id);
 
     return this.refreshSvc.issueTokens(updated, res);
   }
@@ -196,11 +194,9 @@ export class ProfileApiService {
     if (!phone)
       throw new BadRequestException('User does not have a phone to remove.');
 
-    const updated = await this.userSvc.updateUser(user, {
-      profile: { contact: { phone: null } },
-    });
-
     await this.userSvc.deletePhone(phone);
+
+    const updated = await this.userSvc.findByIdOrFail(user.id);
 
     return this.refreshSvc.issueTokens(updated, res);
   }

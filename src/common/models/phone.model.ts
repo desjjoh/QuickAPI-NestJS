@@ -1,7 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { PhoneEntity } from '../entities/phone.entity';
+import { BaseModel } from './base.model';
 
-export class PhoneDto {
+export class PhoneDto extends BaseModel {
   @ApiProperty({
     example: 'SUwDyXR7iSBnyWmr',
     description: 'The unique NanoID of the selected country reference record.',
@@ -31,6 +32,8 @@ export class PhoneDto {
   public readonly phone_e164: string;
 
   public constructor(phone: PhoneEntity) {
+    super(phone);
+
     this.phone_country_id = phone.country.id;
     this.phone_calling_code = phone.phone_calling_code;
     this.phone_national_number = phone.phone_national_number;

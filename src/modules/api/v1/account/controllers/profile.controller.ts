@@ -9,6 +9,8 @@ import {
   UploadedFile,
   Body,
   Res,
+  Patch,
+  Post,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -54,8 +56,8 @@ import { UpdatePhoneDto } from '../models/updatePhone.model';
 export class ProfileApiController {
   public constructor(private readonly svc: ProfileApiService) {}
 
-  // PUT /
-  @Put('')
+  // PATCH /
+  @Patch('')
   @ApiBody({
     type: UpdateProfileDto,
     description:
@@ -138,8 +140,8 @@ export class ProfileApiController {
     return this.svc.updateTimezone(user, dto, res);
   }
 
-  // PUT /avatar
-  @Put('avatar')
+  // POST /avatar
+  @Post('avatar')
   @ApiOperation({
     summary: 'Set profile avatar',
     description:
@@ -196,8 +198,8 @@ export class ProfileApiController {
     return this.svc.removeAvatar(user, res);
   }
 
-  // PUT /phone
-  @Put('phone')
+  // POST /phone
+  @Post('phone')
   @ApiOperation({
     summary: 'Set primary phone number',
     description:
@@ -239,8 +241,8 @@ export class ProfileApiController {
     return this.svc.removePhone(user, res);
   }
 
-  // PUT /address
-  @Put('address')
+  // POST /address
+  @Post('address')
   @ApiOperation({
     summary: 'Set profile address',
     description:
