@@ -189,11 +189,18 @@ export class ProfileDto {
   })
   public readonly region: RegionDto;
 
+  @ApiProperty({
+    type: MediaDto,
+    description: 'Images and media associated with the user account.',
+  })
+  public readonly media: MediaDto;
+
   public constructor(user: UserEntity) {
     this.name = new NameDto(user);
     this.personal = new PersonalDto(user);
     this.contact = new ContactDto(user);
     this.region = new RegionDto(user);
+    this.media = new MediaDto(user);
   }
 }
 
