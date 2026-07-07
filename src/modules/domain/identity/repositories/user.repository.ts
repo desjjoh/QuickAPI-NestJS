@@ -3,7 +3,7 @@ import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
 
 import { Base } from '@/common/models/base.model';
 
-import { UserEntity } from '../entities/user.entity';
+import { createUserMetadata, UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
 import { UserProfileEntity } from '../entities/profile.entity';
 import { UserCredentialsEntity } from '../entities/credentials.entity';
@@ -27,6 +27,10 @@ export class UserRepository extends Repository<UserEntity> {
         ...user.credentials,
         token_version: user.credentials.token_version + 1,
         refresh: null,
+        metadata: createUserMetadata({
+          ...user.metadata,
+          last_updated_at: new Date(),
+        }),
       },
     });
   }

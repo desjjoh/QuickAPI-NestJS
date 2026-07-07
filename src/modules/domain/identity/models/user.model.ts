@@ -228,6 +228,14 @@ export class MetadataDto {
   })
   public readonly lastChangedPassword: string | null;
 
+  @ApiPropertyOptional({
+    example: '2026-06-25T14:30:00.000Z',
+    description:
+      'Most recent user account or profile mutation timestamp, in ISO 8601 format.',
+    nullable: true,
+  })
+  public readonly lastUpdatedAt: string | null;
+
   public constructor(user: UserEntity) {
     const metadata = createUserMetadata(user.metadata);
 
@@ -235,6 +243,7 @@ export class MetadataDto {
     this.lastChangedEmail = metadata.last_changed_email?.toISOString() ?? null;
     this.lastChangedPassword =
       metadata.last_changed_password?.toISOString() ?? null;
+    this.lastUpdatedAt = metadata.last_updated_at?.toISOString() ?? null;
   }
 }
 

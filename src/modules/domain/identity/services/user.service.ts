@@ -28,6 +28,11 @@ import { RoleEntity } from '../../library/entities/role.entity';
 import { RoleRepository } from '../../library/repositories/role.repository';
 import { UserPhoneEntity } from '../entities/phone.entity';
 
+type UpdateUserOptions = {
+  touchLastUpdatedAt?: boolean;
+  lastUpdatedAt?: Date | null;
+};
+
 @Injectable()
 export class UserService {
   public constructor(
@@ -98,8 +103,31 @@ export class UserService {
     return this.userRepo.findByIdOrFail(id);
   }
 
-  public async updateUser(user: UserEntity, dto: DeepPartial<UserEntity>) {
-    const updatedUser: UserEntity = this.userRepo.merge(user, dto);
+  public async updateUser(
+    user: UserEntity,
+    dto: DeepPartial<UserEntity>,
+    options: UpdateUserOptions = {},
+  ): Promise<UserEntity> {
+    const shouldTouchLastUpdatedAt: boolean =
+      options.touchLastUpdatedAt ?? true;
+
+    const dtoMetadata = dto.metadata as
+      | Partial<UserEntity['metadata']>
+      | undefined;
+
+    const metadata = shouldTouchLastUpdatedAt
+      ? createUserMetadata({
+          ...user.metadata,
+          ...(dtoMetadata ?? {}),
+          last_updated_at:
+            options.lastUpdatedAt ?? dtoMetadata?.last_updated_at ?? new Date(),
+        })
+      : dtoMetadata;
+
+    const updatedUser: UserEntity = this.userRepo.merge(user, {
+      ...dto,
+      ...(metadata ? { metadata } : {}),
+    });
 
     await this.userRepo.save(updatedUser);
 
@@ -237,13 +265,9 @@ export class UserService {
 
     if (alreadyHasRole) return user;
 
-    const updatedUser: UserEntity = this.userRepo.merge(user, {
+    return this.updateUser(user, {
       roles: [...(user.roles ?? []), role],
     });
-
-    await this.userRepo.save(updatedUser);
-
-    return this.userRepo.findByIdOrFail(updatedUser.id);
   }
 
   public async deletePhone(phone: UserPhoneEntity): Promise<void> {

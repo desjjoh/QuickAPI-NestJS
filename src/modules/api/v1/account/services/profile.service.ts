@@ -120,7 +120,8 @@ export class ProfileApiService {
 
     await this.imgSvc.remove(avatar);
 
-    const updated = await this.userSvc.findByIdOrFail(user.id);
+    const refreshed = await this.userSvc.findByIdOrFail(user.id);
+    const updated = await this.userSvc.updateMetadata(refreshed, {});
 
     return this.refreshSvc.issueTokens(updated, res);
   }
@@ -164,7 +165,8 @@ export class ProfileApiService {
 
     await this.userSvc.deleteAddress(address);
 
-    const updated = await this.userSvc.findByIdOrFail(user.id);
+    const refreshed = await this.userSvc.findByIdOrFail(user.id);
+    const updated = await this.userSvc.updateMetadata(refreshed, {});
 
     return this.refreshSvc.issueTokens(updated, res);
   }
@@ -192,7 +194,8 @@ export class ProfileApiService {
 
     await this.userSvc.deletePhone(phone);
 
-    const updated = await this.userSvc.findByIdOrFail(user.id);
+    const refreshed = await this.userSvc.findByIdOrFail(user.id);
+    const updated = await this.userSvc.updateMetadata(refreshed, {});
 
     return this.refreshSvc.issueTokens(updated, res);
   }
