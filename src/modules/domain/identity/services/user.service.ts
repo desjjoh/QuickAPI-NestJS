@@ -67,7 +67,7 @@ export class UserService {
     );
 
     if (!hasPermission)
-      throw new UnauthorizedException('User does not have required permission');
+      throw new ForbiddenException('User does not have required permission');
   }
 
   public canAuthenticate(user: UserEntity): boolean {
@@ -88,6 +88,10 @@ export class UserService {
     await this.userRepo.manager.delete(UserAddressEntity, {
       id: address.id,
     });
+  }
+
+  public async clearProfileAvatar(profileId: string): Promise<void> {
+    await this.userRepo.clearProfileAvatar(profileId);
   }
 
   public async findByIdOrFail(id: string): Promise<UserEntity> {

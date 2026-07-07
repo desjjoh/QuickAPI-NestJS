@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import {
@@ -124,7 +128,7 @@ describe('PermissionsGuard', () => {
     const context = createExecutionContext({});
 
     await expect(guard.canActivate(context)).rejects.toThrow(
-      ForbiddenException,
+      UnauthorizedException,
     );
 
     await expect(guard.canActivate(context)).rejects.toThrow(
@@ -132,7 +136,7 @@ describe('PermissionsGuard', () => {
     );
   });
 
-  it('throws when request user does not contain userEntity', async () => {
+  it('throws unauthorized when request user does not contain userEntity', async () => {
     const reflector = createReflectorMock([ACCOUNT_UPDATE]);
     const guard = new PermissionsGuard(asReflector(reflector));
 
@@ -141,6 +145,10 @@ describe('PermissionsGuard', () => {
         id: 'auth-user-id',
       },
     });
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      UnauthorizedException,
+    );
 
     await expect(guard.canActivate(context)).rejects.toThrow(
       'User object could not be found.',

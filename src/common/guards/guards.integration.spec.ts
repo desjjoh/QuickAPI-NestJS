@@ -1,5 +1,6 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   INestApplication,
   Post,
@@ -68,7 +69,7 @@ describe('Guard route integration and exception mapping', () => {
     jest.spyOn(CsrfGuard.prototype, 'canActivate').mockReturnValue(false);
     jest
       .spyOn(PermissionsGuard.prototype, 'canActivate')
-      .mockRejectedValue(new UnauthorizedException('permission denied'));
+      .mockRejectedValue(new ForbiddenException('permission denied'));
 
     const module = await Test.createTestingModule({
       controllers: [ProtectedController],
@@ -121,8 +122,15 @@ describe('Guard route integration and exception mapping', () => {
   });
 
   it('maps permission denial', async () => {
-    await request(app.getHttpServer())
+    const res = await request(app.getHttpServer())
       .get('/protected/permissions')
-      .expect(401);
+      .expect(403);
+
+    expect(res.body).toEqual(
+      expect.objectContaining({
+        status: 403,
+        message: 'permission denied',
+      }),
+    );
   });
 });

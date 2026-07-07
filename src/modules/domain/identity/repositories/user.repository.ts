@@ -79,6 +79,13 @@ export class UserRepository extends Repository<UserEntity> {
     return user;
   }
 
+  public async clearProfileAvatar(profileId: string): Promise<void> {
+    await this.manager.query(
+      'UPDATE `user_profiles` SET `avatar_id` = NULL WHERE `id` = ?',
+      [profileId],
+    );
+  }
+
   public async createUser(
     payload: DeepPartial<Base<UserEntity>>,
   ): Promise<UserEntity> {
@@ -95,12 +102,12 @@ export class UserRepository extends Repository<UserEntity> {
     const profileId = user.profile.id;
     const credentialsId = user.credentials.id;
 
-    if (avatar) await this.imageSvc.remove(avatar);
-
     await this.manager.transaction(async (manager: EntityManager) => {
       await manager.remove(UserEntity, user);
       await manager.delete(UserProfileEntity, { id: profileId });
       await manager.delete(UserCredentialsEntity, { id: credentialsId });
     });
+
+    if (avatar) await this.imageSvc.remove(avatar);
   }
 }

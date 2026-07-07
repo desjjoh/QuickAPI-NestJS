@@ -116,15 +116,11 @@ export class ProfileApiService {
     if (!avatar)
       throw new BadRequestException('User does not have an avatar to remove.');
 
-    const updated = await this.userSvc.updateUser(user, {
-      profile: {
-        media: {
-          avatar: null,
-        },
-      },
-    });
+    await this.userSvc.clearProfileAvatar(user.profile.id);
 
     await this.imgSvc.remove(avatar);
+
+    const updated = await this.userSvc.findByIdOrFail(user.id);
 
     return this.refreshSvc.issueTokens(updated, res);
   }
