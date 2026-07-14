@@ -13,6 +13,8 @@ import { ImageDto } from '../../media/models/image.model';
 import { PhoneDto } from '@/common/models/phone.model';
 import { BaseCountryDto } from '../../library/models/country.model';
 import { BaseTimezoneDto } from '../../library/models/time-zone.model';
+import { AccountStatusDto } from '../../library/models/status.model';
+import { GenderDto } from '../../library/models/gender.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',
@@ -90,16 +92,15 @@ export class PersonalDto {
   public readonly dob: string;
 
   @ApiProperty({
-    example: 'male',
-    description:
-      'Stable gender key selected from the configured gender reference data.',
+    type: GenderDto,
+    description: 'Selected gender from the configured gender reference data.',
   })
-  public readonly gender: string;
+  public readonly gender: GenderDto;
 
   public constructor(user: UserEntity) {
     this.bio = user.profile.personal.bio ?? null;
     this.dob = user.profile.personal.dob;
-    this.gender = user.profile.personal.gender.key;
+    this.gender = new GenderDto(user.profile.personal.gender);
   }
 }
 
@@ -247,6 +248,76 @@ export class MetadataDto {
   }
 }
 
+export class SessionDto {
+  @ApiPropertyOptional({
+    example: 'Chrome',
+    description: 'Browser associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly browser: string | null;
+
+  @ApiPropertyOptional({
+    example: '120.0.0.0',
+    description: 'Browser version associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly browserVersion: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Desktop',
+    description: 'Device class associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly device: string | null;
+
+  @ApiPropertyOptional({
+    example: 'macOS',
+    description: 'Operating system associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly os: string | null;
+
+  @ApiPropertyOptional({
+    example: '14.2.1',
+    description:
+      'Operating system version associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly osVersion: string | null;
+
+  @ApiPropertyOptional({
+    example: '203.0.113.10',
+    description: 'IP address associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly ipAddress: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Mozilla/5.0...',
+    description: 'Raw user-agent associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly userAgent: string | null;
+
+  @ApiPropertyOptional({
+    example: 'https://app.example.com',
+    description: 'Origin header associated with the current stored session.',
+    nullable: true,
+  })
+  public readonly origin: string | null;
+
+  public constructor(user: UserEntity) {
+    this.browser = user.credentials.browser;
+    this.browserVersion = user.credentials.browser_version;
+    this.device = user.credentials.device;
+    this.os = user.credentials.os;
+    this.osVersion = user.credentials.os_version;
+    this.ipAddress = user.credentials.ip_address;
+    this.userAgent = user.credentials.user_agent;
+    this.origin = user.credentials.origin;
+  }
+}
+
 export class UserDto extends BaseModel {
   @ApiProperty({
     type: IdentityDto,
@@ -273,7 +344,18 @@ export class UserDto extends BaseModel {
   })
   public readonly roles: RoleDto[];
 
-  public readonly status: string;
+  @ApiProperty({
+    type: SessionDto,
+    description: 'Current stored session metadata for the user.',
+  })
+  public readonly session: SessionDto;
+
+  @ApiProperty({
+    type: AccountStatusDto,
+    description:
+      'Current lifecycle status of the account, such as whether the account is active, disabled, or otherwise restricted.',
+  })
+  public readonly status: AccountStatusDto;
 
   public constructor(user: UserEntity) {
     super(user);
@@ -282,6 +364,7 @@ export class UserDto extends BaseModel {
     this.profile = new ProfileDto(user);
     this.roles = user.roles?.map((role: RoleEntity) => new RoleDto(role)) ?? [];
     this.metadata = new MetadataDto(user);
-    this.status = user.status.key;
+    this.session = new SessionDto(user);
+    this.status = new AccountStatusDto(user.status);
   }
 }
