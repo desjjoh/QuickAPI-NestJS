@@ -1,13 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { isIP } from 'node:net';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import type { Request } from 'express';
 
 import { env } from '@/config/environment.config';
+import { ConfigurationError } from '@/common/errors/config.error';
 
-const appRequire = createRequire(__filename);
+const loadMaxMind = async (): Promise<MaxMind> =>
+  (await new Function('specifier', 'return import(specifier)')(
+    'maxmind',
+  )) as MaxMind;
 
 type Reader = {
   get(ip: string): MaxMindRecord | null;
@@ -58,6 +61,8 @@ export type SessionIpLocation = {
 };
 
 export async function assertGeoLiteDatabasesAvailable(): Promise<void> {
+  if (env.NODE_ENV === 'test') return;
+
   const required = ['GeoLite2-Country.mmdb', 'GeoLite2-City.mmdb'];
 
   const missing = required.filter((filename) => {
@@ -65,13 +70,13 @@ export async function assertGeoLiteDatabasesAvailable(): Promise<void> {
   });
 
   if (missing.length > 0) {
-    throw new Error(
+    throw new ConfigurationError(
       `GeoLite2 database files are unavailable in ${env.IP_LOCATION_DATA_DIR}: ${missing.join(', ')}. Run npm run geoip:update before starting the API.`,
     );
   }
 
   try {
-    const maxmind = appRequire('maxmind') as MaxMind;
+    const maxmind = await loadMaxMind();
 
     await Promise.all(
       required.map((filename) => {
@@ -81,7 +86,7 @@ export async function assertGeoLiteDatabasesAvailable(): Promise<void> {
       }),
     );
   } catch {
-    throw new Error(
+    throw new ConfigurationError(
       `GeoLite2 databases in ${env.IP_LOCATION_DATA_DIR} could not be opened. Run npm run geoip:update to install valid files.`,
     );
   }
@@ -94,6 +99,8 @@ export class IpLocationService {
   private reader: Reader | null | undefined;
 
   public async resolve(req: Request): Promise<SessionIpLocation> {
+    // Preserve the transport-derived address exactly as supplied by Express/socket
+    // for session debugging; only public, syntactically valid addresses are looked up.
     const ip = req.ip ?? req.socket.remoteAddress ?? null;
     const resolvedAt = new Date();
 
@@ -161,7 +168,7 @@ export class IpLocationService {
   }
 
   protected async openReader(filename: string): Promise<Reader> {
-    const maxmind = appRequire('maxmind') as MaxMind;
+    const maxmind = await loadMaxMind();
 
     return maxmind.open<MaxMindRecord>(
       path.join(env.IP_LOCATION_DATA_DIR, filename),

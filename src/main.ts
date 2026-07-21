@@ -9,8 +9,6 @@ import { assertGeoLiteDatabasesAvailable } from './modules/system/geolocation/se
 async function bootstrap(): Promise<void> {
   const env_mode: mode = env.NODE_ENV;
 
-  const isTest = env.NODE_ENV === 'test';
-
   const name: string = env.APP_NAME;
   const version: string = env.APP_VERSION;
   const node_v: string = process.version;
@@ -24,7 +22,7 @@ async function bootstrap(): Promise<void> {
     },
     {
       name: 'GeoLite2 local database files',
-      start: !isTest ? assertGeoLiteDatabasesAvailable : undefined,
+      start: assertGeoLiteDatabasesAvailable,
     },
 
     {
