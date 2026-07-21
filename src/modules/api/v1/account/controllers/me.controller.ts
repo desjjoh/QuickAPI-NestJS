@@ -1,14 +1,6 @@
 import type { Response } from 'express';
 
-import {
-  Controller,
-  UseGuards,
-  Delete,
-  Patch,
-  Res,
-  Body,
-  Post,
-} from '@nestjs/common';
+import { Controller, UseGuards, Patch, Res, Body, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -45,8 +37,8 @@ import { UpdatePasswordDto } from '../models/updatePassword.model';
 export class MeApiController {
   public constructor(private readonly svc: MeApiService) {}
 
-  // DELETE /
-  @Delete('')
+  // POST /delete
+  @Post('delete')
   @ApiBody({
     type: DeleteAccountDto,
     description:
