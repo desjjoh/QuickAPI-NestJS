@@ -22,6 +22,7 @@ import {
   createSessionInfoFromRequest,
   SessionInfo,
 } from '@/common/helpers/session-info.helper';
+import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
 
 @Injectable()
 export class RefreshService {
@@ -29,6 +30,7 @@ export class RefreshService {
     private readonly tokenSvc: TokenService,
     private readonly userRepo: UserRepository,
     private readonly requestContext: RequestContext,
+    private readonly ipLocation: IpLocationService,
   ) {}
 
   public async issueTokens(user: UserEntity, res: Response): Promise<JWTDto> {
@@ -76,6 +78,7 @@ export class RefreshService {
   ): Promise<UserEntity> {
     const req: Request | undefined = this.requestContext.get('request');
     const session: SessionInfo | null = createSessionInfoFromRequest(req);
+    const location = req ? await this.ipLocation.resolve(req) : null;
 
     const sessionFields = session
       ? {
@@ -87,6 +90,15 @@ export class RefreshService {
           ip_address: session.ip_address,
           user_agent: session.user_agent,
           origin: session.origin,
+          location: {
+            country_code: location?.countryCode ?? null,
+            country_name: location?.countryName ?? null,
+            region_code: location?.regionCode ?? null,
+            region_name: location?.regionName ?? null,
+            city: location?.city ?? null,
+            source: location?.source ?? null,
+            resolved_at: location?.resolvedAt ?? null,
+          },
         }
       : {};
 

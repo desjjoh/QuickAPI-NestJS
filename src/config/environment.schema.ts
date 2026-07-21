@@ -171,6 +171,13 @@ export const EnvSchema = z
     GLOBAL_THROTTLE_LIMIT: positiveIntegerFromEnv.default(200),
 
     // # ============================================================
+    // # Session IP geolocation (local MaxMind only)
+    // # ============================================================
+    MAXMIND_LICENSE_KEY: z.string().optional(),
+    MAXMIND_ACCOUNT_ID: z.string().optional(),
+    IP_LOCATION_DATA_DIR: z.string().min(1).default('data/geoip'),
+
+    // # ============================================================
     // # Database
     // #
     // # Local Docker Compose default:

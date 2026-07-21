@@ -5,6 +5,29 @@ import { BaseEntity } from '@/common/entities/base.entity';
 
 import { UserEntity } from './user.entity';
 
+class Location {
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  public readonly country_code!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly country_name!: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  public readonly region_code!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly region_name!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly city!: string | null;
+
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  public readonly source!: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  public readonly resolved_at!: Date | null;
+}
+
 @Entity('user_credentials')
 export class UserCredentialsEntity extends BaseEntity {
   @OneToOne(() => UserEntity, (user: UserEntity) => user.credentials, {
@@ -37,6 +60,9 @@ export class UserCredentialsEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 45, nullable: true, default: null })
   public readonly ip_address!: string | null;
+
+  @Column(() => Location, { prefix: false })
+  public readonly location!: Location;
 
   @Column({ type: 'text', nullable: true, default: null })
   public readonly user_agent!: string | null;

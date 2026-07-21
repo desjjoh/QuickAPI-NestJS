@@ -18,12 +18,16 @@ export function createSessionInfoFromRequest(
   if (!req) return null;
 
   const userAgent = req.get('user-agent') ?? null;
-  const forwardedFor = req.get('x-forwarded-for');
-  const ipAddress =
-    forwardedFor?.split(',')[0]?.trim() ||
-    req.ip ||
-    req.socket.remoteAddress ||
-    null;
+
+  // const forwardedFor = req.get('x-forwarded-for');
+  // const ipAddress =
+  //   forwardedFor?.split(',')[0]?.trim() ||
+  //   req.ip ||
+  //   req.socket.remoteAddress ||
+  //   null;
+
+  // Do not manually trust client-supplied forwarding headers.
+  const ipAddress = req.ip || req.socket.remoteAddress || null;
 
   return {
     browser: getBrowser(userAgent),

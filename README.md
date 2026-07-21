@@ -587,6 +587,16 @@ Run E2E tests:
 npm run check:e2e
 ```
 
+### Session IP geolocation
+
+Refresh-token session metadata stores the trusted request IP and a coarse GeoLite2-derived country, region, and city when available. It never calls an external geolocation service during authentication, and does not retain coordinates. Set `MAXMIND_LICENSE_KEY` (and optionally `MAXMIND_ACCOUNT_ID`) and install/update the local databases with:
+
+```bash
+npm run geoip:update
+```
+
+Databases are kept in `IP_LOCATION_DATA_DIR` (default `data/geoip`; mount this directory as persistent storage in containers). Run the command as a deployment migration or scheduled job before starting/rolling application instances; it validates and replaces the local files with the current download. The API refuses to start when either database is unavailable or unreadable. GeoLite2 City is seeded in addition to Country because Country cannot provide city or region fields.
+
 ---
 
 ## Continuous Integration
