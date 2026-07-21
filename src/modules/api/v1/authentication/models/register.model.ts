@@ -242,15 +242,3 @@ export class ValidateRegistrationTokenResponseDto {
     this.valid = data.valid;
   }
 }
-
-export class VerifyRegistrationResponseDto {
-  @ApiProperty({
-    example: 'Registration verified successfully.',
-    description: 'Human-readable confirmation message.',
-  })
-  public readonly message: string;
-
-  public constructor(data: VerifyRegistrationResponseDto) {
-    this.message = data.message;
-  }
-}

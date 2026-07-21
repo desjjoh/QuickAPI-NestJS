@@ -40,15 +40,3 @@ export class ValidateEmailChangeTokenResponseDto {
     this.valid = data.valid;
   }
 }
-
-export class VerifyEmailResponseDto {
-  @ApiProperty({
-    example: 'Email address verified successfully.',
-    description: 'Human-readable confirmation message.',
-  })
-  public readonly message: string;
-
-  public constructor(data: VerifyEmailResponseDto) {
-    this.message = data.message;
-  }
-}

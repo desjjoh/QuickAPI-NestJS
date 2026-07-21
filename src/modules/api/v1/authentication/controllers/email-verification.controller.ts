@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import {
   Body,
   Controller,
@@ -6,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -23,16 +25,20 @@ import {
   ValidateEmailChangeTokenDto,
   ValidateEmailChangeTokenResponseDto,
   VerifyEmailDto,
-  VerifyEmailResponseDto,
 } from '../models/verify-email.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
+import { AuthService } from '../services/authentication.service';
+import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 
 @ApiTags('Email Verification')
 @UseGuards(CsrfGuard)
 @Controller('email-verification')
 export class EmailVerificationApiController {
-  public constructor(private readonly evSvc: EmailVerificationService) {}
+  public constructor(
+    private readonly evSvc: EmailVerificationService,
+    private readonly authSvc: AuthService,
+  ) {}
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @Post('validate')
@@ -73,7 +79,7 @@ export class EmailVerificationApiController {
   @ApiOperation({
     summary: 'Confirm account email change.',
     description:
-      'Consumes a one-time email change token and updates the account email when the token and verification code are valid.',
+      'Consumes a one-time email verification token and issues an authenticated session when the token and verification code are valid.',
   })
   @ApiBody({
     type: VerifyEmailDto,
@@ -81,17 +87,17 @@ export class EmailVerificationApiController {
       'The raw token and 6-digit verification code from the verification email.',
   })
   @ApiOkResponse({
-    type: VerifyEmailResponseDto,
-    description: 'The email address change was verified successfully.',
+    type: JWTDto,
+    description:
+      'The email address was verified successfully and an authenticated session was issued.',
   })
   public async verifyEmail(
     @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() dto: VerifyEmailDto,
-  ): Promise<VerifyEmailResponseDto> {
-    await this.evSvc.verifyEmail(tokenId, dto.token, dto.code);
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    const user = await this.evSvc.verifyEmail(tokenId, dto.token, dto.code);
 
-    return new VerifyEmailResponseDto({
-      message: 'Email address verified successfully.',
-    });
+    return this.authSvc.signIn(user, res);
   }
 }

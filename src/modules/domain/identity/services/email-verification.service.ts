@@ -140,7 +140,7 @@ export class EmailVerificationService {
     tokenId: string,
     token: string,
     mfaCode: string,
-  ): Promise<void> {
+  ): Promise<UserEntity> {
     const accountToken: AccountTokenEntity =
       await this.accountTokenSvc.validateToken(
         tokenId,
@@ -165,12 +165,12 @@ export class EmailVerificationService {
     );
 
     if (newEmail) {
-      await this.verifyEmailChange(user, newEmail);
-
-      return;
+      return this.verifyEmailChange(user, newEmail);
     }
 
     await this.verifyInitialEmail(user);
+
+    return user;
   }
 
   private async createVerificationToken(
@@ -186,12 +186,11 @@ export class EmailVerificationService {
       mfaCodeHash,
     });
   }
-
   public async verifyRegistrationToken(
     tokenId: string,
     token: string,
     mfaCode: string,
-  ): Promise<void> {
+  ): Promise<UserEntity> {
     const registrationToken = await this.registrationTokenSvc.validateToken(
       tokenId,
       token,
@@ -201,12 +200,12 @@ export class EmailVerificationService {
 
     await this.registrationTokenSvc.consumeToken(tokenId, token);
 
-    await this.verifyRegistration(registrationToken.metadata);
+    return this.verifyRegistration(registrationToken.metadata);
   }
 
   private async verifyRegistration(
     metadata: RegistrationTokenMetadata,
-  ): Promise<void> {
+  ): Promise<UserEntity> {
     const existingUser: UserEntity | null = await this.repo.findByEmail(
       metadata.email,
     );
@@ -236,6 +235,8 @@ export class EmailVerificationService {
         userId: user.id,
       },
     });
+
+    return user;
   }
 
   private async verifyInitialEmail(user: UserEntity): Promise<void> {
@@ -251,7 +252,7 @@ export class EmailVerificationService {
   private async verifyEmailChange(
     user: UserEntity,
     newEmail: string,
-  ): Promise<void> {
+  ): Promise<UserEntity> {
     if (!this.userSvc.canAuthenticate(user))
       throw new BadRequestException('Account cannot change email address.');
 
@@ -288,6 +289,8 @@ export class EmailVerificationService {
         userId: changedUser.id,
       },
     });
+
+    return changedUser;
   }
 
   private async sendEmail({

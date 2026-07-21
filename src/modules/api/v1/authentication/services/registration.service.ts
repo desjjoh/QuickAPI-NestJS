@@ -89,7 +89,7 @@ export class RegistrationService {
     tokenId: string,
     token: string,
     mfaCode: string,
-  ): Promise<void> {
-    await this.emailSvc.verifyRegistrationToken(tokenId, token, mfaCode);
+  ): Promise<UserEntity> {
+    return this.emailSvc.verifyRegistrationToken(tokenId, token, mfaCode);
   }
 }

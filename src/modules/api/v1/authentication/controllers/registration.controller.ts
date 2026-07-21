@@ -1,3 +1,4 @@
+import type { Response } from 'express';
 import {
   Body,
   Controller,
@@ -5,6 +6,7 @@ import {
   HttpStatus,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -27,16 +29,20 @@ import {
   ValidateRegistrationTokenDto,
   ValidateRegistrationTokenResponseDto,
   VerifyRegistrationDto,
-  VerifyRegistrationResponseDto,
 } from '../models/register.model';
 import { RegistrationService } from '../services/registration.service';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
+import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { AuthService } from '../services/authentication.service';
 
 @ApiTags('Registration')
 @UseGuards(CsrfGuard)
 @Controller('registration')
 export class RegistrationApiController {
-  public constructor(private readonly svc: RegistrationService) {}
+  public constructor(
+    private readonly svc: RegistrationService,
+    private readonly authSvc: AuthService,
+  ) {}
 
   @Post('request')
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
@@ -133,19 +139,24 @@ export class RegistrationApiController {
   @ApiOperation({
     summary: 'Verify a pending registration',
     description:
-      'Consumes a one-time registration token and creates the user account when the token and verification code are valid.',
+      'Consumes a one-time registration token, creates the user account, and issues an authenticated session when the token and verification code are valid.',
   })
   @ApiOkResponse({
-    description: 'The pending registration was verified successfully.',
-    type: VerifyRegistrationResponseDto,
+    description:
+      'The pending registration was verified successfully and an authenticated session was issued.',
+    type: JWTDto,
   })
   public async verifyRegistration(
     @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() input: VerifyRegistrationDto,
-  ): Promise<VerifyRegistrationResponseDto> {
-    await this.svc.verifyRegistration(tokenId, input.token, input.code);
-    return new VerifyRegistrationResponseDto({
-      message: 'Registration verified successfully.',
-    });
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    const user = await this.svc.verifyRegistration(
+      tokenId,
+      input.token,
+      input.code,
+    );
+
+    return this.authSvc.signIn(user, res);
   }
 }
