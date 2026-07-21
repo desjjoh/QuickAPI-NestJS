@@ -293,6 +293,56 @@ export class SessionDto {
   public readonly ipAddress: string | null;
 
   @ApiPropertyOptional({
+    example: 'CA',
+    description:
+      'GeoLite2 country ISO 3166-1 alpha-2 code for the stored session.',
+    nullable: true,
+  })
+  public readonly countryCode: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Canada',
+    description: 'GeoLite2 country name for the stored session.',
+    nullable: true,
+  })
+  public readonly countryName: string | null;
+
+  @ApiPropertyOptional({
+    example: 'ON',
+    description: 'GeoLite2 subdivision/region code for the stored session.',
+    nullable: true,
+  })
+  public readonly regionCode: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Ontario',
+    description: 'GeoLite2 subdivision/region name for the stored session.',
+    nullable: true,
+  })
+  public readonly regionName: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Ottawa',
+    description: 'GeoLite2 city for the stored session.',
+    nullable: true,
+  })
+  public readonly city: string | null;
+
+  @ApiPropertyOptional({
+    example: 'maxmind',
+    description: 'Source used to resolve the stored session location.',
+    nullable: true,
+  })
+  public readonly locationSource: string | null;
+
+  @ApiPropertyOptional({
+    example: '2026-07-21T12:00:00.000Z',
+    description: 'Time at which the stored session location was resolved.',
+    nullable: true,
+  })
+  public readonly locationResolvedAt: string | null;
+
+  @ApiPropertyOptional({
     example: 'Mozilla/5.0...',
     description: 'Raw user-agent associated with the current stored session.',
     nullable: true,
@@ -313,6 +363,14 @@ export class SessionDto {
     this.os = user.credentials.os;
     this.osVersion = user.credentials.os_version;
     this.ipAddress = user.credentials.ip_address;
+    this.countryCode = user.credentials.location.country_code;
+    this.countryName = user.credentials.location.country_name;
+    this.regionCode = user.credentials.location.region_code;
+    this.regionName = user.credentials.location.region_name;
+    this.city = user.credentials.location.city;
+    this.locationSource = user.credentials.location.source;
+    this.locationResolvedAt =
+      user.credentials.location.resolved_at?.toISOString() ?? null;
     this.userAgent = user.credentials.user_agent;
     this.origin = user.credentials.origin;
   }
