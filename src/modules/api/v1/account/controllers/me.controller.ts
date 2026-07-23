@@ -25,7 +25,6 @@ import {
 } from '@/common/decorators/current-user.decorator';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
-import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 
 import { MeApiService } from '../services/me.service';
 

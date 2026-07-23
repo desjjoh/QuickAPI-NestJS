@@ -12,7 +12,6 @@ import {
   CurrentUser,
 } from '@/common/decorators/current-user.decorator';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
-import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import {
