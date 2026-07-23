@@ -22,7 +22,16 @@ export class UserRepository extends Repository<UserEntity> {
     await this.manager
       .createQueryBuilder()
       .update(UserSessionEntity)
-      .set({ refresh: null, token_version: () => '`token_version` + 1' })
+      .set({ token_version: () => '`token_version` + 1' })
+      .where('userId = :userId AND active = true', { userId })
+      .execute();
+  }
+
+  public async revokeAllSessions(userId: string): Promise<void> {
+    await this.manager
+      .createQueryBuilder()
+      .update(UserSessionEntity)
+      .set({ active: false, refresh: null })
       .where('userId = :userId AND active = true', { userId })
       .execute();
   }

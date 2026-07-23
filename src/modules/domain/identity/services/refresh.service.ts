@@ -87,6 +87,11 @@ export class RefreshService {
     });
   }
 
+  public async revokeAllSessions(userId: string, res: Response): Promise<void> {
+    await this.userRepo.revokeAllSessions(userId);
+    res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
+  }
+
   public async revokeOtherSessions(
     userId: string,
     currentSessionId: string,
@@ -104,7 +109,7 @@ export class RefreshService {
 
   public async findSessions(userId: string): Promise<UserSessionEntity[]> {
     return this.userRepo.manager.find(UserSessionEntity, {
-      where: { user: { id: userId } },
+      where: { user: { id: userId }, active: true },
       order: { createdAt: 'DESC' },
     });
   }

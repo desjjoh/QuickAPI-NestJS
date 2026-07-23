@@ -69,7 +69,7 @@ export class PasswordResetService {
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
     await this.userSvc.recordPasswordChanged(user);
-    await this.userRepo.incrementTokenVersion(user.id);
+    await this.userRepo.revokeAllSessions(user.id);
 
     await this.emailSvc.sendEmail({
       to: user.identity.email,

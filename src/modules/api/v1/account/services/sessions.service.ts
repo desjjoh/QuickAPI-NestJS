@@ -27,4 +27,8 @@ export class SessionsApiService {
 
     await this.refreshSvc.revokeSessionById(user.id, sessionId);
   }
+
+  public async revokeAll(user: UserEntity, res: Response): Promise<void> {
+    await this.refreshSvc.revokeAllSessions(user.id, res);
+  }
 }

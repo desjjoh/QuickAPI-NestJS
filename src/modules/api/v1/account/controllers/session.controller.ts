@@ -35,7 +35,7 @@ export class SessionsApiController {
   @ApiOperation({
     summary: 'List sessions',
     description:
-      'Returns every session owned by the authenticated user, including inactive sessions so clients can display their status. The session in the user payload remains the current session only.',
+      'Returns active sessions owned by the authenticated user. The session in the user payload remains the current session only.',
   })
   @ApiOkResponse({ type: SessionDto, isArray: true })
   @Permissions(
@@ -43,6 +43,23 @@ export class SessionsApiController {
   )
   public findAll(@CurrentUser() user: UserEntity): Promise<SessionDto[]> {
     return this.svc.findAll(user);
+  }
+
+  @Delete()
+  @ApiOperation({
+    summary: 'Revoke all sessions',
+    description:
+      'Marks every active session for the authenticated user inactive, clears their refresh tokens, and clears the current browser refresh cookie.',
+  })
+  @ApiNoContentResponse({ description: 'All sessions revoked successfully.' })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async revokeAll(
+    @CurrentUser() user: UserEntity,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    await this.svc.revokeAll(user, res);
   }
 
   @Delete(':id')

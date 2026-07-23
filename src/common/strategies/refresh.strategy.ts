@@ -56,11 +56,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
       where: { id: payload.sid, user: { id: user.id } },
     });
 
-    if (
-      !session?.active ||
-      !session.refresh ||
-      payload.version !== session.token_version
-    )
+    if (!session?.active || !session.refresh)
       throw new UnauthorizedException('Session has been revoked');
 
     if (
