@@ -214,10 +214,6 @@ export class UserService {
     const role: RoleEntity = await this.getDefaultUserRole();
     const user: UserEntity = await this.userRepo.createUser({
       ...input,
-      credentials: {
-        refresh: null,
-        token_version: 0,
-      },
       status: { id: status.id },
       roles: [role],
       metadata: createUserMetadata(),

@@ -165,10 +165,6 @@ export class RegisterMapper {
           timezone: { id: dto.timezone_id },
         },
       },
-      credentials: {
-        refresh: null,
-        token_version: 0,
-      },
     };
   }
 }

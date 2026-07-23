@@ -34,11 +34,11 @@ export class JWTDto {
   })
   public readonly user: UserDto;
 
-  constructor({ access_token, iat, exp, user, refresh }: tokenParams) {
+  constructor({ access_token, iat, exp, user, refresh, session }: tokenParams) {
     this.refresh = refresh;
     this.access_token = access_token;
     this.iat = iat;
     this.exp = exp;
-    this.user = new UserDto(user);
+    this.user = new UserDto(user, session);
   }
 }

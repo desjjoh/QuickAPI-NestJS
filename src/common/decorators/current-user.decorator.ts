@@ -6,3 +6,8 @@ export const CurrentUser = createParamDecorator(
     return request.user?.userEntity;
   },
 );
+
+export const CurrentSession = createParamDecorator(
+  (_: unknown, ctx: ExecutionContext) =>
+    ctx.switchToHttp().getRequest().user?.sessionEntity,
+);

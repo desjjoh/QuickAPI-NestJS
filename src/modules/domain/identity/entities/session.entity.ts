@@ -1,5 +1,5 @@
 import { Exclude } from 'class-transformer';
-import { Entity, OneToOne, Column, type Relation } from 'typeorm';
+import { Entity, ManyToOne, Column, type Relation } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 
@@ -28,9 +28,9 @@ class Location {
   public readonly resolved_at!: Date | null;
 }
 
-@Entity('user_credentials')
-export class UserCredentialsEntity extends BaseEntity {
-  @OneToOne(() => UserEntity, (user: UserEntity) => user.credentials, {
+@Entity('user_sessions')
+export class UserSessionEntity extends BaseEntity {
+  @ManyToOne(() => UserEntity, (user) => user.sessions, {
     nullable: false,
     onDelete: 'CASCADE',
   })
@@ -42,6 +42,9 @@ export class UserCredentialsEntity extends BaseEntity {
 
   @Column({ type: 'int', default: 0 })
   public readonly token_version!: number;
+
+  @Column({ type: 'boolean', default: true })
+  public readonly active!: boolean;
 
   @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   public readonly browser!: string | null;

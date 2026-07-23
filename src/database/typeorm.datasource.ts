@@ -9,7 +9,6 @@ import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
-import { UserCredentialsEntity } from '@/modules/domain/identity/entities/credentials.entity';
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
@@ -18,6 +17,7 @@ import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -44,7 +44,7 @@ const dataSourceOptions: DataSourceOptions = {
     UserAddressEntity,
     UserPhoneEntity,
 
-    UserCredentialsEntity,
+    UserSessionEntity,
     UserProfileEntity,
     UserEntity,
     AccountTokenEntity,

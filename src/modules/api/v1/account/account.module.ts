@@ -7,6 +7,8 @@ import { ProfileApiController } from './controllers/profile.controller';
 import { ProfileApiService } from './services/profile.service';
 import { LibraryModule } from '@/modules/domain/library/library.module';
 import { MediaModule } from '@/modules/domain/media/media.module';
+import { SessionsApiController } from './controllers/session.controller';
+import { SessionsApiService } from './services/sessions.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 
 @Module({
@@ -17,7 +19,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     MediaModule,
     EmailModule,
   ],
-  providers: [MeApiService, ProfileApiService],
-  controllers: [MeApiController, ProfileApiController],
+  providers: [MeApiService, ProfileApiService, SessionsApiService],
+  controllers: [MeApiController, ProfileApiController, SessionsApiController],
 })
 export class AccountApiModule {}
