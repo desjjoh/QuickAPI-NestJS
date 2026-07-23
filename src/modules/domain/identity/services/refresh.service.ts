@@ -133,7 +133,9 @@ export class RefreshService {
     const session = await this.userRepo.manager.findOne(UserSessionEntity, {
       where: { id: sessionId, user: { id: userId } },
     });
+
     if (!session) throw new NotFoundException('Session not found.');
+
     await this.revokeSession(session);
   }
 
@@ -141,6 +143,7 @@ export class RefreshService {
     const req = this.requestContext.get('request');
     const info: SessionInfo | null = createSessionInfoFromRequest(req);
     const location = req ? await this.ipLocation.resolve(req) : null;
+
     return this.userRepo.manager.save(
       UserSessionEntity,
       this.userRepo.manager.create(UserSessionEntity, {
