@@ -3,11 +3,11 @@ import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
 
 import { Base } from '@/common/models/base.model';
 
-import { createUserMetadata, UserEntity } from '../entities/user.entity';
+import { UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
 import { UserProfileEntity } from '../entities/profile.entity';
-import { UserCredentialsEntity } from '../entities/credentials.entity';
 import { ImageService } from '../../media/services/image.service';
+import { UserSessionEntity } from '../entities/session.entity';
 
 @Injectable()
 export class UserRepository extends Repository<UserEntity> {
@@ -19,28 +19,12 @@ export class UserRepository extends Repository<UserEntity> {
   }
 
   public async incrementTokenVersion(userId: string): Promise<void> {
-    const user = await this.findByIdOrFail(userId);
-
-    await this.save({
-      ...user,
-      credentials: {
-        ...user.credentials,
-        token_version: user.credentials.token_version + 1,
-        refresh: null,
-        browser: null,
-        browser_version: null,
-        device: null,
-        os: null,
-        os_version: null,
-        ip_address: null,
-        user_agent: null,
-        origin: null,
-        metadata: createUserMetadata({
-          ...user.metadata,
-          last_updated_at: new Date(),
-        }),
-      },
-    });
+    await this.manager
+      .createQueryBuilder()
+      .update(UserSessionEntity)
+      .set({ refresh: null, token_version: () => '`token_version` + 1' })
+      .where('user_id = :userId AND active = true', { userId })
+      .execute();
   }
 
   public async paginate(
@@ -49,7 +33,6 @@ export class UserRepository extends Repository<UserEntity> {
     const { sort, search, order, take, skip } = pageOptions;
     return this.createQueryBuilder('user')
       .leftJoinAndSelect('user.profile', 'profile')
-      .leftJoinAndSelect('user.credentials', 'credentials')
       .leftJoinAndSelect('user.status', 'status')
       .leftJoinAndSelect('user.roles', 'roles')
       .leftJoinAndSelect('roles.permissions', 'permissions')
@@ -114,12 +97,10 @@ export class UserRepository extends Repository<UserEntity> {
 
     const avatar = user.profile.media.avatar;
     const profileId = user.profile.id;
-    const credentialsId = user.credentials.id;
 
     await this.manager.transaction(async (manager: EntityManager) => {
       await manager.remove(UserEntity, user);
       await manager.delete(UserProfileEntity, { id: profileId });
-      await manager.delete(UserCredentialsEntity, { id: credentialsId });
     });
 
     if (avatar) await this.imageSvc.remove(avatar);

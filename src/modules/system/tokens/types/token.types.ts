@@ -7,6 +7,7 @@ export type JwtPayload = {
 
 export type RefreshPayload = JwtPayload & {
   version: number;
+  sid: string;
 };
 
 export type TokenServiceOptions = {

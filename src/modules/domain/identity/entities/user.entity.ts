@@ -15,7 +15,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 
 import { UserProfileEntity } from './profile.entity';
-import { UserCredentialsEntity } from './credentials.entity';
+import { UserSessionEntity } from './session.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { AccountTokenEntity } from './account-token.entity';
 
@@ -59,13 +59,8 @@ export class UserEntity extends BaseEntity {
   @Column(() => Identity, { prefix: false })
   public readonly identity!: Identity;
 
-  @OneToOne(
-    () => UserCredentialsEntity,
-    (credentials: UserCredentialsEntity) => credentials.user,
-    { eager: true, cascade: true, nullable: false },
-  )
-  @JoinColumn({ name: 'credentials_id', referencedColumnName: 'id' })
-  public readonly credentials!: Relation<UserCredentialsEntity>;
+  @OneToMany(() => UserSessionEntity, (session) => session.user)
+  public readonly sessions!: Relation<UserSessionEntity[]>;
 
   @OneToMany(
     () => AccountTokenEntity,

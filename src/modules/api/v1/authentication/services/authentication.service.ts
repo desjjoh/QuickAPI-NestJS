@@ -4,6 +4,7 @@ import { UserService } from '@/modules/domain/identity/services/user.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 @Injectable()
 export class AuthService {
@@ -18,11 +19,18 @@ export class AuthService {
     return this.refreshSvc.issueTokens(updated, res);
   }
 
-  public async verify(user: UserEntity, res: Response): Promise<JWTDto> {
-    return this.refreshSvc.issueTokens(user, res);
+  public async verify(
+    user: UserEntity,
+    res: Response,
+    session: UserSessionEntity,
+  ): Promise<JWTDto> {
+    return this.refreshSvc.issueTokens(user, res, session);
   }
 
-  public async signOut(user: UserEntity, res: Response): Promise<void> {
-    await this.refreshSvc.revokeTokens(user, res);
+  public async signOut(
+    session: UserSessionEntity,
+    res: Response,
+  ): Promise<void> {
+    await this.refreshSvc.revokeTokens(session, res);
   }
 }

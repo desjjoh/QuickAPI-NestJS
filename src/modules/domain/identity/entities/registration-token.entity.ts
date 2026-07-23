@@ -21,10 +21,6 @@ export type RegistrationTokenMetadata = {
       timezone: { id: string };
     };
   };
-  credentials: {
-    refresh: null;
-    token_version: 0;
-  };
 };
 
 @Entity('registration_tokens')

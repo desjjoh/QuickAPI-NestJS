@@ -6,6 +6,7 @@ import { PaginationOptions } from '@/common/models/pagination.model';
 import { BaseModel } from '@/common/models/base.model';
 import { AddressDto } from '@/common/models/address.model';
 
+import { UserSessionEntity } from '../entities/session.entity';
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { RoleDto } from '../../library/models/role.model';
 import { RoleEntity } from '../../library/entities/role.entity';
@@ -248,7 +249,14 @@ export class MetadataDto {
   }
 }
 
-export class SessionDto {
+export class SessionDto extends BaseModel {
+  @ApiProperty({
+    example: true,
+    description:
+      'Whether the session is still active and can authenticate requests.',
+  })
+  public readonly active: boolean;
+
   @ApiPropertyOptional({
     example: 'Chrome',
     description: 'Browser associated with the current stored session.',
@@ -356,23 +364,26 @@ export class SessionDto {
   })
   public readonly origin: string | null;
 
-  public constructor(user: UserEntity) {
-    this.browser = user.credentials.browser;
-    this.browserVersion = user.credentials.browser_version;
-    this.device = user.credentials.device;
-    this.os = user.credentials.os;
-    this.osVersion = user.credentials.os_version;
-    this.ipAddress = user.credentials.ip_address;
-    this.countryCode = user.credentials.location.country_code;
-    this.countryName = user.credentials.location.country_name;
-    this.regionCode = user.credentials.location.region_code;
-    this.regionName = user.credentials.location.region_name;
-    this.city = user.credentials.location.city;
-    this.locationSource = user.credentials.location.source;
+  public constructor(session: UserSessionEntity) {
+    super(session);
+
+    this.active = session.active;
+    this.browser = session.browser;
+    this.browserVersion = session.browser_version;
+    this.device = session.device;
+    this.os = session.os;
+    this.osVersion = session.os_version;
+    this.ipAddress = session.ip_address;
+    this.countryCode = session.location.country_code;
+    this.countryName = session.location.country_name;
+    this.regionCode = session.location.region_code;
+    this.regionName = session.location.region_name;
+    this.city = session.location.city;
+    this.locationSource = session.location.source;
     this.locationResolvedAt =
-      user.credentials.location.resolved_at?.toISOString() ?? null;
-    this.userAgent = user.credentials.user_agent;
-    this.origin = user.credentials.origin;
+      session.location.resolved_at?.toISOString() ?? null;
+    this.userAgent = session.user_agent;
+    this.origin = session.origin;
   }
 }
 
@@ -404,9 +415,11 @@ export class UserDto extends BaseModel {
 
   @ApiProperty({
     type: SessionDto,
-    description: 'Current stored session metadata for the user.',
+    nullable: true,
+    description:
+      'Current authenticated session metadata. Full session history is available from the sessions endpoint.',
   })
-  public readonly session: SessionDto;
+  public readonly session: SessionDto | null;
 
   @ApiProperty({
     type: AccountStatusDto,
@@ -415,14 +428,14 @@ export class UserDto extends BaseModel {
   })
   public readonly status: AccountStatusDto;
 
-  public constructor(user: UserEntity) {
+  public constructor(user: UserEntity, session?: UserSessionEntity) {
     super(user);
 
     this.identity = new IdentityDto(user);
     this.profile = new ProfileDto(user);
     this.roles = user.roles?.map((role: RoleEntity) => new RoleDto(role)) ?? [];
     this.metadata = new MetadataDto(user);
-    this.session = new SessionDto(user);
+    this.session = session ? new SessionDto(session) : null;
     this.status = new AccountStatusDto(user.status);
   }
 }

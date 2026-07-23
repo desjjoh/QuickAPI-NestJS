@@ -5,7 +5,6 @@ import { TokenModule } from '@/modules/system/tokens/token.module';
 
 import { UserEntity } from './entities/user.entity';
 import { UserProfileEntity } from './entities/profile.entity';
-import { UserCredentialsEntity } from './entities/credentials.entity';
 import { UserAddressEntity } from './entities/address.entity';
 import { UserRepository } from './repositories/user.repository';
 import { UserService } from './services/user.service';
@@ -21,6 +20,7 @@ import { PasswordResetService } from './services/password-reset.service';
 import { MediaModule } from '../media/media.module';
 import { UserPhoneEntity } from './entities/phone.entity';
 import { RegistrationTokenService } from './services/registration-token.service';
+import { UserSessionEntity } from './entities/session.entity';
 
 @Module({
   imports: [
@@ -29,7 +29,7 @@ import { RegistrationTokenService } from './services/registration-token.service'
       UserProfileEntity,
       UserAddressEntity,
       UserPhoneEntity,
-      UserCredentialsEntity,
+      UserSessionEntity,
       AccountTokenEntity,
       RegistrationTokenEntity,
     ]),

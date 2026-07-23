@@ -16,11 +16,15 @@ import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { AuthService } from '../services/authentication.service';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { SignInDto } from '../models/signin.model';
-import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import {
+  CurrentSession,
+  CurrentUser,
+} from '@/common/decorators/current-user.decorator';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { LocalAuthGuard } from '@/common/guards/local.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 import { SignOutResponseDto } from '../models/sign-out.model';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 @ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
@@ -75,9 +79,10 @@ export class AuthApiController {
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async verifyToken(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.svc.verify(user, res);
+    return this.svc.verify(user, res, session);
   }
 
   // POST /sign-out
@@ -98,10 +103,10 @@ export class AuthApiController {
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async signOut(
-    @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SignOutResponseDto> {
-    await this.svc.signOut(user, res);
+    await this.svc.signOut(session, res);
 
     return new SignOutResponseDto({ message: 'Signed out successfully.' });
   }
