@@ -16,6 +16,9 @@ import {
   SessionInfo,
 } from '@/common/helpers/session-info.helper';
 import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
+import { MoreThan, Not, IsNull } from 'typeorm';
+import { day } from '@/common/constants/milliseconds.constants';
+import { env } from '@/config/environment.config';
 
 @Injectable()
 export class RefreshService {
@@ -108,8 +111,17 @@ export class RefreshService {
   }
 
   public async findSessions(userId: string): Promise<UserSessionEntity[]> {
+    const refreshTokenNotExpiredAfter = new Date(
+      Date.now() - env.REFRESH_COOKIE_MAX_AGE_DAYS * day,
+    );
+
     return this.userRepo.manager.find(UserSessionEntity, {
-      where: { user: { id: userId }, active: true },
+      where: {
+        user: { id: userId },
+        active: true,
+        refresh: Not(IsNull()),
+        updatedAt: MoreThan(refreshTokenNotExpiredAfter),
+      },
       order: { createdAt: 'DESC' },
     });
   }
