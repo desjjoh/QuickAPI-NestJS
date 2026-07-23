@@ -1,10 +1,8 @@
-import { Response } from 'express';
-
 import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { AddressEntity } from '@/common/entities/address.entity';
@@ -14,7 +12,6 @@ import {
   UpdateProfileDto,
   UpdateProfileTimezoneDto,
 } from '../models/updateProfile.model';
-import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import {
   CreateImageInput,
   ImageService,
@@ -30,7 +27,6 @@ import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 export class ProfileApiService {
   public constructor(
     private readonly userSvc: UserService,
-    private readonly refreshSvc: RefreshService,
     private readonly imgSvc: ImageService,
     private readonly regionRepo: RegionRepository,
   ) {}
@@ -38,8 +34,7 @@ export class ProfileApiService {
   public async updateProfile(
     user: UserEntity,
     dto: UpdateProfileDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: {
         name: {
@@ -55,38 +50,35 @@ export class ProfileApiService {
       },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
   public async updateCountry(
     user: UserEntity,
     dto: UpdateProfileCountryDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: { region: { country: { id: dto.country_id } } },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
   public async updateTimezone(
     user: UserEntity,
     dto: UpdateProfileTimezoneDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: { region: { timezone: { id: dto.timezone_id } } },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
   public async uploadAvatar(
     user: UserEntity,
     file: Express.Multer.File,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const existingAvatar: ImageEntity | null =
       user.profile.media.avatar ?? null;
 
@@ -107,10 +99,10 @@ export class ProfileApiService {
       profile: { media: { avatar: { id: image.id } } },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
-  public async removeAvatar(user: UserEntity, res: Response): Promise<JWTDto> {
+  public async removeAvatar(user: UserEntity): Promise<UserDto> {
     const avatar: ImageEntity | null = user.profile.media.avatar;
 
     if (!avatar)
@@ -120,17 +112,13 @@ export class ProfileApiService {
 
     await this.imgSvc.remove(avatar);
 
-    const refreshed = await this.userSvc.findByIdOrFail(user.id);
-    const updated = await this.userSvc.updateMetadata(refreshed, {});
-
-    return this.refreshSvc.issueTokens(updated, res);
+    return this.reloadUserDto(user.id);
   }
 
   public async updateAddress(
     user: UserEntity,
     dto: UpdateAddressDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const address: UserAddressEntity | null = user.profile.contact.address;
     const region: RegionEntity | null =
       await this.regionRepo.findByIdAndCountry(dto.region_id, dto.country_id);
@@ -154,10 +142,10 @@ export class ProfileApiService {
       profile: { contact: { address: payload } },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
-  public async removeAddress(user: UserEntity, res: Response): Promise<JWTDto> {
+  public async removeAddress(user: UserEntity): Promise<UserDto> {
     const address: UserAddressEntity | null = user.profile.contact.address;
 
     if (!address)
@@ -165,17 +153,13 @@ export class ProfileApiService {
 
     await this.userSvc.deleteAddress(address);
 
-    const refreshed = await this.userSvc.findByIdOrFail(user.id);
-    const updated = await this.userSvc.updateMetadata(refreshed, {});
-
-    return this.refreshSvc.issueTokens(updated, res);
+    return this.reloadUserDto(user.id);
   }
 
   public async updatePhone(
     user: UserEntity,
     dto: UpdatePhoneDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<UserDto> {
     const phone: UserPhoneEntity | null = user.profile.contact.phone;
     const payload = this.getPhonePayload(dto, phone);
 
@@ -183,10 +167,10 @@ export class ProfileApiService {
       profile: { contact: { phone: payload } },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return new UserDto(updated);
   }
 
-  public async removePhone(user: UserEntity, res: Response): Promise<JWTDto> {
+  public async removePhone(user: UserEntity): Promise<UserDto> {
     const phone: UserPhoneEntity | null = user.profile.contact.phone;
 
     if (!phone)
@@ -194,10 +178,7 @@ export class ProfileApiService {
 
     await this.userSvc.deletePhone(phone);
 
-    const refreshed = await this.userSvc.findByIdOrFail(user.id);
-    const updated = await this.userSvc.updateMetadata(refreshed, {});
-
-    return this.refreshSvc.issueTokens(updated, res);
+    return this.reloadUserDto(user.id);
   }
 
   private getPhonePayload(
@@ -211,5 +192,12 @@ export class ProfileApiService {
       phone_national_number: dto.phone_national_number,
       phone_e164: dto.phone_e164,
     };
+  }
+
+  private async reloadUserDto(userId: string): Promise<UserDto> {
+    const refreshed = await this.userSvc.findByIdOrFail(userId);
+    const updated = await this.userSvc.updateMetadata(refreshed, {});
+
+    return new UserDto(updated);
   }
 }

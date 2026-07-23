@@ -36,8 +36,10 @@ export class RefreshService {
         | { sessionEntity?: UserSessionEntity }
         | undefined
     )?.sessionEntity;
+
     const session =
       existingSession ?? currentSession ?? (await this.createSession(user));
+
     const rotatedSession = await this.rotateSession(session);
     const tokens = await this.tokenSvc.createTokenPair({
       sub: user.id,
@@ -45,17 +47,21 @@ export class RefreshService {
       version: rotatedSession.token_version,
       sid: rotatedSession.id,
     });
+
     const updatedSession = await this.updateSession(
       rotatedSession,
       this.tokenSvc.hashToken(tokens.refresh_token),
     );
+
     const accessToken = this.tokenSvc.decode(tokens.access_token);
     const refreshToken = this.tokenSvc.decode(tokens.refresh_token);
+
     res.cookie(
       getRefreshCookieName(),
       tokens.refresh_token,
       getRefreshCookieOptions(),
     );
+
     return new JWTDto({
       refresh: refreshToken.exp,
       access_token: tokens.access_token,
@@ -79,6 +85,21 @@ export class RefreshService {
       active: false,
       refresh: null,
     });
+  }
+
+  public async revokeOtherSessions(
+    userId: string,
+    currentSessionId: string,
+  ): Promise<void> {
+    await this.userRepo.manager
+      .createQueryBuilder()
+      .update(UserSessionEntity)
+      .set({ active: false, refresh: null })
+      .where('userId = :userId AND id != :currentSessionId AND active = true', {
+        userId,
+        currentSessionId,
+      })
+      .execute();
   }
 
   public async findSessions(userId: string): Promise<UserSessionEntity[]> {

@@ -98,6 +98,9 @@ describe('IpLocationService', () => {
       await expect(service.resolve(request(ip))).resolves.toMatchObject({
         ip,
         countryCode: null,
+        countryName: null,
+        regionCode: null,
+        regionName: null,
         city: null,
         source: 'unknown',
       });
@@ -117,6 +120,9 @@ describe('IpLocationService', () => {
     await expect(service.resolve(request('8.8.8.8'))).resolves.toMatchObject({
       ip: '8.8.8.8',
       countryCode: null,
+      countryName: null,
+      regionCode: null,
+      regionName: null,
       city: null,
       source: 'unknown',
     });

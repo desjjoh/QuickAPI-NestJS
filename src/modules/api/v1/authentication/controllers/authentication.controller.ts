@@ -1,7 +1,6 @@
 import type { Response } from 'express';
 import { Controller, Post, Res, UseGuards } from '@nestjs/common';
 import {
-  ApiBearerAuth,
   ApiBody,
   ApiOkResponse,
   ApiOperation,
@@ -64,7 +63,7 @@ export class AuthApiController {
   @ApiOperation({
     summary: 'Verify and refresh authenticated session',
     description:
-      'Validates the current authentication session using refresh and access token context. If valid, returns a fresh access token and the current user payload.',
+      'Validates and rotates the current refresh-token session. If valid, returns a fresh access token and the current user payload.',
   })
   @ApiOkResponse({
     description:
@@ -75,7 +74,6 @@ export class AuthApiController {
     description: 'Authentication is invalid, expired, or has been revoked.',
   })
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @ApiBearerAuth('access-token')
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async verifyToken(
     @CurrentUser() user: UserEntity,
@@ -99,7 +97,6 @@ export class AuthApiController {
   @ApiUnauthorizedResponse({
     description: 'User is not authenticated or session is already invalid.',
   })
-  @ApiBearerAuth('access-token')
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async signOut(

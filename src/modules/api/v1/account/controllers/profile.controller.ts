@@ -1,5 +1,3 @@
-import type { Response } from 'express';
-
 import {
   Controller,
   UseGuards,
@@ -8,7 +6,6 @@ import {
   UseInterceptors,
   UploadedFile,
   Body,
-  Res,
   Patch,
   Post,
 } from '@nestjs/common';
@@ -28,12 +25,12 @@ import {
 } from '@/config/permissions.config';
 import { storage } from '@/config/storage.config';
 
-import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
-import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
+import { JwtAuthGuard } from '@/common/guards/jwt.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
@@ -52,7 +49,7 @@ import { UpdatePhoneDto } from '../models/updatePhone.model';
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
 @Controller('profile')
-@UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
+@UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
 export class ProfileApiController {
   public constructor(private readonly svc: ProfileApiService) {}
 
@@ -70,8 +67,8 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile information updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile information updated successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -79,9 +76,8 @@ export class ProfileApiController {
   public async updateProfile(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateProfileDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateProfile(user, dto, res);
+  ): Promise<UserDto> {
+    return this.svc.updateProfile(user, dto);
   }
 
   // PUT /country
@@ -98,8 +94,8 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile country updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile country updated successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -107,9 +103,8 @@ export class ProfileApiController {
   public async updateCountry(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateProfileCountryDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateCountry(user, dto, res);
+  ): Promise<UserDto> {
+    return this.svc.updateCountry(user, dto);
   }
 
   // PUT /timezone
@@ -126,8 +121,8 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile timezone updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile timezone updated successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -135,9 +130,8 @@ export class ProfileApiController {
   public async updateTimezone(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateProfileTimezoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateTimezone(user, dto, res);
+  ): Promise<UserDto> {
+    return this.svc.updateTimezone(user, dto);
   }
 
   // POST /avatar
@@ -155,8 +149,8 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile avatar updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile avatar updated successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @UseInterceptors(FileInterceptor('avatar', { storage }))
   @Permissions(
@@ -171,9 +165,8 @@ export class ProfileApiController {
       }),
     )
     file: Express.Multer.File,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.uploadAvatar(user, file, res);
+  ): Promise<UserDto> {
+    return this.svc.uploadAvatar(user, file);
   }
 
   // DELETE /avatar
@@ -185,17 +178,14 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile avatar removed successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile avatar removed successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
-  public async removeAvatar(
-    @CurrentUser() user: UserEntity,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.removeAvatar(user, res);
+  public async removeAvatar(@CurrentUser() user: UserEntity): Promise<UserDto> {
+    return this.svc.removeAvatar(user);
   }
 
   // POST /phone
@@ -208,7 +198,7 @@ export class ProfileApiController {
   @ApiOkResponse({
     description:
       'The primary phone number was created or updated successfully.',
-    type: JWTDto,
+    type: UserDto,
   })
   @ApiBody({
     type: UpdatePhoneDto,
@@ -218,9 +208,8 @@ export class ProfileApiController {
   public async updatePrimaryPhone(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdatePhoneDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updatePhone(user, dto, res);
+  ): Promise<UserDto> {
+    return this.svc.updatePhone(user, dto);
   }
 
   // DELETE /phone
@@ -232,13 +221,12 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description: 'The primary phone number was removed successfully.',
-    type: JWTDto,
+    type: UserDto,
   })
   public async removePrimaryPhone(
     @CurrentUser() user: UserEntity,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.removePhone(user, res);
+  ): Promise<UserDto> {
+    return this.svc.removePhone(user);
   }
 
   // POST /address
@@ -255,8 +243,8 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile address created or updated successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile address created or updated successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -264,9 +252,8 @@ export class ProfileApiController {
   public async uploadAddress(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateAddressDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateAddress(user, dto, res);
+  ): Promise<UserDto> {
+    return this.svc.updateAddress(user, dto);
   }
 
   // DELETE /address
@@ -278,16 +265,15 @@ export class ProfileApiController {
   })
   @ApiOkResponse({
     description:
-      'Profile address removed successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Profile address removed successfully. Returns the updated authenticated user payload.',
+    type: UserDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
   public async removeAddress(
     @CurrentUser() user: UserEntity,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.removeAddress(user, res);
+  ): Promise<UserDto> {
+    return this.svc.removeAddress(user);
   }
 }

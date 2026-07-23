@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
@@ -46,17 +47,21 @@ export class MeApiService {
 
   public async updatePassword(
     user: UserEntity,
+    currentSession: UserSessionEntity,
     dto: UpdatePasswordDto,
     res: Response,
   ): Promise<JWTDto> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
     const hashed = await this.userSvc.hashPassword(dto.confirm);
+
     await this.userSvc.updateUser(user, {
       identity: { password: hashed },
     });
 
     const updated = await this.userSvc.recordPasswordChanged(user);
+
+    await this.refreshSvc.revokeOtherSessions(updated.id, currentSession.id);
 
     await this.emailSvc.sendEmail({
       to: updated.identity.email,
@@ -69,6 +74,6 @@ export class MeApiService {
       },
     });
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return this.refreshSvc.issueTokens(updated, res, currentSession);
   }
 }

@@ -23,11 +23,12 @@ import { UserSessionEntity } from '@/modules/domain/identity/entities/session.en
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { SessionDto } from '@/modules/domain/identity/models/user.model';
 import { SessionsApiService } from '../services/sessions.service';
+import { JwtAuthGuard } from '@/common/guards/jwt.guard';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
 @Controller('sessions')
-@UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
+@UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
 export class SessionsApiController {
   public constructor(private readonly svc: SessionsApiService) {}
 

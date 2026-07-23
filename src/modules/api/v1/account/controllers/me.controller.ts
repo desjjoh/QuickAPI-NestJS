@@ -19,7 +19,10 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 
 import { Permissions } from '@/common/decorators/permissions.decorator';
-import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import {
+  CurrentSession,
+  CurrentUser,
+} from '@/common/decorators/current-user.decorator';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
@@ -29,11 +32,13 @@ import { MeApiService } from '../services/me.service';
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
+import { JwtAuthGuard } from '@/common/guards/jwt.guard';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
 @Controller('')
-@UseGuards(CsrfGuard, RefreshTokenGuard, PermissionsGuard)
+@UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
 export class MeApiController {
   public constructor(private readonly svc: MeApiService) {}
 
@@ -112,9 +117,10 @@ export class MeApiController {
   )
   public async updatePassword(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() currentSession: UserSessionEntity,
     @Body() dto: UpdatePasswordDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.svc.updatePassword(user, dto, res);
+    return this.svc.updatePassword(user, currentSession, dto, res);
   }
 }
