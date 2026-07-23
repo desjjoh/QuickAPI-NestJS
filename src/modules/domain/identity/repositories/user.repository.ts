@@ -23,7 +23,7 @@ export class UserRepository extends Repository<UserEntity> {
       .createQueryBuilder()
       .update(UserSessionEntity)
       .set({ refresh: null, token_version: () => '`token_version` + 1' })
-      .where('user_id = :userId AND active = true', { userId })
+      .where('userId = :userId AND active = true', { userId })
       .execute();
   }
 

@@ -29,6 +29,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
       passReqToCallback: true,
     });
   }
+
   async validate(
     req: Request,
     payload: RefreshPayload,
@@ -42,19 +43,26 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     version: number;
   }> {
     const refresh = req.cookies?.[getRefreshCookieName()];
+
     if (!refresh) throw new UnauthorizedException('Refresh token missing');
+
     const user = await this.repo.findByIdOrFail(payload.sub);
+
     if (!user) throw new NotFoundException('User was not found');
+
     this.svc.assertCanAuthenticate(user);
+
     const session = await this.repo.manager.findOne(UserSessionEntity, {
       where: { id: payload.sid, user: { id: user.id } },
     });
+
     if (
       !session?.active ||
       !session.refresh ||
       payload.version !== session.token_version
     )
       throw new UnauthorizedException('Session has been revoked');
+
     if (
       createHmac('sha256', env.CRYPTO_SECRET || '')
         .update(refresh)
