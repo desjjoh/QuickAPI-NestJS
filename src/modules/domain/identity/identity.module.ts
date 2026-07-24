@@ -21,6 +21,8 @@ import { MediaModule } from '../media/media.module';
 import { UserPhoneEntity } from './entities/phone.entity';
 import { RegistrationTokenService } from './services/registration-token.service';
 import { UserSessionEntity } from './entities/session.entity';
+import { UserMfaSettingsEntity } from './entities/mfa.entity';
+import { MfaService } from './services/mfa.service';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { UserSessionEntity } from './entities/session.entity';
       UserSessionEntity,
       AccountTokenEntity,
       RegistrationTokenEntity,
+      UserMfaSettingsEntity,
     ]),
     TokenModule,
     LibraryModule,
@@ -46,6 +49,7 @@ import { UserSessionEntity } from './entities/session.entity';
     EmailVerificationService,
     RegistrationTokenService,
     PasswordResetService,
+    MfaService,
   ],
   exports: [
     UserRepository,
@@ -55,6 +59,7 @@ import { UserSessionEntity } from './entities/session.entity';
     RegistrationTokenService,
     EmailVerificationService,
     PasswordResetService,
+    MfaService,
   ],
 })
 export class IdentityModule {}

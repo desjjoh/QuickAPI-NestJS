@@ -207,6 +207,12 @@ export class ProfileDto {
 }
 
 export class MetadataDto {
+  @ApiProperty({
+    example: false,
+    description: 'Whether sign-in multi-factor authentication is enabled.',
+  })
+  public readonly mfaEnabled: boolean;
+
   @ApiPropertyOptional({
     example: '2026-06-25T14:30:00.000Z',
     description:
@@ -246,6 +252,7 @@ export class MetadataDto {
     this.lastChangedPassword =
       metadata.last_changed_password?.toISOString() ?? null;
     this.lastUpdatedAt = metadata.last_updated_at?.toISOString() ?? null;
+    this.mfaEnabled = metadata.mfa_enabled ?? false;
   }
 }
 

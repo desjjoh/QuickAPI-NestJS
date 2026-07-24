@@ -14,6 +14,17 @@ import { RefreshService } from '@/modules/domain/identity/services/refresh.servi
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
+import { MfaService } from '@/modules/domain/identity/services/mfa.service';
+import {
+  MfaChallengeResponseDto,
+  VerifyMfaChallengeDto,
+} from '../../authentication/models/mfa.model';
+import { UpdateMfaDto } from '../models/updateMfa.model';
+import {
+  MfaChallengePurpose,
+  MfaMethod,
+} from '@/modules/domain/identity/entities/mfa.entity';
+import { UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class MeApiService {
@@ -22,6 +33,7 @@ export class MeApiService {
     private readonly refreshSvc: RefreshService,
     private readonly evSvc: EmailVerificationService,
     private readonly emailSvc: EmailService,
+    private readonly mfaSvc: MfaService,
   ) {}
 
   public async deleteMe(
@@ -32,6 +44,44 @@ export class MeApiService {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
     await this.userSvc.deleteUser(user, res);
+  }
+
+  public async updateMfa(
+    user: UserEntity,
+    dto: UpdateMfaDto,
+  ): Promise<MfaChallengeResponseDto | void> {
+    await this.userSvc.validateUser(user.identity.email, dto.password);
+
+    if (!dto.enabled) {
+      await this.mfaSvc.disable(user);
+      await this.userSvc.updateMetadata(user, { mfa_enabled: false });
+
+      return;
+    }
+
+    const challenge = await this.mfaSvc.requestEnable(user);
+    return new MfaChallengeResponseDto({
+      challenge_id: challenge.id,
+      method: MfaMethod.EMAIL_OTP,
+      expires_at: challenge.expires_at,
+    });
+  }
+
+  public async confirmMfa(
+    user: UserEntity,
+    dto: VerifyMfaChallengeDto,
+  ): Promise<void> {
+    const challengeUser = await this.mfaSvc.verifyChallenge(
+      dto.challenge_id,
+      dto.code,
+      MfaChallengePurpose.ENABLE,
+      user.id,
+    );
+    if (challengeUser.id !== user.id)
+      throw new UnauthorizedException('Invalid MFA challenge.');
+
+    await this.mfaSvc.enable(user);
+    await this.userSvc.updateMetadata(user, { mfa_enabled: true });
   }
 
   public async updateEmail(

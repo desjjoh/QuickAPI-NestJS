@@ -102,6 +102,33 @@ export class AccountTokenService {
     return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
   }
 
+  public async consumeMfaCode(
+    tokenId: string,
+    type: AccountTokenType,
+    code: string,
+    expectedMetadata: AccountTokenMetadata,
+    userId?: string,
+  ): Promise<AccountTokenEntity> {
+    const entity = await this.tokenRepo.findOne({
+      where: { id: tokenId, type, consumed_at: IsNull() },
+      relations: { user: true },
+    });
+
+    if (!entity || entity.expires_at.getTime() <= Date.now())
+      throw new UnauthorizedException('Invalid or expired token.');
+    if (userId && entity.user.id !== userId)
+      throw new UnauthorizedException('Invalid or expired token.');
+    if (!this.matchesMetadata(entity.metadata, expectedMetadata))
+      throw new UnauthorizedException('Invalid or expired token.');
+    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code)))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+  }
+
   public async revokeActiveTokens(
     userId: string,
     type: AccountTokenType,
@@ -133,5 +160,14 @@ export class AccountTokenService {
     if (expectedBuffer.length !== actualBuffer.length) return false;
 
     return timingSafeEqual(expectedBuffer, actualBuffer);
+  }
+
+  private matchesMetadata(
+    metadata: AccountTokenMetadata | null,
+    expectedMetadata: AccountTokenMetadata,
+  ): boolean {
+    return Object.entries(expectedMetadata).every(
+      ([key, value]) => metadata?.[key] === value,
+    );
   }
 }

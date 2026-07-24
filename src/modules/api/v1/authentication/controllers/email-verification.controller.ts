@@ -98,6 +98,6 @@ export class EmailVerificationApiController {
   ): Promise<JWTDto> {
     const user = await this.evSvc.verifyEmail(tokenId, dto.token, dto.code);
 
-    return this.authSvc.signIn(user, res);
+    return this.authSvc.completeSignIn(user, res);
   }
 }

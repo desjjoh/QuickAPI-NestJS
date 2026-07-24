@@ -157,6 +157,6 @@ export class RegistrationApiController {
       input.code,
     );
 
-    return this.authSvc.signIn(user, res);
+    return this.authSvc.completeSignIn(user, res);
   }
 }
