@@ -1,6 +1,15 @@
 import type { Response } from 'express';
-import { Controller, Post, Res, UseGuards } from '@nestjs/common';
 import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiAcceptedResponse,
   ApiBody,
   ApiOkResponse,
   ApiOperation,
@@ -24,6 +33,10 @@ import { LocalAuthGuard } from '@/common/guards/local.guard';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
 import { SignOutResponseDto } from '../models/sign-out.model';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import {
+  MfaChallengeResponseDto,
+  VerifyMfaChallengeDto,
+} from '../models/mfa.model';
 
 @ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
@@ -47,6 +60,10 @@ export class AuthApiController {
     description: 'User successfully authenticated.',
     type: JWTDto,
   })
+  @ApiAcceptedResponse({
+    description: 'Password accepted; an email MFA challenge must be completed.',
+    type: MfaChallengeResponseDto,
+  })
   @ApiUnauthorizedResponse({
     description: 'Invalid email or password.',
   })
@@ -54,8 +71,30 @@ export class AuthApiController {
   async signIn(
     @CurrentUser() user: UserEntity,
     @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto | MfaChallengeResponseDto> {
+    const result = await this.svc.signIn(user, res);
+    if (result instanceof MfaChallengeResponseDto)
+      res.status(HttpStatus.ACCEPTED);
+
+    return result;
+  }
+
+  // POST /sign-in/mfa/verify
+  @Post('/sign-in/mfa/verify')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 1 * minute } })
+  @ApiOperation({
+    summary: 'Complete MFA sign-in',
+    description:
+      'Verifies the email code for a pending sign-in challenge and issues tokens.',
+  })
+  @ApiBody({ type: VerifyMfaChallengeDto })
+  @ApiOkResponse({ type: JWTDto })
+  public async verifyMfa(
+    @Body() dto: VerifyMfaChallengeDto,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.svc.signIn(user, res);
+    return this.svc.verifyMfa(dto.challenge_id, dto.code, res);
   }
 
   // POST /refresh

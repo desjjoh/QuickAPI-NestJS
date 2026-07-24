@@ -33,6 +33,11 @@ import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { JwtAuthGuard } from '@/common/guards/jwt.guard';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UpdateMfaDto } from '../models/updateMfa.model';
+import {
+  MfaChallengeResponseDto,
+  VerifyMfaChallengeDto,
+} from '../../authentication/models/mfa.model';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
@@ -121,5 +126,43 @@ export class MeApiController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     return this.svc.updatePassword(user, currentSession, dto, res);
+  }
+
+  // PATCH /mfa
+  @Patch('mfa')
+  @ApiBody({ type: UpdateMfaDto })
+  @ApiOperation({
+    summary: 'Update sign-in MFA',
+    description:
+      'Requires the current password. Enabling MFA sends an email verification code; disabling MFA takes effect immediately.',
+  })
+  @ApiOkResponse({ type: MfaChallengeResponseDto })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async updateMfa(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: UpdateMfaDto,
+  ): Promise<MfaChallengeResponseDto | void> {
+    return this.svc.updateMfa(user, dto);
+  }
+
+  // POST /mfa/confirm
+  @Post('mfa/confirm')
+  @ApiBody({ type: VerifyMfaChallengeDto })
+  @ApiOperation({
+    summary: 'Confirm sign-in MFA enrollment',
+    description:
+      'Verifies the emailed code and enables sign-in MFA for the current account.',
+  })
+  @ApiNoContentResponse({ description: 'Sign-in MFA enabled successfully.' })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async confirmMfa(
+    @CurrentUser() user: UserEntity,
+    @Body() dto: VerifyMfaChallengeDto,
+  ): Promise<void> {
+    return this.svc.confirmMfa(user, dto);
   }
 }

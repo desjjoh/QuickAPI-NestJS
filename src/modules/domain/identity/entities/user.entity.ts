@@ -18,6 +18,7 @@ import { UserProfileEntity } from './profile.entity';
 import { UserSessionEntity } from './session.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { AccountTokenEntity } from './account-token.entity';
+import { UserMfaSettingsEntity } from './mfa.entity';
 
 class Metadata {
   @Column({ type: 'datetime', nullable: true })
@@ -31,6 +32,9 @@ class Metadata {
 
   @Column({ type: 'datetime', nullable: true })
   public readonly last_updated_at!: Date | null;
+
+  @Column({ type: 'boolean', default: false })
+  public readonly mfa_enabled!: boolean;
 }
 
 export type UserMetadata = Metadata;
@@ -42,6 +46,7 @@ export const createUserMetadata = (
   last_changed_email: null,
   last_changed_password: null,
   last_updated_at: null,
+  mfa_enabled: false,
   ...overrides,
 });
 
@@ -67,6 +72,9 @@ export class UserEntity extends BaseEntity {
     (token: AccountTokenEntity) => token.user,
   )
   public readonly account_tokens!: Relation<AccountTokenEntity[]>;
+
+  @OneToOne(() => UserMfaSettingsEntity, (settings) => settings.user)
+  public readonly mfa_settings!: Relation<UserMfaSettingsEntity | null>;
 
   @OneToOne(
     () => UserProfileEntity,

@@ -18,6 +18,7 @@ import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -43,7 +44,7 @@ const dataSourceOptions: DataSourceOptions = {
     // IDENTITY MODULE
     UserAddressEntity,
     UserPhoneEntity,
-
+    UserMfaSettingsEntity,
     UserSessionEntity,
     UserProfileEntity,
     UserEntity,
