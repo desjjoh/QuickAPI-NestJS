@@ -69,6 +69,7 @@ export class MeApiService {
 
   public async confirmMfa(
     user: UserEntity,
+    currentSession: UserSessionEntity,
     dto: VerifyMfaChallengeDto,
   ): Promise<void> {
     const challengeUser = await this.mfaSvc.verifyChallenge(
@@ -82,6 +83,7 @@ export class MeApiService {
 
     await this.mfaSvc.enable(user);
     await this.userSvc.updateMetadata(user, { mfa_enabled: true });
+    await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
   }
 
   public async updateEmail(

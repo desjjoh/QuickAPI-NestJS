@@ -153,7 +153,7 @@ export class MeApiController {
   @ApiOperation({
     summary: 'Confirm sign-in MFA enrollment',
     description:
-      'Verifies the emailed code and enables sign-in MFA for the current account.',
+      'Verifies the emailed code, enables sign-in MFA for the current account, and revokes every other session to require a new sign-in.',
   })
   @ApiNoContentResponse({ description: 'Sign-in MFA enabled successfully.' })
   @Permissions(
@@ -161,8 +161,9 @@ export class MeApiController {
   )
   public async confirmMfa(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() currentSession: UserSessionEntity,
     @Body() dto: VerifyMfaChallengeDto,
   ): Promise<void> {
-    return this.svc.confirmMfa(user, dto);
+    return this.svc.confirmMfa(user, currentSession, dto);
   }
 }

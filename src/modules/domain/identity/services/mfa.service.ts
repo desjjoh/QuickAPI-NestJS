@@ -16,6 +16,7 @@ import {
 } from '../entities/mfa.entity';
 import { UserEntity } from '../entities/user.entity';
 import { AccountTokenService, CreatedAccountToken } from './token.service';
+import { MfaEnrollmentCodeTemplate } from '@/modules/system/email/templates/mfa-enrollment-code.template';
 
 const MFA_CODE_EXPIRES_IN_MINUTES = 10;
 
@@ -44,6 +45,11 @@ export class MfaService {
   }
 
   public async requestEnable(user: UserEntity): Promise<CreatedAccountToken> {
+    const current = await this.findSettings(user.id);
+
+    if (current?.enabled)
+      throw new BadRequestException('MFA is already enabled.');
+
     return this.createChallenge(
       user,
       MfaMethod.EMAIL_OTP,
@@ -70,9 +76,11 @@ export class MfaService {
 
   public async enable(user: UserEntity): Promise<void> {
     const now = new Date();
-    const current = await this.settingsRepo.findOne({
-      where: { user: { id: user.id } },
-    });
+    const current = await this.findSettings(user.id);
+
+    if (current?.enabled)
+      throw new BadRequestException('MFA is already enabled.');
+
     await this.settingsRepo.save(
       current
         ? {
@@ -95,10 +103,11 @@ export class MfaService {
   }
 
   public async disable(user: UserEntity): Promise<void> {
-    const current = await this.settingsRepo.findOne({
-      where: { user: { id: user.id } },
-    });
-    if (!current) return;
+    const current = await this.findSettings(user.id);
+
+    if (!current?.enabled)
+      throw new BadRequestException('MFA is already disabled.');
+
     await this.settingsRepo.save({
       ...current,
       enabled: false,
@@ -126,9 +135,13 @@ export class MfaService {
       metadata: { purpose },
       mfaCodeHash: this.hashCode(code),
     });
+
     await this.emailSvc.sendEmail({
       to: user.identity.email,
-      template: MfaCodeTemplate,
+      template:
+        purpose === MfaChallengePurpose.ENABLE
+          ? MfaEnrollmentCodeTemplate
+          : MfaCodeTemplate,
       model: {
         firstName: user.profile.name.preferred ?? user.profile.name.first,
         code,
@@ -138,6 +151,12 @@ export class MfaService {
     });
 
     return token;
+  }
+
+  private findSettings(userId: string): Promise<UserMfaSettingsEntity | null> {
+    return this.settingsRepo.findOne({
+      where: { user: { id: userId } },
+    });
   }
 
   private hashCode(code: string): string {
