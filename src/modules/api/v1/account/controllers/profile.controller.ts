@@ -32,7 +32,11 @@ import { CsrfGuard } from '@/common/guards/csrf.guard';
 import { PermissionsGuard } from '@/common/guards/permission.guard';
 import { JwtAuthGuard } from '@/common/guards/jwt.guard';
 import { Permissions } from '@/common/decorators/permissions.decorator';
-import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import {
+  CurrentSession,
+  CurrentUser,
+} from '@/common/decorators/current-user.decorator';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
 import { megabyte } from '@/common/constants/bytes.constants';
 import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
@@ -75,9 +79,10 @@ export class ProfileApiController {
   )
   public async updateProfile(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Body() dto: UpdateProfileDto,
   ): Promise<UserDto> {
-    return this.svc.updateProfile(user, dto);
+    return this.svc.updateProfile(user, session, dto);
   }
 
   // PUT /country
@@ -102,9 +107,10 @@ export class ProfileApiController {
   )
   public async updateCountry(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Body() dto: UpdateProfileCountryDto,
   ): Promise<UserDto> {
-    return this.svc.updateCountry(user, dto);
+    return this.svc.updateCountry(user, session, dto);
   }
 
   // PUT /timezone
@@ -129,9 +135,10 @@ export class ProfileApiController {
   )
   public async updateTimezone(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Body() dto: UpdateProfileTimezoneDto,
   ): Promise<UserDto> {
-    return this.svc.updateTimezone(user, dto);
+    return this.svc.updateTimezone(user, session, dto);
   }
 
   // POST /avatar
@@ -158,6 +165,7 @@ export class ProfileApiController {
   )
   public async uploadAvatar(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @UploadedFile(
       new ImageUploadValidationPipe({
         maxSize: 1 * megabyte,
@@ -166,7 +174,7 @@ export class ProfileApiController {
     )
     file: Express.Multer.File,
   ): Promise<UserDto> {
-    return this.svc.uploadAvatar(user, file);
+    return this.svc.uploadAvatar(user, session, file);
   }
 
   // DELETE /avatar
@@ -184,8 +192,11 @@ export class ProfileApiController {
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
-  public async removeAvatar(@CurrentUser() user: UserEntity): Promise<UserDto> {
-    return this.svc.removeAvatar(user);
+  public async removeAvatar(
+    @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
+  ): Promise<UserDto> {
+    return this.svc.removeAvatar(user, session);
   }
 
   // POST /phone
@@ -207,9 +218,10 @@ export class ProfileApiController {
   })
   public async updatePrimaryPhone(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Body() dto: UpdatePhoneDto,
   ): Promise<UserDto> {
-    return this.svc.updatePhone(user, dto);
+    return this.svc.updatePhone(user, session, dto);
   }
 
   // DELETE /phone
@@ -225,8 +237,9 @@ export class ProfileApiController {
   })
   public async removePrimaryPhone(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
   ): Promise<UserDto> {
-    return this.svc.removePhone(user);
+    return this.svc.removePhone(user, session);
   }
 
   // POST /address
@@ -251,9 +264,10 @@ export class ProfileApiController {
   )
   public async uploadAddress(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
     @Body() dto: UpdateAddressDto,
   ): Promise<UserDto> {
-    return this.svc.updateAddress(user, dto);
+    return this.svc.updateAddress(user, session, dto);
   }
 
   // DELETE /address
@@ -273,7 +287,8 @@ export class ProfileApiController {
   )
   public async removeAddress(
     @CurrentUser() user: UserEntity,
+    @CurrentSession() session: UserSessionEntity,
   ): Promise<UserDto> {
-    return this.svc.removeAddress(user);
+    return this.svc.removeAddress(user, session);
   }
 }

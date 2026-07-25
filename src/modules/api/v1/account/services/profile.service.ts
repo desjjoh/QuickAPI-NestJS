@@ -22,6 +22,7 @@ import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { PhoneEntity } from '@/common/entities/phone.entity';
 import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 @Injectable()
 export class ProfileApiService {
@@ -33,6 +34,7 @@ export class ProfileApiService {
 
   public async updateProfile(
     user: UserEntity,
+    session: UserSessionEntity,
     dto: UpdateProfileDto,
   ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
@@ -50,33 +52,36 @@ export class ProfileApiService {
       },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
   public async updateCountry(
     user: UserEntity,
+    session: UserSessionEntity,
     dto: UpdateProfileCountryDto,
   ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: { region: { country: { id: dto.country_id } } },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
   public async updateTimezone(
     user: UserEntity,
+    session: UserSessionEntity,
     dto: UpdateProfileTimezoneDto,
   ): Promise<UserDto> {
     const updated = await this.userSvc.updateUser(user, {
       profile: { region: { timezone: { id: dto.timezone_id } } },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
   public async uploadAvatar(
     user: UserEntity,
+    session: UserSessionEntity,
     file: Express.Multer.File,
   ): Promise<UserDto> {
     const existingAvatar: ImageEntity | null =
@@ -99,10 +104,13 @@ export class ProfileApiService {
       profile: { media: { avatar: { id: image.id } } },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
-  public async removeAvatar(user: UserEntity): Promise<UserDto> {
+  public async removeAvatar(
+    user: UserEntity,
+    session: UserSessionEntity,
+  ): Promise<UserDto> {
     const avatar: ImageEntity | null = user.profile.media.avatar;
 
     if (!avatar)
@@ -112,11 +120,12 @@ export class ProfileApiService {
 
     await this.imgSvc.remove(avatar);
 
-    return this.reloadUserDto(user.id);
+    return this.reloadUserDto(user.id, session);
   }
 
   public async updateAddress(
     user: UserEntity,
+    session: UserSessionEntity,
     dto: UpdateAddressDto,
   ): Promise<UserDto> {
     const address: UserAddressEntity | null = user.profile.contact.address;
@@ -142,10 +151,13 @@ export class ProfileApiService {
       profile: { contact: { address: payload } },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
-  public async removeAddress(user: UserEntity): Promise<UserDto> {
+  public async removeAddress(
+    user: UserEntity,
+    session: UserSessionEntity,
+  ): Promise<UserDto> {
     const address: UserAddressEntity | null = user.profile.contact.address;
 
     if (!address)
@@ -153,11 +165,12 @@ export class ProfileApiService {
 
     await this.userSvc.deleteAddress(address);
 
-    return this.reloadUserDto(user.id);
+    return this.reloadUserDto(user.id, session);
   }
 
   public async updatePhone(
     user: UserEntity,
+    session: UserSessionEntity,
     dto: UpdatePhoneDto,
   ): Promise<UserDto> {
     const phone: UserPhoneEntity | null = user.profile.contact.phone;
@@ -167,10 +180,13 @@ export class ProfileApiService {
       profile: { contact: { phone: payload } },
     });
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 
-  public async removePhone(user: UserEntity): Promise<UserDto> {
+  public async removePhone(
+    user: UserEntity,
+    session: UserSessionEntity,
+  ): Promise<UserDto> {
     const phone: UserPhoneEntity | null = user.profile.contact.phone;
 
     if (!phone)
@@ -178,7 +194,7 @@ export class ProfileApiService {
 
     await this.userSvc.deletePhone(phone);
 
-    return this.reloadUserDto(user.id);
+    return this.reloadUserDto(user.id, session);
   }
 
   private getPhonePayload(
@@ -194,10 +210,13 @@ export class ProfileApiService {
     };
   }
 
-  private async reloadUserDto(userId: string): Promise<UserDto> {
+  private async reloadUserDto(
+    userId: string,
+    session: UserSessionEntity,
+  ): Promise<UserDto> {
     const refreshed = await this.userSvc.findByIdOrFail(userId);
     const updated = await this.userSvc.updateMetadata(refreshed, {});
 
-    return new UserDto(updated);
+    return new UserDto(updated, session);
   }
 }
