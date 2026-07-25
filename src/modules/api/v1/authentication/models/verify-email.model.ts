@@ -1,18 +1,30 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
+import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 
-export class ValidateEmailChangeTokenDto {
-  @ApiProperty({
-    example: 'A9x4bW8rN2Yp7sQmL6zT0cF3vH1jK5uDqE8iRoP',
-    description:
-      'The raw one-time email verification token sent to the user. The API hashes this value before comparison.',
-  })
-  @IsString()
-  @IsNotEmpty()
-  public readonly token!: string;
+export class EmailVerificationChallengeDto {
+  @ApiProperty({ example: 'emailVerificationChallenge123' })
+  public readonly challenge_id: string;
+
+  @ApiProperty({ enum: MfaMethod, example: MfaMethod.EMAIL_OTP })
+  public readonly method: MfaMethod;
+
+  @ApiProperty({ example: '2026-07-25T12:30:00.000Z' })
+  public readonly expires_at: Date;
+
+  public constructor(data: EmailVerificationChallengeDto) {
+    this.challenge_id = data.challenge_id;
+    this.method = data.method;
+    this.expires_at = data.expires_at;
+  }
 }
 
-export class VerifyEmailDto extends ValidateEmailChangeTokenDto {
+export class VerifyEmailDto {
+  @ApiProperty({ example: 'emailVerificationChallenge123' })
+  @IsString()
+  @IsNotEmpty()
+  public readonly challenge_id!: string;
+
   @ApiProperty({
     example: '123456',
     description:
@@ -26,17 +38,4 @@ export class VerifyEmailDto extends ValidateEmailChangeTokenDto {
     message: 'Verification code must be exactly 6 digits.',
   })
   public readonly code!: string;
-}
-
-export class ValidateEmailChangeTokenResponseDto {
-  @ApiProperty({
-    example: true,
-    description:
-      'Indicates the email change token exists, has not expired, has not been consumed, matches the provided token value, and contains email change metadata.',
-  })
-  public readonly valid: boolean;
-
-  public constructor(data: ValidateEmailChangeTokenResponseDto) {
-    this.valid = data.valid;
-  }
 }

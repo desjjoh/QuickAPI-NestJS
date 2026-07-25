@@ -25,6 +25,7 @@ import {
   MfaMethod,
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { UnauthorizedException } from '@nestjs/common';
+import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
 
 @Injectable()
 export class MeApiService {
@@ -89,12 +90,18 @@ export class MeApiService {
   public async updateEmail(
     user: UserEntity,
     dto: UpdateEmailDto,
-    res: Response,
-  ): Promise<JWTDto> {
+  ): Promise<EmailVerificationChallengeDto> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
-    await this.evSvc.sendEmailChangeVerification(user, dto.email);
+    const challenge = await this.evSvc.sendEmailChangeVerification(
+      user,
+      dto.email,
+    );
 
-    return this.refreshSvc.issueTokens(user, res);
+    return new EmailVerificationChallengeDto({
+      challenge_id: challenge.id,
+      method: MfaMethod.EMAIL_OTP,
+      expires_at: challenge.expires_at,
+    });
   }
 
   public async updatePassword(

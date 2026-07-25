@@ -15,6 +15,7 @@ import { EmailVerificationService } from '@/modules/domain/identity/services/ema
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
+import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 
 @Injectable()
 export class RegistrationService {
@@ -35,7 +36,7 @@ export class RegistrationService {
 
     const password: string = await this.userSvc.hashPassword(dto.password);
 
-    await this.emailSvc.sendRegistrationVerificationEmail(
+    const challenge = await this.emailSvc.sendRegistrationVerificationEmail(
       normalizedEmail,
       RegisterMapper.toRegistrationTokenMetadata(
         { ...dto, email: normalizedEmail },
@@ -46,6 +47,9 @@ export class RegistrationService {
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',
       email: normalizedEmail,
+      challenge_id: challenge.id,
+      method: MfaMethod.EMAIL_OTP,
+      expires_at: challenge.expires_at,
     });
   }
 
@@ -67,7 +71,7 @@ export class RegistrationService {
         'No pending registration exists for this email address.',
       );
 
-    await this.emailSvc.sendRegistrationVerificationEmail(
+    const challenge = await this.emailSvc.sendRegistrationVerificationEmail(
       normalizedEmail,
       pendingToken.metadata,
     );
@@ -75,21 +79,16 @@ export class RegistrationService {
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',
       email: normalizedEmail,
+      challenge_id: challenge.id,
+      method: MfaMethod.EMAIL_OTP,
+      expires_at: challenge.expires_at,
     });
   }
 
-  public async validateRegistration(
-    tokenId: string,
-    token: string,
-  ): Promise<void> {
-    await this.registrationTokenSvc.validateToken(tokenId, token);
-  }
-
   public async verifyRegistration(
-    tokenId: string,
-    token: string,
-    mfaCode: string,
+    challengeId: string,
+    code: string,
   ): Promise<UserEntity> {
-    return this.emailSvc.verifyRegistrationToken(tokenId, token, mfaCode);
+    return this.emailSvc.verifyRegistrationToken(challengeId, code);
   }
 }

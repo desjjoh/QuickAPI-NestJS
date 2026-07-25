@@ -13,6 +13,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { DeepPartial } from 'typeorm';
+import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 
 export class RegisterDto {
   @ApiProperty({
@@ -182,9 +183,21 @@ export class RegistrationPendingDto {
   })
   public readonly email: string;
 
+  @ApiProperty({ example: 'registrationChallenge123' })
+  public readonly challenge_id: string;
+
+  @ApiProperty({ enum: MfaMethod, example: MfaMethod.EMAIL_OTP })
+  public readonly method: MfaMethod;
+
+  @ApiProperty({ example: '2026-07-25T12:30:00.000Z' })
+  public readonly expires_at: Date;
+
   public constructor(data: RegistrationPendingDto) {
     this.message = data.message;
     this.email = data.email;
+    this.challenge_id = data.challenge_id;
+    this.method = data.method;
+    this.expires_at = data.expires_at;
   }
 }
 
@@ -210,7 +223,12 @@ export class ValidateRegistrationTokenDto {
   public readonly token!: string;
 }
 
-export class VerifyRegistrationDto extends ValidateRegistrationTokenDto {
+export class VerifyRegistrationDto {
+  @ApiProperty({ example: 'registrationChallenge123' })
+  @IsString()
+  @IsNotEmpty()
+  public readonly challenge_id!: string;
+
   @ApiProperty({
     example: '123456',
     description:
@@ -224,17 +242,4 @@ export class VerifyRegistrationDto extends ValidateRegistrationTokenDto {
     message: 'Verification code must be exactly 6 digits.',
   })
   public readonly code!: string;
-}
-
-export class ValidateRegistrationTokenResponseDto {
-  @ApiProperty({
-    example: true,
-    description:
-      'Indicates the registration token exists, has not expired, has not been consumed, and matches the provided token value.',
-  })
-  public readonly valid: boolean;
-
-  public constructor(data: ValidateRegistrationTokenResponseDto) {
-    this.valid = data.valid;
-  }
 }

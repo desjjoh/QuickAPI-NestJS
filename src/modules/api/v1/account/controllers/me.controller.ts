@@ -38,6 +38,7 @@ import {
   MfaChallengeResponseDto,
   VerifyMfaChallengeDto,
 } from '../../authentication/models/mfa.model';
+import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
@@ -82,12 +83,12 @@ export class MeApiController {
   @ApiOperation({
     summary: 'Request account email change',
     description:
-      'Sends a verification email to the requested new email address. The account email is not changed until the verification token is confirmed.',
+      'Sends a verification code to the requested new email address. The account email is not changed until the challenge is confirmed.',
   })
   @ApiOkResponse({
     description:
-      'Email change verification sent successfully. Returns the refreshed authenticated user payload and updated tokens.',
-    type: JWTDto,
+      'Email change verification sent successfully. Returns the challenge needed to submit the emailed code.',
+    type: EmailVerificationChallengeDto,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
@@ -95,9 +96,8 @@ export class MeApiController {
   public async sendEmailVerification(
     @CurrentUser() user: UserEntity,
     @Body() dto: UpdateEmailDto,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<JWTDto> {
-    return this.svc.updateEmail(user, dto, res);
+  ): Promise<EmailVerificationChallengeDto> {
+    return this.svc.updateEmail(user, dto);
   }
 
   // PATCH /password

@@ -99,6 +99,26 @@ export class RegistrationTokenService {
     return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
   }
 
+  public async consumeVerificationCode(
+    challengeId: string,
+    code: string,
+  ): Promise<RegistrationTokenEntity> {
+    const entity = await this.tokenRepo.findOne({
+      where: { id: challengeId, consumed_at: IsNull() },
+    });
+
+    if (!entity || entity.expires_at.getTime() <= Date.now())
+      throw new UnauthorizedException('Invalid or expired challenge.');
+    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    const codeHash = this.hashToken(code);
+    if (!this.compareTokenHashes(entity.mfa_code_hash, codeHash))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+  }
+
   private async revokeActiveTokens(email: string): Promise<void> {
     await this.tokenRepo.update(
       {

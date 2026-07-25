@@ -2,7 +2,6 @@ import { EmailTemplate } from '../models/template.model';
 
 export interface EmailVerificationTemplateContext {
   firstName: string;
-  verificationUrl: string;
   expiresInMinutes: number;
   mfaCode: string;
 }
@@ -43,11 +42,11 @@ export const EmailVerificationTemplate = new EmailTemplate({
                       </p>
 
                       <p style="margin:0 0 16px 0;font-size:16px;line-height:1.6;">
-                        We received a request to change the email address for your account. Please confirm this email address and enter the 6-digit verification code to complete the change.
+                        We received a request to change the email address for your account. Enter the 6-digit verification code in the email change screen to complete the change.
                       </p>
 
                       <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">
-                        This link and code expire in {{expiresInMinutes}} minutes.
+                        This code expires in {{expiresInMinutes}} minutes.
                       </p>
                     </td>
                   </tr>
@@ -66,32 +65,6 @@ export const EmailVerificationTemplate = new EmailTemplate({
                           </td>
                         </tr>
                       </table>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td align="center" style="padding:8px 32px 32px 32px;text-align:center;">
-                      <table role="presentation" cellspacing="0" cellpadding="0" align="center" style="margin:0 auto;">
-                        <tr>
-                          <td align="center" bgcolor="#111827" style="border-radius:8px;text-align:center;">
-                            <a href="{{verificationUrl}}" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;padding:14px 22px;border-radius:8px;">Confirm email change</a>
-                          </td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-
-                  <tr>
-                    <td style="padding:0 32px 24px 32px;">
-                      <p style="margin:0 0 8px 0;font-size:14px;line-height:1.6;color:#4b5563;">
-                        If the button does not work, copy and paste this link into your browser:
-                      </p>
-
-                      <p style="margin:0;font-size:14px;line-height:1.6;word-break:break-all;color:#374151;">
-                        <a href="{{verificationUrl}}" style="color:#2563eb;">
-                          {{verificationUrl}}
-                        </a>
-                      </p>
                     </td>
                   </tr>
 

@@ -14,12 +14,11 @@ import { UserService } from './user.service';
 import { AccountTokenEntity } from '../entities/account-token.entity';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { EmailVerificationTemplate } from '@/modules/system/email/templates/email-verification.template';
-import { env } from '@/config/environment.config';
 import { UserRepository } from '../repositories/user.repository';
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { RegistrationTokenMetadata } from '../entities/registration-token.entity';
 import { RegistrationTokenService } from './registration-token.service';
-import { createHash, randomInt, timingSafeEqual } from 'crypto';
+import { createHash, randomInt } from 'crypto';
 import { RegistrationVerificationTemplate } from '@/modules/system/email/templates/registration-verification.template';
 import { RegistrationSuccessTemplate } from '@/modules/system/email/templates/registration-success.template';
 import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/email-changed.template';
@@ -40,7 +39,9 @@ export class EmailVerificationService {
     private readonly emailSvc: EmailService,
   ) {}
 
-  public async sendVerificationEmail(user: UserEntity): Promise<void> {
+  public async sendVerificationEmail(
+    user: UserEntity,
+  ): Promise<CreatedAccountToken> {
     const mfaCode: string = this.generateMfaCode();
     const verification: CreatedAccountToken =
       await this.createVerificationToken(user, null, this.hashMfaCode(mfaCode));
@@ -49,15 +50,16 @@ export class EmailVerificationService {
       user,
       to: user.identity.email,
       tokenId: verification.id,
-      token: verification.token,
       mfaCode,
     });
+
+    return verification;
   }
 
   public async sendEmailChangeVerification(
     user: UserEntity,
     newEmail: string,
-  ): Promise<void> {
+  ): Promise<CreatedAccountToken> {
     const normalizedEmail: string = newEmail.trim().toLowerCase();
 
     if (normalizedEmail === user.identity.email.toLowerCase())
@@ -85,17 +87,16 @@ export class EmailVerificationService {
       user,
       to: normalizedEmail,
       tokenId: verification.id,
-      token: verification.token,
       mfaCode,
-      verificationPath: '/authentication/verify-email',
-      verificationType: 'email-change',
     });
+
+    return verification;
   }
 
   public async sendRegistrationVerificationEmail(
     email: string,
     metadata: RegistrationTokenMetadata,
-  ): Promise<void> {
+  ): Promise<CreatedAccountToken> {
     const mfaCode: string = this.generateMfaCode();
     const verification: CreatedAccountToken =
       await this.registrationTokenSvc.createToken({
@@ -109,56 +110,32 @@ export class EmailVerificationService {
       firstName: metadata.profile.name.preferred ?? metadata.profile.name.first,
       to: email,
       tokenId: verification.id,
-      token: verification.token,
       mfaCode,
-      verificationPath: '/authentication/verify-email',
-      verificationType: 'register',
-
       template: RegistrationVerificationTemplate,
       metadata: {
         email,
         tokenId: verification.id,
       },
     });
-  }
 
-  public async validateEmailChangeToken(
-    tokenId: string,
-    token: string,
-  ): Promise<void> {
-    const accountToken: AccountTokenEntity =
-      await this.accountTokenSvc.validateToken(
-        tokenId,
-        AccountTokenType.EMAIL_VERIFICATION,
-        token,
-      );
-
-    this.getNewEmailFromMetadata(accountToken.metadata, true);
+    return verification;
   }
 
   public async verifyEmail(
-    tokenId: string,
-    token: string,
-    mfaCode: string,
+    challengeId: string,
+    code: string,
   ): Promise<UserEntity> {
     const accountToken: AccountTokenEntity =
-      await this.accountTokenSvc.validateToken(
-        tokenId,
+      await this.accountTokenSvc.consumeMfaCode(
+        challengeId,
         AccountTokenType.EMAIL_VERIFICATION,
-        token,
+        code,
+        {},
       );
 
     const user: UserEntity | undefined = accountToken.user;
 
     if (!user) throw new BadRequestException('Invalid verification token.');
-
-    this.assertValidMfaCode(accountToken.mfa_code_hash, mfaCode);
-
-    await this.accountTokenSvc.consumeToken(
-      tokenId,
-      AccountTokenType.EMAIL_VERIFICATION,
-      token,
-    );
 
     const newEmail: string | null = this.getNewEmailFromMetadata(
       accountToken.metadata,
@@ -186,19 +163,16 @@ export class EmailVerificationService {
       mfaCodeHash,
     });
   }
+
   public async verifyRegistrationToken(
-    tokenId: string,
-    token: string,
-    mfaCode: string,
+    challengeId: string,
+    code: string,
   ): Promise<UserEntity> {
-    const registrationToken = await this.registrationTokenSvc.validateToken(
-      tokenId,
-      token,
-    );
-
-    this.assertValidMfaCode(registrationToken.mfa_code_hash, mfaCode);
-
-    await this.registrationTokenSvc.consumeToken(tokenId, token);
+    const registrationToken =
+      await this.registrationTokenSvc.consumeVerificationCode(
+        challengeId,
+        code,
+      );
 
     return this.verifyRegistration(registrationToken.metadata);
   }
@@ -298,37 +272,23 @@ export class EmailVerificationService {
     firstName = user?.profile.name.preferred ?? user?.profile.name.first ?? '',
     to,
     tokenId,
-    token,
     mfaCode,
     metadata,
-    verificationPath = '/authentication/verify-email',
-    verificationType,
     template = EmailVerificationTemplate,
   }: {
     user?: UserEntity;
     firstName?: string;
     to: string;
     tokenId: string;
-    token: string;
     mfaCode: string;
     metadata?: Record<string, string>;
-    verificationPath?: string;
-    verificationType?: 'register' | 'email-change';
     template?: typeof EmailVerificationTemplate;
   }): Promise<void> {
-    const verificationUrl: string = this.buildVerificationUrl(
-      tokenId,
-      token,
-      verificationPath,
-      verificationType,
-    );
-
     await this.emailSvc.sendEmail({
       to,
       template,
       model: {
         firstName,
-        verificationUrl,
         mfaCode,
         expiresInMinutes: EMAIL_VERIFICATION_EXPIRES_IN_MINUTES,
       },
@@ -345,24 +305,6 @@ export class EmailVerificationService {
 
   private hashMfaCode(code: string): string {
     return createHash('sha256').update(code).digest('hex');
-  }
-
-  private assertValidMfaCode(
-    expectedCodeHash: string | null,
-    code: string,
-  ): void {
-    if (!expectedCodeHash || !/^\d{6}$/.test(code))
-      throw new BadRequestException('Invalid verification code.');
-
-    const expectedBuffer = Buffer.from(expectedCodeHash, 'hex');
-    const actualBuffer = Buffer.from(this.hashMfaCode(code), 'hex');
-
-    if (expectedBuffer.length !== actualBuffer.length)
-      throw new BadRequestException('Invalid verification code.');
-
-    const isMatch = timingSafeEqual(expectedBuffer, actualBuffer);
-
-    if (!isMatch) throw new BadRequestException('Invalid verification code.');
   }
 
   private getNewEmailFromMetadata(
@@ -389,21 +331,5 @@ export class EmailVerificationService {
       throw new BadRequestException('Invalid verification token metadata.');
 
     return newEmail.trim().toLowerCase();
-  }
-
-  private buildVerificationUrl(
-    tokenId: string,
-    token: string,
-    path: string,
-    type?: 'register' | 'email-change',
-  ): string {
-    const url: URL = new URL(path, env.PUBLIC_WEB_URL);
-
-    url.searchParams.set('token_id', tokenId);
-    url.searchParams.set('token', token);
-
-    if (type) url.searchParams.set('type', type);
-
-    return url.toString();
   }
 }

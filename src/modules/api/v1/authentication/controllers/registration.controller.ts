@@ -5,7 +5,6 @@ import {
   HttpCode,
   HttpStatus,
   Post,
-  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +14,6 @@ import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -26,12 +24,9 @@ import {
   RegisterDto,
   RegistrationPendingDto,
   ResendRegistrationDto,
-  ValidateRegistrationTokenDto,
-  ValidateRegistrationTokenResponseDto,
   VerifyRegistrationDto,
 } from '../models/register.model';
 import { RegistrationService } from '../services/registration.service';
-import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { AuthService } from '../services/authentication.service';
 
@@ -55,7 +50,7 @@ export class RegistrationApiController {
   @ApiOperation({
     summary: 'Register a new user',
     description:
-      'Creates a pending registration token and sends a verification email before creating the user account.',
+      'Creates a pending registration challenge and sends a verification code before creating the user account.',
   })
   @ApiCreatedResponse({
     description: 'The registration request is pending email verification.',
@@ -75,16 +70,16 @@ export class RegistrationApiController {
   @ApiBody({
     type: ResendRegistrationDto,
     description:
-      'Email address for a pending registration whose verification link should be resent.',
+      'Email address for a pending registration whose verification code should be resent.',
   })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Resend pending registration verification',
     description:
-      'Creates a fresh registration verification link for an existing pending registration using the email address in the request body.',
+      'Creates a fresh registration challenge and verification code for an existing pending registration.',
   })
   @ApiOkResponse({
-    description: 'A fresh registration verification link was sent.',
+    description: 'A fresh registration verification code was sent.',
     type: RegistrationPendingDto,
   })
   @ApiConflictResponse({
@@ -96,50 +91,18 @@ export class RegistrationApiController {
     return this.svc.resendRegistration(input.email);
   }
 
-  @Post('validate')
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @ApiQuery({
-    name: 'token_id',
-    description: 'The unique NanoID of the registration token record.',
-  })
-  @ApiBody({
-    type: ValidateRegistrationTokenDto,
-    description: 'The raw token from the registration verification link.',
-  })
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Validate pending registration token',
-    description:
-      'Checks whether a registration token is valid without consuming it, allowing clients to render the registration confirmation form only for valid links.',
-  })
-  @ApiOkResponse({
-    description: 'The pending registration token is valid.',
-    type: ValidateRegistrationTokenResponseDto,
-  })
-  public async validateRegistration(
-    @Query('token_id', NanoIdParamPipe) tokenId: string,
-    @Body() input: ValidateRegistrationTokenDto,
-  ): Promise<ValidateRegistrationTokenResponseDto> {
-    await this.svc.validateRegistration(tokenId, input.token);
-    return new ValidateRegistrationTokenResponseDto({ valid: true });
-  }
-
   @Post('confirm')
   @Throttle({ default: { limit: 3, ttl: 1 * minute } })
-  @ApiQuery({
-    name: 'token_id',
-    description: 'The unique NanoID of the registration token record.',
-  })
   @ApiBody({
     type: VerifyRegistrationDto,
     description:
-      'The raw token and 6-digit verification code from the registration verification email.',
+      'The registration challenge identifier and 6-digit verification code.',
   })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify a pending registration',
     description:
-      'Consumes a one-time registration token, creates the user account, and issues an authenticated session when the token and verification code are valid.',
+      'Consumes a one-time registration challenge, creates the user account, and issues an authenticated session when the code is valid.',
   })
   @ApiOkResponse({
     description:
@@ -147,13 +110,11 @@ export class RegistrationApiController {
     type: JWTDto,
   })
   public async verifyRegistration(
-    @Query('token_id', NanoIdParamPipe) tokenId: string,
     @Body() input: VerifyRegistrationDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     const user = await this.svc.verifyRegistration(
-      tokenId,
-      input.token,
+      input.challenge_id,
       input.code,
     );
 
