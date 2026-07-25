@@ -124,6 +124,7 @@ export class EmailVerificationService {
   public async verifyEmail(
     challengeId: string,
     code: string,
+    authenticatedUser: UserEntity,
   ): Promise<UserEntity> {
     const accountToken: AccountTokenEntity =
       await this.accountTokenSvc.consumeMfaCode(
@@ -135,7 +136,8 @@ export class EmailVerificationService {
 
     const user: UserEntity | undefined = accountToken.user;
 
-    if (!user) throw new BadRequestException('Invalid verification token.');
+    if (!user || authenticatedUser.id !== user.id)
+      throw new BadRequestException('Invalid verification token.');
 
     const newEmail: string | null = this.getNewEmailFromMetadata(
       accountToken.metadata,
