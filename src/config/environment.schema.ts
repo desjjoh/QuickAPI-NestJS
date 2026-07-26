@@ -202,7 +202,6 @@ export const EnvSchema = z
     DB_SYNC: booleanFromEnv.default(false),
     DB_SEED: booleanFromEnv.default(false),
 
-    DB_MIGRATIONS_RUN: booleanFromEnv.default(false),
     DB_SSL: booleanFromEnv.default(false),
     DB_SSL_REJECT_UNAUTHORIZED: booleanFromEnv.default(true),
     DB_POOL_CONNECTION_LIMIT: positiveIntegerFromEnv.default(10),

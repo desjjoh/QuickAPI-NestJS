@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import path from 'path';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
 import { env } from '@/config/environment.config';
@@ -51,7 +52,7 @@ const dataSourceOptions: DataSourceOptions = {
     AccountTokenEntity,
     RegistrationTokenEntity,
   ],
-  migrations: ['src/database/migrations/*{.ts,.js}'],
+  migrations: [path.join(__dirname, 'migrations', '*{.ts,.js}')],
   ssl: env.DB_SSL
     ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED }
     : undefined,

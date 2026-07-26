@@ -45,6 +45,26 @@ services:
       retries: 10
       start_period: 20s
 
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: quickapi_app
+      DB_PASSWORD: quickapi_password
+      DB_DATABASE: quickapi
+      DB_SYNC: 'false'
+    command: ['npm', 'run', 'migration:run:prod']
+
   api:
     build:
       context: .
@@ -57,6 +77,8 @@ services:
     restart: unless-stopped
 
     depends_on:
+      migration:
+        condition: service_completed_successfully
       mysql:
         condition: service_healthy
       redis:
