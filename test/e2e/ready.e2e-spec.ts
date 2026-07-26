@@ -4,21 +4,30 @@ import request from 'supertest';
 
 import { LC } from '@/common/handlers/lifecycle.handler';
 import { TypeOrmService } from '@/modules/system/database/services/typeorm.service';
-import { createTestApp } from '../helpers/test-app';
+import {
+  setupTestSuite,
+  teardownTestSuite,
+  TestSuite,
+} from '../helpers/test-app';
 
 describe('Readiness endpoint', () => {
   let app: INestApplication;
   let database: TypeOrmService;
+  let suite: TestSuite;
 
   beforeAll(async () => {
-    app = await createTestApp();
+    suite = await setupTestSuite();
+    app = suite.app;
     database = app.get(TypeOrmService);
   });
 
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    await suite.resetDatabase();
+  });
 
   afterAll(async () => {
-    await app.close();
+    await teardownTestSuite(suite);
   });
 
   it('GET /health reports liveness without querying TypeORM', async () => {

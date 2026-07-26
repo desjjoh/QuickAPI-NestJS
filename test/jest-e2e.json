@@ -17,5 +17,7 @@
     "^@/(.*)$": "<rootDir>/src/$1",
     "^(\\.{1,2}/.*)\\.js$": "$1"
   },
-  "setupFiles": ["<rootDir>/test/setup-env.ts"]
+  "setupFiles": ["<rootDir>/test/setup-env.ts"],
+  "globalSetup": "<rootDir>/test/helpers/database/global-setup.ts",
+  "globalTeardown": "<rootDir>/test/helpers/database/global-teardown.ts"
 }

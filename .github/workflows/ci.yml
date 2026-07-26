@@ -71,6 +71,8 @@ jobs:
       DB_USER: quickapi_app
       DB_PASSWORD: quickapi_password
       DB_DATABASE: quickapi_test
+      TEST_DB_ENABLED: true
+      TEST_DB_DATABASE: quickapi_test
 
     steps:
       - name: Checkout repository

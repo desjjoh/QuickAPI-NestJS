@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { existsSync } from 'node:fs';
 import path from 'path';
 import { DataSource, DataSourceOptions } from 'typeorm';
 
@@ -20,6 +21,15 @@ import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/regi
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
+
+const sourceMigrationDirectory = path.resolve(
+  process.cwd(),
+  'src/database/migrations',
+);
+
+const migrationDirectory = existsSync(sourceMigrationDirectory)
+  ? sourceMigrationDirectory
+  : path.resolve(process.cwd(), 'dist/database/migrations');
 
 const dataSourceOptions: DataSourceOptions = {
   type: 'mysql',
@@ -52,7 +62,7 @@ const dataSourceOptions: DataSourceOptions = {
     AccountTokenEntity,
     RegistrationTokenEntity,
   ],
-  migrations: [path.join(__dirname, 'migrations', '*{.ts,.js}')],
+  migrations: [path.join(migrationDirectory, '*{.ts,.js}')],
   ssl: env.DB_SSL
     ? { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED }
     : undefined,
