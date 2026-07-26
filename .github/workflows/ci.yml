@@ -72,6 +72,10 @@ jobs:
       DB_PASSWORD: quickapi_password
       DB_DATABASE: quickapi_test
       TEST_DB_ENABLED: true
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: 3306
+      TEST_DB_USER: quickapi_app
+      TEST_DB_PASSWORD: quickapi_password
       TEST_DB_DATABASE: quickapi_test
 
     steps:

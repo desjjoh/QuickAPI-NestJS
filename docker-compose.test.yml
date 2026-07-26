@@ -1,0 +1,57 @@
+# Disposable dependencies for local integration and E2E tests. This topology is
+# intentionally independent from the ordinary development Compose stack.
+name: quickapi-test
+
+services:
+  mysql-test:
+    image: mysql:8.4
+    container_name: quickapi-test-mysql
+    ports:
+      - '3308:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: quickapi_test_root_password
+      MYSQL_DATABASE: quickapi_test
+      MYSQL_USER: quickapi_test_app
+      MYSQL_PASSWORD: quickapi_test_password
+    volumes:
+      - quickapi_test_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: quickapi-test-redis
+    ports:
+      - '6380:6379'
+    environment:
+      REDIS_PASSWORD: quickapi_test_redis_password
+    command:
+      [
+        'sh',
+        '-c',
+        'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"',
+      ]
+    volumes:
+      - quickapi_test_redis_data:/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'redis-cli -a "$$REDIS_PASSWORD" ping 2>/dev/null | grep PONG',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  quickapi_test_mysql_data:
+  quickapi_test_redis_data:

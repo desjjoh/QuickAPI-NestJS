@@ -173,6 +173,38 @@ DB_PORT="3306"
 
 ---
 
+## Disposable local E2E dependencies
+
+The dedicated test Compose stack runs only MySQL and Redis. It uses the
+`quickapi_test` database, test-specific credentials and host ports (`3308` and
+`6380`), and volumes that are separate from local development data.
+
+```bash
+# Start both dependencies and wait for their health checks.
+npm run test:infra:up
+
+# Apply the deployment migrations to the disposable database, then run E2E tests.
+npm run test:db:prepare
+npm run test:e2e:local
+```
+
+If startup or a test fails, inspect dependency state and the recent logs:
+
+```bash
+docker compose -f docker-compose.test.yml ps
+npm run test:infra:logs
+```
+
+Destroy the stack when finished. This removes only the containers, network, and
+named volumes declared by `docker-compose.test.yml`; it does not touch the
+ordinary development stack or its data.
+
+```bash
+npm run test:infra:down
+```
+
+---
+
 ## Environment Variables (`.env`)
 
 ```bash
