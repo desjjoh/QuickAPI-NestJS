@@ -4,3 +4,5 @@ export enum AccountTokenType {
   EMAIL_CHANGE = 'email_change',
   EMAIL_MFA = 'email_mfa',
 }
+
+export const MAX_VERIFICATION_CODE_ATTEMPTS = 5;

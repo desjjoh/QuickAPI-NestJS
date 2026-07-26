@@ -54,6 +54,8 @@ export class AuthService {
       MfaChallengePurpose.SIGN_IN,
     );
 
+    this.userSvc.assertCanAuthenticate(user);
+
     return this.completeSignIn(user, res);
   }
 

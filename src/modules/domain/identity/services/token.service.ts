@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { IsNull, Repository } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { AccountTokenEntity } from '../entities/account-token.entity';
 import { UserEntity } from '../entities/user.entity';
@@ -116,11 +117,20 @@ export class AccountTokenService {
     )
       throw new UnauthorizedException('Invalid or expired token.');
 
-    return this.tokenRepo.save({
-      ...entity,
-      consumed_at: new Date(),
-      metadata: consumedMetadata ?? entity.metadata,
-    });
+    const consumedAt = new Date();
+    const metadata = consumedMetadata ?? entity.metadata;
+    const result = await this.tokenRepo.update(
+      { id: entity.id, consumed_at: IsNull() },
+      {
+        consumed_at: consumedAt,
+        metadata,
+      } as QueryDeepPartialEntity<AccountTokenEntity>,
+    );
+
+    if (result.affected !== 1)
+      throw new UnauthorizedException('Invalid or expired token.');
+
+    return { ...entity, consumed_at: consumedAt, metadata };
   }
 
   public async consumeMfaCode(
@@ -147,7 +157,16 @@ export class AccountTokenService {
     if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code)))
       throw new UnauthorizedException('Invalid verification code.');
 
-    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+    const consumedAt = new Date();
+    const result = await this.tokenRepo.update(
+      { id: entity.id, consumed_at: IsNull() },
+      { consumed_at: consumedAt },
+    );
+
+    if (result.affected !== 1)
+      throw new UnauthorizedException('Invalid or expired token.');
+
+    return { ...entity, consumed_at: consumedAt };
   }
 
   public async authorizeMfaCode({
@@ -177,15 +196,25 @@ export class AccountTokenService {
 
     const token = this.generateToken();
     const expiresAt = new Date(Date.now() + expiresInMs);
-    const saved = await this.tokenRepo.save({
-      ...entity,
-      token_hash: this.hashToken(token),
-      mfa_code_hash: null,
-      metadata: verifiedMetadata,
-      expires_at: expiresAt,
-    });
+    const tokenHash = this.hashToken(token);
+    const result = await this.tokenRepo.update(
+      {
+        id: entity.id,
+        consumed_at: IsNull(),
+        mfa_code_hash: entity.mfa_code_hash,
+      },
+      {
+        token_hash: tokenHash,
+        mfa_code_hash: null,
+        metadata: verifiedMetadata,
+        expires_at: expiresAt,
+      } as QueryDeepPartialEntity<AccountTokenEntity>,
+    );
 
-    return { id: saved.id, token, expires_at: saved.expires_at };
+    if (result.affected !== 1)
+      throw new UnauthorizedException('Invalid or expired challenge.');
+
+    return { id: entity.id, token, expires_at: expiresAt };
   }
 
   public async revokeActiveTokens(

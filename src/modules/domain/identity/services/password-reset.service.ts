@@ -93,6 +93,9 @@ export class PasswordResetService {
     );
 
     const user: UserEntity = accountToken.user;
+
+    this.userSvc.assertCanAuthenticate(user);
+
     const hashed: string = await this.userSvc.hashPassword(password);
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });

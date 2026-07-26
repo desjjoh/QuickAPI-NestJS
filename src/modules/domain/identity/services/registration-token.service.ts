@@ -41,6 +41,8 @@ export class RegistrationTokenService {
       expires_at: expiresAt,
       consumed_at: null,
       mfa_code_hash: mfaCodeHash,
+      failed_attempts: 0,
+      locked_at: null,
       metadata,
     });
 
@@ -96,7 +98,16 @@ export class RegistrationTokenService {
   ): Promise<RegistrationTokenEntity> {
     const entity = await this.validateToken(tokenId, token);
 
-    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+    const consumedAt = new Date();
+    const result = await this.tokenRepo.update(
+      { id: entity.id, consumed_at: IsNull() },
+      { consumed_at: consumedAt },
+    );
+
+    if (result.affected !== 1)
+      throw new UnauthorizedException('Invalid or expired token.');
+
+    return { ...entity, consumed_at: consumedAt };
   }
 
   public async consumeVerificationCode(
@@ -116,7 +127,16 @@ export class RegistrationTokenService {
     if (!this.compareTokenHashes(entity.mfa_code_hash, codeHash))
       throw new UnauthorizedException('Invalid verification code.');
 
-    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+    const consumedAt = new Date();
+    const result = await this.tokenRepo.update(
+      { id: entity.id, consumed_at: IsNull() },
+      { consumed_at: consumedAt },
+    );
+
+    if (result.affected !== 1)
+      throw new UnauthorizedException('Invalid or expired challenge.');
+
+    return { ...entity, consumed_at: consumedAt };
   }
 
   private async revokeActiveTokens(email: string): Promise<void> {
