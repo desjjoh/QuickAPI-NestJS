@@ -1,5 +1,5 @@
 import 'tsconfig-paths/register';
-import '../../setup-env';
+import '../../load-test-env';
 
 import { migrateAndSeedEmptyTestSchema } from './test-database';
 
