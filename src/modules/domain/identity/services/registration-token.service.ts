@@ -1,13 +1,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 
 import {
   RegistrationTokenEntity,
   RegistrationTokenMetadata,
 } from '../entities/registration-token.entity';
 import { CreatedAccountToken } from './token.service';
+import { MAX_VERIFICATION_CODE_ATTEMPTS } from '@/config/token.config';
 
 export type CreateRegistrationTokenOptions = {
   email: string;
@@ -41,8 +42,6 @@ export class RegistrationTokenService {
       expires_at: expiresAt,
       consumed_at: null,
       mfa_code_hash: mfaCodeHash,
-      failed_attempts: 0,
-      locked_at: null,
       metadata,
     });
 
@@ -120,16 +119,31 @@ export class RegistrationTokenService {
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired challenge.');
-    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
-      throw new UnauthorizedException('Invalid verification code.');
+    if (
+      entity.locked_at ||
+      entity.failed_attempts >= MAX_VERIFICATION_CODE_ATTEMPTS
+    )
+      throw new UnauthorizedException('Invalid or expired challenge.');
 
     const codeHash = this.hashToken(code);
-    if (!this.compareTokenHashes(entity.mfa_code_hash, codeHash))
-      throw new UnauthorizedException('Invalid verification code.');
+    if (
+      !entity.mfa_code_hash ||
+      !/^\d{6}$/.test(code) ||
+      !this.compareTokenHashes(entity.mfa_code_hash, codeHash)
+    ) {
+      await this.recordFailedAttempt(entity.id);
+      throw new UnauthorizedException('Invalid or expired challenge.');
+    }
 
     const consumedAt = new Date();
     const result = await this.tokenRepo.update(
-      { id: entity.id, consumed_at: IsNull() },
+      {
+        id: entity.id,
+        consumed_at: IsNull(),
+        locked_at: IsNull(),
+        failed_attempts: LessThan(MAX_VERIFICATION_CODE_ATTEMPTS),
+        mfa_code_hash: entity.mfa_code_hash,
+      },
       { consumed_at: consumedAt },
     );
 
@@ -137,6 +151,24 @@ export class RegistrationTokenService {
       throw new UnauthorizedException('Invalid or expired challenge.');
 
     return { ...entity, consumed_at: consumedAt };
+  }
+
+  private async recordFailedAttempt(id: string): Promise<void> {
+    await this.tokenRepo
+      .createQueryBuilder()
+      .update(RegistrationTokenEntity)
+      .set({
+        failed_attempts: () => '`failed_attempts` + 1',
+        locked_at: () =>
+          `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
+      })
+      .where('id = :id', { id })
+      .andWhere('consumed_at IS NULL')
+      .andWhere('locked_at IS NULL')
+      .andWhere('failed_attempts < :maxAttempts', {
+        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+      })
+      .execute();
   }
 
   private async revokeActiveTokens(email: string): Promise<void> {

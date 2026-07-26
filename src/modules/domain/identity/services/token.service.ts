@@ -1,12 +1,15 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes, createHash, timingSafeEqual } from 'crypto';
-import { IsNull, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { AccountTokenEntity } from '../entities/account-token.entity';
 import { UserEntity } from '../entities/user.entity';
-import { AccountTokenType } from '@/config/token.config';
+import {
+  AccountTokenType,
+  MAX_VERIFICATION_CODE_ATTEMPTS,
+} from '@/config/token.config';
 
 export type AccountTokenMetadata = Record<string, unknown>;
 
@@ -60,6 +63,8 @@ export class AccountTokenService {
       expires_at: expiresAt,
       consumed_at: null,
       mfa_code_hash: mfaCodeHash,
+      failed_attempts: 0,
+      locked_at: null,
       metadata,
     });
 
@@ -147,19 +152,37 @@ export class AccountTokenService {
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired token.');
+
+    if (
+      entity.locked_at ||
+      entity.failed_attempts >= MAX_VERIFICATION_CODE_ATTEMPTS
+    )
+      throw new UnauthorizedException('Invalid or expired token.');
+
     if (userId && entity.user.id !== userId)
       throw new UnauthorizedException('Invalid or expired token.');
+
     if (!this.matchesMetadata(entity.metadata, expectedMetadata))
       throw new UnauthorizedException('Invalid or expired token.');
-    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
-      throw new UnauthorizedException('Invalid verification code.');
 
-    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code)))
-      throw new UnauthorizedException('Invalid verification code.');
+    if (
+      !entity.mfa_code_hash ||
+      !/^\d{6}$/.test(code) ||
+      !this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code))
+    ) {
+      await this.recordFailedAttempt(entity.id);
+      throw new UnauthorizedException('Invalid or expired token.');
+    }
 
     const consumedAt = new Date();
     const result = await this.tokenRepo.update(
-      { id: entity.id, consumed_at: IsNull() },
+      {
+        id: entity.id,
+        consumed_at: IsNull(),
+        locked_at: IsNull(),
+        failed_attempts: LessThan(MAX_VERIFICATION_CODE_ATTEMPTS),
+        mfa_code_hash: entity.mfa_code_hash,
+      },
       { consumed_at: consumedAt },
     );
 
@@ -167,6 +190,24 @@ export class AccountTokenService {
       throw new UnauthorizedException('Invalid or expired token.');
 
     return { ...entity, consumed_at: consumedAt };
+  }
+
+  private async recordFailedAttempt(id: string): Promise<void> {
+    await this.tokenRepo
+      .createQueryBuilder()
+      .update(AccountTokenEntity)
+      .set({
+        failed_attempts: () => '`failed_attempts` + 1',
+        locked_at: () =>
+          `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
+      })
+      .where('id = :id', { id })
+      .andWhere('consumed_at IS NULL')
+      .andWhere('locked_at IS NULL')
+      .andWhere('failed_attempts < :maxAttempts', {
+        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+      })
+      .execute();
   }
 
   public async authorizeMfaCode({
