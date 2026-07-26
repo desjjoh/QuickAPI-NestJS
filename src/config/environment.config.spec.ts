@@ -63,6 +63,28 @@ describe('environment config', () => {
     ).toThrow();
   });
 
+  it('rejects enabling Bull Board in production', () => {
+    expect(() =>
+      parseEnv(
+        createValidEnv({
+          NODE_ENV: 'production',
+          BULL_BOARD_ENABLED: 'true',
+        }),
+      ),
+    ).toThrow(/BULL_BOARD_ENABLED must be false in production/);
+  });
+
+  it('allows Bull Board to remain disabled in production', () => {
+    const env = parseEnv(
+      createValidEnv({
+        NODE_ENV: 'production',
+        BULL_BOARD_ENABLED: 'false',
+      }),
+    );
+
+    expect(env.BULL_BOARD_ENABLED).toBe(false);
+  });
+
   it('rejects short JWT secrets', () => {
     expect(() =>
       parseEnv(

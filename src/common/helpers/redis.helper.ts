@@ -41,3 +41,13 @@ export async function assertRedisAvailable(): Promise<void> {
     });
   }
 }
+
+export async function checkRedisAvailable(): Promise<boolean> {
+  try {
+    await assertRedisAvailable();
+
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -1,6 +1,6 @@
 import { RootResponseDto } from './_root.model';
 import { HealthResponseDto } from './_health.model';
-import { ReadyResponseDto } from './_ready.model';
+import { DependencyCheckDto, ReadyResponseDto } from './_ready.model';
 import { InfoResponseDto } from './_info.model';
 import { SystemResponseDto } from './_system.model';
 
@@ -10,4 +10,5 @@ export {
   ReadyResponseDto,
   InfoResponseDto,
   SystemResponseDto,
+  DependencyCheckDto,
 };

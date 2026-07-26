@@ -92,6 +92,16 @@ export async function assertGeoLiteDatabasesAvailable(): Promise<void> {
   }
 }
 
+export async function checkGeoLiteDatabasesAvailable(): Promise<boolean> {
+  try {
+    await assertGeoLiteDatabasesAvailable();
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 @Injectable()
 export class IpLocationService {
   private readonly logger = new Logger(IpLocationService.name);

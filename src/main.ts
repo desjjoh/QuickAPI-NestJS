@@ -3,8 +3,14 @@ import { LC } from '@/common/handlers/lifecycle.handler';
 import { logger } from '@/config/logger.config';
 import { env } from '@/config/environment.config';
 import { mode } from '@/config/environment.schema';
-import { assertRedisAvailable } from './common/helpers/redis.helper';
-import { assertGeoLiteDatabasesAvailable } from './modules/system/geolocation/services/ip-location.service';
+import {
+  assertRedisAvailable,
+  checkRedisAvailable,
+} from './common/helpers/redis.helper';
+import {
+  assertGeoLiteDatabasesAvailable,
+  checkGeoLiteDatabasesAvailable,
+} from './modules/system/geolocation/services/ip-location.service';
 
 async function bootstrap(): Promise<void> {
   const env_mode: mode = env.NODE_ENV;
@@ -19,10 +25,12 @@ async function bootstrap(): Promise<void> {
     {
       name: 'remote dictionary server (redis)',
       start: assertRedisAvailable,
+      check: checkRedisAvailable,
     },
     {
       name: 'GeoLite2 local database files',
       start: assertGeoLiteDatabasesAvailable,
+      check: checkGeoLiteDatabasesAvailable,
     },
     {
       name: 'http server (nest)',

@@ -271,7 +271,7 @@ export const EnvSchema = z
     // # BullBoard
     // # ============================================================
 
-    BULL_BOARD_ENABLED: z.coerce.boolean().default(false),
+    BULL_BOARD_ENABLED: booleanFromEnv.default(false),
     BULL_BOARD_ROUTE: z.string().default('/admin/queues'),
   })
   .superRefine((env, ctx) => {
@@ -280,6 +280,14 @@ export const EnvSchema = z
         code: 'custom',
         path: ['DB_SYNC'],
         message: 'DB_SYNC must be false in production. Use migrations.',
+      });
+    }
+
+    if (env.NODE_ENV === 'production' && env.BULL_BOARD_ENABLED) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['BULL_BOARD_ENABLED'],
+        message: 'BULL_BOARD_ENABLED must be false in production.',
       });
     }
   })
