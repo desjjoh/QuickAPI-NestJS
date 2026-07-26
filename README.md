@@ -326,6 +326,7 @@ REFRESH_EXPIRY_TIME="7d"
 # Email / Postmark
 # ============================================================
 
+POSTMARK_ENABLED="false"
 POSTMARK_SERVER_TOKEN="__INJECT_POSTMARK_SERVER_TOKEN_FROM_SECRET_MANAGER__"
 POSTMARK_FROM_EMAIL="noreply@example.com"
 POSTMARK_MESSAGE_STREAM="outbound"

@@ -264,6 +264,7 @@ export const EnvSchema = z
     // # Email / Postmark
     // # ============================================================
 
+    POSTMARK_ENABLED: booleanFromEnv.default(false),
     POSTMARK_SERVER_TOKEN: z.string().min(1).optional(),
     POSTMARK_FROM_EMAIL: z.email().optional(),
     POSTMARK_MESSAGE_STREAM: z
@@ -327,28 +328,30 @@ export const EnvSchema = z
       }
     }
 
-    for (const name of [
-      'POSTMARK_SERVER_TOKEN',
-      'POSTMARK_FROM_EMAIL',
-    ] as const) {
-      if (!env[name]) {
+    if (env.POSTMARK_ENABLED) {
+      for (const name of [
+        'POSTMARK_SERVER_TOKEN',
+        'POSTMARK_FROM_EMAIL',
+      ] as const) {
+        if (!env[name]) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [name],
+            message: `${name} is required when POSTMARK_ENABLED is true.`,
+          });
+        }
+      }
+      if (
+        env.NODE_ENV === 'production' &&
+        env.POSTMARK_SERVER_TOKEN === exampleSentinels.POSTMARK_SERVER_TOKEN
+      ) {
         ctx.addIssue({
           code: 'custom',
-          path: [name],
-          message: `${name} is required when POSTMARK_ENABLED is true.`,
+          path: ['POSTMARK_SERVER_TOKEN'],
+          message:
+            'POSTMARK_SERVER_TOKEN must not use the .env.example sentinel in production.',
         });
       }
-    }
-    if (
-      env.NODE_ENV === 'production' &&
-      env.POSTMARK_SERVER_TOKEN === exampleSentinels.POSTMARK_SERVER_TOKEN
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['POSTMARK_SERVER_TOKEN'],
-        message:
-          'POSTMARK_SERVER_TOKEN must not use the .env.example sentinel in production.',
-      });
     }
 
     if (env.STORAGE_DRIVER === 'r2') {
