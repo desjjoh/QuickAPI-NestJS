@@ -16,6 +16,16 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    env:
+      POSTMARK_ENABLED: 'false'
+      POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
+      POSTMARK_FROM_EMAIL: noreply@test.example.com
+      R2_ACCOUNT_ID: cloudflare-test-account
+      R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
+      R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID
+      R2_SECRET_ACCESS_KEY: R2_TEST_SECRET_ACCESS_KEY
+      R2_BUCKET_NAME: quickapi-test
+      R2_PUBLIC_BASE_URL: https://assets.test.example.com
 
     steps:
       - name: Checkout repository
@@ -77,6 +87,15 @@ jobs:
       TEST_DB_USER: quickapi_app
       TEST_DB_PASSWORD: quickapi_password
       TEST_DB_DATABASE: quickapi_test
+      POSTMARK_ENABLED: 'false'
+      POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
+      POSTMARK_FROM_EMAIL: noreply@test.example.com
+      R2_ACCOUNT_ID: cloudflare-test-account
+      R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
+      R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID
+      R2_SECRET_ACCESS_KEY: R2_TEST_SECRET_ACCESS_KEY
+      R2_BUCKET_NAME: quickapi-test
+      R2_PUBLIC_BASE_URL: https://assets.test.example.com
 
     steps:
       - name: Checkout repository

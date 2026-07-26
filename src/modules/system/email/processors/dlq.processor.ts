@@ -11,6 +11,13 @@ import { EMAIL_DLQ } from '../queues/queue.tokens';
 @Processor(EMAIL_DLQ)
 export class EmailDeadLetterQueueProcessor extends WorkerHost {
   public async process(job: Job<EmailDeadLetterPayload>): Promise<void> {
+    if (
+      !job?.data?.meta ||
+      typeof job.data.meta.failedReason !== 'string' ||
+      !Array.isArray(job.data.meta.stacktrace)
+    )
+      throw new Error('Malformed email dead-letter job payload.');
+
     logger.info(
       `Handling email DLQ job ${job.id}; original job=${job.data.meta.jobId}; reason=${job.data.meta.failedReason}`,
     );

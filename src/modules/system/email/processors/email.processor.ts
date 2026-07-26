@@ -16,6 +16,17 @@ export class EmailQueueProcessor extends WorkerHost {
   }
 
   public async process(job: Job<EmailJobPayload>): Promise<void> {
+    const payload = job?.data;
+
+    if (
+      !payload ||
+      typeof payload.to !== 'string' ||
+      typeof payload.subject !== 'string' ||
+      typeof payload.htmlBody !== 'string' ||
+      typeof payload.messageStream !== 'string'
+    )
+      throw new Error('Malformed email job payload.');
+
     await this.transportSvc.sendCompiledEmail(job.data);
   }
 

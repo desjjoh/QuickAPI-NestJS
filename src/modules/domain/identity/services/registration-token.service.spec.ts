@@ -72,12 +72,24 @@ describe('RegistrationTokenService', () => {
   });
 
   it('finds the newest unconsumed registration', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    const pendingToken = entity();
+    repo.findOne.mockResolvedValue(pendingToken);
     await expect(service.findPendingByEmail('new@test.dev')).resolves.toEqual(
-      entity(),
+      pendingToken,
     );
     expect(repo.findOne).toHaveBeenCalledWith(
       expect.objectContaining({ order: { createdAt: 'DESC' } }),
+    );
+  });
+
+  it('validates and consumes a valid token', async () => {
+    const validToken = entity();
+    repo.findOne.mockResolvedValue(validToken);
+    await expect(service.validateToken('r1', 'plain')).resolves.toEqual(
+      validToken,
+    );
+    await expect(service.consumeToken('r1', 'plain')).resolves.toEqual(
+      expect.objectContaining({ consumed_at: expect.any(Date) }),
     );
   });
 
