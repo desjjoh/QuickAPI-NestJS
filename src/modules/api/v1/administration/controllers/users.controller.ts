@@ -29,11 +29,14 @@ import { Permissions } from '@/common/decorators/permissions.decorator';
 import { EntityIdParam } from '@/common/decorators/id-param.decorator';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { UserAdminService } from '../service/users.service';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('users')
+@Throttle({ default: throttlePolicies.administrationRead })
 export class UserAdministrationController {
   public constructor(private readonly svc: UserAdminService) {}
 
@@ -83,6 +86,7 @@ export class UserAdministrationController {
 
   // DELETE /:id
   @Delete(':id')
+  @Throttle({ default: throttlePolicies.administrationMutation })
   @ApiOperation({
     summary: 'Delete user',
     description:

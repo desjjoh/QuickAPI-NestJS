@@ -2,10 +2,10 @@ import { Controller, Get, Res } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
-import { minute } from '@/common/constants/milliseconds.constants';
 import { Throttle } from '@nestjs/throttler';
 import { SecurityApiService } from '../services/security.service';
 import { CsrfDto } from '../models/csrf.model';
+import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Request Security')
 @Controller()
@@ -14,7 +14,7 @@ export class SecurityApiController {
 
   // GET /csrf
   @Get('/csrf')
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.csrf })
   @ApiOperation({
     summary: 'Issue CSRF token',
     description:

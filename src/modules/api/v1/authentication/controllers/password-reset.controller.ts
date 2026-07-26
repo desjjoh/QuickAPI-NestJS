@@ -17,7 +17,6 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { minute } from '@/common/constants/milliseconds.constants';
 import {
   ConfirmPasswordResetResponseDto,
   RequestPasswordResetResponseDto,
@@ -31,6 +30,7 @@ import {
 } from '../models/password-reset.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
+import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Password Reset')
 @UseGuards(CsrfGuard)
@@ -38,7 +38,7 @@ import { CsrfGuard } from '@/common/guards/csrf.guard';
 export class PasswordResetApiController {
   public constructor(private readonly prSvc: PasswordResetService) {}
 
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.passwordReset })
   @Post('request')
   @ApiOperation({
     summary: 'Request password reset',
@@ -56,7 +56,7 @@ export class PasswordResetApiController {
     });
   }
 
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.otpConfirmation })
   @Post('verify')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -84,7 +84,7 @@ export class PasswordResetApiController {
     });
   }
 
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.passwordResetConfirmation })
   @Patch('confirm')
   @HttpCode(HttpStatus.OK)
   @ApiQuery({

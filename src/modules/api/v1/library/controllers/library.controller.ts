@@ -6,9 +6,12 @@ import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { LibraryService } from '../services/library.service';
 import { BaseAccountStatusDto } from '@/modules/domain/library/models/status.model';
 import { BaseTimezoneDto } from '@/modules/domain/library/models/time-zone.model';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Reference Data')
 @Controller('')
+@Throttle({ default: throttlePolicies.publicRead })
 export class GenderController {
   public constructor(private readonly svc: LibraryService) {}
 

@@ -18,7 +18,6 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { minute } from '@/common/constants/milliseconds.constants';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 
 import { AuthService } from '../services/authentication.service';
@@ -37,6 +36,7 @@ import {
   MfaChallengeResponseDto,
   VerifyMfaChallengeDto,
 } from '../models/mfa.model';
+import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
@@ -46,7 +46,7 @@ export class AuthApiController {
 
   // POST /sign-in
   @Post('/sign-in')
-  @Throttle({ default: { limit: 5, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.signIn })
   @ApiBody({
     type: SignInDto,
     description: 'User credentials for authentication.',
@@ -82,7 +82,7 @@ export class AuthApiController {
   // POST /sign-in/mfa/verify
   @Post('/sign-in/mfa/verify')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.otpConfirmation })
   @ApiOperation({
     summary: 'Complete MFA sign-in',
     description:
@@ -112,7 +112,7 @@ export class AuthApiController {
   @ApiUnauthorizedResponse({
     description: 'Authentication is invalid, expired, or has been revoked.',
   })
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.tokenRefresh })
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async verifyToken(
     @CurrentUser() user: UserEntity,
@@ -136,7 +136,7 @@ export class AuthApiController {
   @ApiUnauthorizedResponse({
     description: 'User is not authenticated or session is already invalid.',
   })
-  @Throttle({ default: { limit: 10, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.signOut })
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async signOut(
     @CurrentSession() session: UserSessionEntity,

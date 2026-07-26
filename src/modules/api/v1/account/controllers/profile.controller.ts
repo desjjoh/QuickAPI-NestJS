@@ -49,11 +49,14 @@ import {
   UpdateProfileTimezoneDto,
 } from '../models/updateProfile.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
 @Controller('profile')
 @UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
+@Throttle({ default: throttlePolicies.profileMutation })
 export class ProfileApiController {
   public constructor(private readonly svc: ProfileApiService) {}
 
@@ -143,6 +146,7 @@ export class ProfileApiController {
 
   // POST /avatar
   @Post('avatar')
+  @Throttle({ default: throttlePolicies.fileUpload })
   @ApiOperation({
     summary: 'Set profile avatar',
     description:

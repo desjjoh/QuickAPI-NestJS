@@ -29,11 +29,11 @@ import { sanitizeHeadersMiddleware } from '@/common/middleware/header-sanitizati
 import { methodWhitelistMiddleware } from '@/common/middleware/method-whitelist.middleware';
 import { contentTypeMiddleware } from '@/common/middleware/content-type.middleware';
 import { headerLimitsMiddleware } from '@/common/middleware/header-limit.middleware';
-import { rateLimitMiddleware } from '@/common/middleware/rate-limit.middleware';
 import { securityHeadersMiddleware } from '@/common/middleware/security-headers.middleware';
 import { corsMiddleware } from '@/common/middleware/cors.middleware';
 import { bodyLimitMiddleware } from '@/common/middleware/request-size-limit.middleware';
 import { httpMetricsMiddleware } from '@/common/middleware/metrics.middleware';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 import { rootPath } from '@/common/helpers/path.helper';
 
@@ -41,6 +41,7 @@ let app: INestApplication | null = null;
 let ready: boolean = false;
 
 function createApp(app: INestApplication): void {
+  configureTrustProxy(app as NestExpressApplication, env.TRUST_PROXY);
   // Resolve and attach request context store
   const requestContext = app.get(RequestContext);
   attachRequestContext(requestContext);
@@ -60,14 +61,6 @@ function createApp(app: INestApplication): void {
       exposedHeaders: env.CORS_EXPOSED_HEADERS,
       credentials: env.CORS_CREDENTIALS,
       maxAge: env.CORS_MAX_AGE_SECONDS,
-    }),
-  );
-
-  app.use(
-    rateLimitMiddleware({
-      windowMs: env.RATE_LIMIT_WINDOW_MS,
-      max: env.RATE_LIMIT_MAX,
-      keyGenerator: (req) => req.ip ?? 'unknown',
     }),
   );
 
@@ -125,6 +118,18 @@ function createApp(app: INestApplication): void {
 
 function resolveCertPath(certPath: string): string {
   return path.isAbsolute(certPath) ? certPath : path.join(rootPath, certPath);
+}
+
+export function configureTrustProxy(
+  app: NestExpressApplication,
+  configuredProxies: string,
+): void {
+  const proxies = configuredProxies
+    .split(',')
+    .map((proxy) => proxy.trim())
+    .filter(Boolean);
+
+  app.set('trust proxy', proxies.length === 0 ? false : proxies);
 }
 
 export function createNestOptions(

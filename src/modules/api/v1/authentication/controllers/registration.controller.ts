@@ -18,7 +18,6 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { minute } from '@/common/constants/milliseconds.constants';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
 import {
   RegisterDto,
@@ -29,6 +28,7 @@ import {
 import { RegistrationService } from '../services/registration.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { AuthService } from '../services/authentication.service';
+import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Registration')
 @UseGuards(CsrfGuard)
@@ -40,7 +40,7 @@ export class RegistrationApiController {
   ) {}
 
   @Post('request')
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.registration })
   @ApiBody({
     type: RegisterDto,
     description:
@@ -66,7 +66,7 @@ export class RegistrationApiController {
   }
 
   @Post('resend')
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.resend })
   @ApiBody({
     type: ResendRegistrationDto,
     description:
@@ -92,7 +92,7 @@ export class RegistrationApiController {
   }
 
   @Post('confirm')
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.otpConfirmation })
   @ApiBody({
     type: VerifyRegistrationDto,
     description:

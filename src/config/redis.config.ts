@@ -1,8 +1,8 @@
-import { ConnectionOptions } from 'bullmq';
+import type { RedisOptions } from 'ioredis';
 
 import { env } from './environment.config';
 
-export const redisConnection: ConnectionOptions = {
+export const redisConnection: RedisOptions = {
   host: env.REDIS_HOST,
   port: env.REDIS_PORT,
   password: env.REDIS_PASSWORD || undefined,

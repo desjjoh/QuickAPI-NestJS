@@ -23,11 +23,14 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { SessionDto } from '@/modules/domain/identity/models/user.model';
 import { SessionsApiService } from '../services/sessions.service';
 import { JwtAuthGuard } from '@/common/guards/jwt.guard';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
 @Controller('sessions')
 @UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
+@Throttle({ default: throttlePolicies.sessionRead })
 export class SessionsApiController {
   public constructor(private readonly svc: SessionsApiService) {}
 
@@ -46,6 +49,7 @@ export class SessionsApiController {
   }
 
   @Delete()
+  @Throttle({ default: throttlePolicies.sessionMutation })
   @ApiOperation({
     summary: 'Revoke all sessions',
     description:
@@ -63,6 +67,7 @@ export class SessionsApiController {
   }
 
   @Delete(':id')
+  @Throttle({ default: throttlePolicies.sessionMutation })
   @ApiOperation({
     summary: 'Revoke a session',
     description:

@@ -170,6 +170,8 @@ export const EnvSchema = z
     GLOBAL_THROTTLE_TTL_MINUTES: positiveIntegerFromEnv.default(60),
     GLOBAL_THROTTLE_LIMIT: positiveIntegerFromEnv.default(200),
 
+    TRUST_PROXY: z.string().default(''),
+
     // # ============================================================
     // # Session IP geolocation (local MaxMind only)
     // # ============================================================

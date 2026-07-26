@@ -17,7 +17,6 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
-import { minute } from '@/common/constants/milliseconds.constants';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { VerifyEmailDto } from '../models/verify-email.model';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
@@ -30,6 +29,7 @@ import {
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { RefreshTokenGuard } from '@/common/guards/refresh.guard';
+import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Email Verification')
 @ApiBearerAuth('access-token')
@@ -41,7 +41,7 @@ export class EmailVerificationApiController {
     private readonly authSvc: AuthService,
   ) {}
 
-  @Throttle({ default: { limit: 3, ttl: 1 * minute } })
+  @Throttle({ default: throttlePolicies.otpConfirmation })
   @Patch('confirm')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

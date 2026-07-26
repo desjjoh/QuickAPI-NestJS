@@ -533,6 +533,43 @@ The account and administration APIs rely on the same shared identity/domain laye
 
 ---
 
+## Distributed rate limiting and reverse proxies
+
+Nest's throttler stores counters in the same Redis service used by BullMQ, so
+limits apply across every API replica rather than independently per process.
+The authentication policies are intentionally separate: sign-in is 5/minute,
+registration is 3/minute, registration resend is 2/minute, password-reset
+request is 3/minute, and OTP confirmation is 5/minute per client and route.
+
+Client identity is taken from Express `req.ip`. By default `TRUST_PROXY` is
+empty and forwarded headers are ignored. In production, set `TRUST_PROXY` to a
+comma-separated allowlist of the IP addresses or CIDR ranges from which the API
+actually receives load-balancer connections. The load balancer must:
+
+1. connect from an address in that allowlist;
+2. remove any client-supplied `X-Forwarded-For` header; and
+3. write `X-Forwarded-For` as the original client address followed by any
+   trusted proxy hops.
+
+Do not configure `TRUST_PROXY=true`, `0.0.0.0/0`, or `::/0`, and do not expose
+an alternate network path directly to the API. Requests from peers outside the
+allowlist are identified by their socket address, so a forged forwarded header
+cannot create a fresh rate-limit identity.
+
+When a policy is exceeded, the API responds with **HTTP 429** and:
+
+- `Content-Type: application/json`;
+- `Retry-After: <seconds>` indicating when the block expires;
+- `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`
+  headers; and
+- the standard error body
+  `{ "status": 429, "message": "ThrottlerException: Too Many Requests", "timestamp": <unix milliseconds> }`.
+
+Redis availability is required for request throttling. This is deliberately
+fail-closed rather than silently falling back to process-local counters.
+
+---
+
 ## Email Queueing (BullMQ + Redis)
 
 Background email delivery runs through BullMQ-backed queues with Redis transport.

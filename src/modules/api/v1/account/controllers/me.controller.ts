@@ -39,11 +39,14 @@ import {
   VerifyMfaChallengeDto,
 } from '../../authentication/models/mfa.model';
 import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
 @Controller('')
 @UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
+@Throttle({ default: throttlePolicies.accountSecurityMutation })
 export class MeApiController {
   public constructor(private readonly svc: MeApiService) {}
 
@@ -149,6 +152,7 @@ export class MeApiController {
 
   // POST /mfa/confirm
   @Post('mfa/confirm')
+  @Throttle({ default: throttlePolicies.otpConfirmation })
   @ApiBody({ type: VerifyMfaChallengeDto })
   @ApiOperation({
     summary: 'Confirm sign-in MFA enrollment',

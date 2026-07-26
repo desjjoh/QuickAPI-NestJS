@@ -17,9 +17,12 @@ import {
 } from '../models';
 import { ApplicationControllerService } from '../services/application.service';
 import { metricsRegistry } from '@/config/metrics.config';
+import { throttlePolicies } from '@/config/throttle-policy.config';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('System Operations')
 @Controller()
+@Throttle({ default: throttlePolicies.system })
 export class ApplicationController {
   constructor(private readonly svc: ApplicationControllerService) {}
 
