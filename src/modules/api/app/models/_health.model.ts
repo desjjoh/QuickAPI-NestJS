@@ -1,20 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-import { DependencyCheckDto } from './_ready.model';
-
-export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
+export type HealthStatus = 'alive' | 'dead';
 
 export class HealthResponseDto {
   @ApiProperty({
-    description: 'Whether the process is accepting health checks.',
+    description: 'Whether this application process is alive.',
     example: true,
   })
   public readonly alive: boolean;
 
   @ApiProperty({
-    description: 'Aggregate application and dependency health state.',
-    example: 'healthy',
-    enum: ['healthy', 'degraded', 'unhealthy'],
+    description: 'In-process liveness state. Dependencies are not checked.',
+    example: 'alive',
+    enum: ['alive', 'dead'],
   })
   public readonly status: HealthStatus;
 
@@ -27,26 +25,10 @@ export class HealthResponseDto {
   })
   public readonly timestamp: string;
 
-  @ApiProperty({
-    description: 'Individual service dependency health checks.',
-    type: () => [DependencyCheckDto],
-  })
-  public readonly checks: DependencyCheckDto[];
-
-  constructor(
-    alive: boolean,
-    uptime: number,
-    timestamp: string,
-    checks: DependencyCheckDto[] = [],
-  ) {
+  constructor(alive: boolean, uptime: number, timestamp: string) {
     this.alive = alive;
-    this.status = alive
-      ? checks.every((check) => check.status === 'up')
-        ? 'healthy'
-        : 'degraded'
-      : 'unhealthy';
+    this.status = alive ? 'alive' : 'dead';
     this.uptime = uptime;
     this.timestamp = timestamp;
-    this.checks = checks;
   }
 }

@@ -27,6 +27,44 @@ describe('environment config', () => {
     expect(env.DB_SYNC).toEqual(expect.any(Boolean));
     expect(env.DB_POOL_CONNECTION_LIMIT).toEqual(expect.any(Number));
     expect(env.DB_POOL_WAIT_FOR_CONNECTIONS).toEqual(expect.any(Boolean));
+    expect(env.DOCUMENTATION_ENABLED).toBe(false);
+    expect(env.METRICS_ENABLED).toBe(false);
+    expect(env.DETAILED_DIAGNOSTICS_ENABLED).toBe(false);
+  });
+
+  it('requires an operations credential for each protected surface', () => {
+    for (const setting of ['METRICS_ENABLED', 'DETAILED_DIAGNOSTICS_ENABLED']) {
+      expect(() =>
+        parseEnv(
+          createValidEnv({ [setting]: 'true', OPERATIONS_TOKEN: undefined }),
+        ),
+      ).toThrow(/OPERATIONS_TOKEN is required/);
+    }
+  });
+
+  it('allows documentation to be enabled independently', () => {
+    const env = parseEnv(
+      createValidEnv({
+        DOCUMENTATION_ENABLED: 'true',
+        METRICS_ENABLED: 'false',
+        DETAILED_DIAGNOSTICS_ENABLED: 'false',
+      }),
+    );
+
+    expect(env.DOCUMENTATION_ENABLED).toBe(true);
+  });
+
+  it('does not require an operations credential in development', () => {
+    const env = parseEnv(
+      createValidEnv({
+        NODE_ENV: 'development',
+        METRICS_ENABLED: 'true',
+        DETAILED_DIAGNOSTICS_ENABLED: 'true',
+        OPERATIONS_TOKEN: undefined,
+      }),
+    );
+
+    expect(env.OPERATIONS_TOKEN).toBeUndefined();
   });
 
   it('parses CSV values into arrays', () => {

@@ -23,6 +23,8 @@ import { mode } from '@/config/environment.schema';
 
 @Injectable()
 export class ApplicationControllerService {
+  private static readonly READINESS_CHECK_TIMEOUT_MS = 1000;
+
   constructor(private readonly health: TypeOrmService) {}
 
   public get_root(message: string): RootResponseDto {
@@ -31,28 +33,52 @@ export class ApplicationControllerService {
 
   private async get_database_check(): Promise<DependencyCheckDto> {
     const start = performance.now();
-    const status = await this.health.get_status();
+    const available = await this.run_readiness_check(async () => {
+      const status = await this.health.get_status();
+      return status === 'connected';
+    });
 
     return new DependencyCheckDto(
       'database',
-      status === 'connected' ? 'up' : 'down',
+      available ? 'up' : 'down',
       Number((performance.now() - start).toFixed(3)),
     );
   }
 
-  public async get_health(): Promise<HealthResponseDto> {
+  private async run_readiness_check(
+    check: () => Promise<boolean>,
+  ): Promise<boolean> {
+    let timeout: NodeJS.Timeout | undefined;
+
+    try {
+      return await Promise.race([
+        check(),
+        new Promise<boolean>((resolve) => {
+          timeout = setTimeout(
+            () => resolve(false),
+            ApplicationControllerService.READINESS_CHECK_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } catch {
+      return false;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
+  public get_health(): HealthResponseDto {
     const alive: boolean = LC.isAlive();
     const uptime: number = Number(process.uptime().toFixed(3));
     const timestamp: string = new Date().toISOString();
 
-    return new HealthResponseDto(alive, uptime, timestamp, [
-      await this.get_database_check(),
-    ]);
+    return new HealthResponseDto(alive, uptime, timestamp);
   }
 
   public async get_ready(): Promise<ReadyResponseDto> {
-    const lifecycleReady: boolean =
-      LC.isReady() && (await LC.areAllServicesHealthy());
+    const lifecycleReady = await this.run_readiness_check(
+      async () => LC.isReady() && (await LC.areAllServicesHealthy()),
+    );
 
     const database = await this.get_database_check();
     const typeormReady: boolean = database.status === 'up';

@@ -90,11 +90,11 @@ Routes are composed in layers:
 ```bash
 /                         # Root/system app endpoints
 /health                   # Liveness check
-/ready                    # Readiness check with database status
-/info                     # Runtime metadata
-/system                   # System diagnostics
-/metrics                  # Prometheus metrics
-/docs                     # Swagger UI
+/ready                    # Readiness result (dependency details are private)
+/info                     # Public application name and version
+/system                   # Protected, opt-in system diagnostics
+/metrics                  # Protected, opt-in Prometheus metrics
+/docs                     # Opt-in Swagger UI
 /docs-json                # OpenAPI JSON
 
 /api/v1/security          # CSRF and browser request-security endpoints
@@ -592,15 +592,22 @@ npm run docker:redis:up
 
 Built-in operational endpoints include:
 
-| Endpoint   | Purpose                                                                 |
-| ---------- | ----------------------------------------------------------------------- |
-| `/health`  | Process liveness check                                                  |
-| `/ready`   | Readiness check including database connectivity                         |
-| `/info`    | Application name, version, environment, host, and PID                   |
-| `/system`  | Runtime diagnostics such as uptime, event loop lag, and database status |
-| `/metrics` | Prometheus-formatted metrics                                            |
+| Endpoint   | Purpose                                               |
+| ---------- | ----------------------------------------------------- |
+| `/health`  | Process liveness check                                |
+| `/ready`   | Aggregate readiness result for platform probes        |
+| `/info`    | Intentionally public application name and version     |
+| `/system`  | Protected runtime and dependency diagnostics (opt-in) |
+| `/metrics` | Protected Prometheus-formatted metrics (opt-in)       |
 
-The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms.
+`/health` and `/ready` remain unauthenticated for platform probes, but do not
+return dependency identities or failure details. Set `METRICS_ENABLED=true` or
+`DETAILED_DIAGNOSTICS_ENABLED=true` independently and send the non-user
+deployment credential in `X-Operations-Key`. Disabled operational endpoints
+return 404; missing or invalid credentials return 401. Swagger is only mounted
+when `DOCUMENTATION_ENABLED=true`.
+
+The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms when metrics are enabled.
 
 ## Quality Checks
 
@@ -704,7 +711,12 @@ Recommended deployment contract:
 - Use HTTPS publicly.
 - Set `COOKIE_SECURE=true` for HTTPS environments.
 - Use `/ready` for readiness checks.
-- Use `/metrics` for Prometheus scraping.
+- For staging, keep `DOCUMENTATION_ENABLED=false`, `METRICS_ENABLED=true`, and
+  `DETAILED_DIAGNOSTICS_ENABLED=false` by default. Give the metrics scraper a
+  randomly generated `OPERATIONS_TOKEN` (at least 32 characters), send it as
+  `X-Operations-Key`, and additionally restrict operational routes to a private
+  network at the ingress when possible. Temporarily enable documentation or
+  detailed diagnostics only when needed.
 - Do not bake `.env`, certificates, runtime uploads, or local temp files into the image.
 
 ---

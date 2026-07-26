@@ -49,7 +49,9 @@ function createApp(app: INestApplication): void {
   // MIDDLEWARE
   app.use(requestContextMiddleware());
   app.use(outgoingLogger());
-  app.use(httpMetricsMiddleware);
+
+  if (env.METRICS_ENABLED) app.use(httpMetricsMiddleware);
+
   app.use(cookieParser());
 
   app.use(securityHeadersMiddleware());
@@ -113,7 +115,7 @@ function createApp(app: INestApplication): void {
   app.useGlobalFilters(new GlobalExceptionFilter());
   app.useGlobalFilters(new NotFoundFilter());
 
-  SwaggerConfig.setup(app);
+  if (env.DOCUMENTATION_ENABLED) SwaggerConfig.setup(app);
 }
 
 function resolveCertPath(certPath: string): string {

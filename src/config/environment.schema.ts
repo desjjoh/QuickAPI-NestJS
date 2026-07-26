@@ -78,6 +78,13 @@ export const EnvSchema = z
       'silent',
     ]),
 
+    // Public operational surfaces are opt-in and independent. The operations
+    // token is a deployment credential, not an end-user access token.
+    DOCUMENTATION_ENABLED: booleanFromEnv.default(false),
+    METRICS_ENABLED: booleanFromEnv.default(false),
+    DETAILED_DIAGNOSTICS_ENABLED: booleanFromEnv.default(false),
+    OPERATIONS_TOKEN: z.string().min(32).optional(),
+
     // # ============================================================
     // # CORS
     // # ============================================================
@@ -274,6 +281,19 @@ export const EnvSchema = z
     BULL_BOARD_ROUTE: z.string().default('/admin/queues'),
   })
   .superRefine((env, ctx) => {
+    if (
+      env.NODE_ENV !== 'development' &&
+      (env.METRICS_ENABLED || env.DETAILED_DIAGNOSTICS_ENABLED) &&
+      !env.OPERATIONS_TOKEN
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['OPERATIONS_TOKEN'],
+        message:
+          'OPERATIONS_TOKEN is required when metrics or detailed diagnostics are enabled.',
+      });
+    }
+
     if (env.NODE_ENV === 'production' && env.DB_SYNC === true) {
       ctx.addIssue({
         code: 'custom',

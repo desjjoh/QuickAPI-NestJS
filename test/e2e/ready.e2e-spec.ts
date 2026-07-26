@@ -20,6 +20,18 @@ describe('Readiness endpoint', () => {
     await app.close();
   });
 
+  it('GET /health reports liveness without querying TypeORM', async () => {
+    const databaseCheck = jest.spyOn(database, 'get_status');
+
+    const response = await request(app.getHttpServer())
+      .get('/health')
+      .expect(200);
+
+    expect(response.body).toMatchObject({ alive: true, status: 'alive' });
+    expect(response.body).not.toHaveProperty('checks');
+    expect(databaseCheck).not.toHaveBeenCalled();
+  });
+
   it('GET /ready returns 200 when all readiness checks pass', async () => {
     jest.spyOn(LC, 'isReady').mockReturnValue(true);
     jest.spyOn(LC, 'areAllServicesHealthy').mockResolvedValue(true);
@@ -73,6 +85,27 @@ describe('Readiness endpoint', () => {
       checks: [
         { name: 'lifecycle', status: 'down' },
         { name: 'database', status: 'up' },
+      ],
+    });
+  });
+
+  it('GET /ready converts database connection errors into a down check', async () => {
+    jest.spyOn(LC, 'isReady').mockReturnValue(true);
+    jest.spyOn(LC, 'areAllServicesHealthy').mockResolvedValue(true);
+    jest
+      .spyOn(database, 'get_status')
+      .mockRejectedValue(new Error('connection refused'));
+
+    const response = await request(app.getHttpServer())
+      .get('/ready')
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      ready: false,
+      status: 'not_ready',
+      checks: [
+        { name: 'lifecycle', status: 'up' },
+        { name: 'database', status: 'down' },
       ],
     });
   });

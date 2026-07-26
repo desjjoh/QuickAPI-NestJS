@@ -1,4 +1,4 @@
-import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res, UseGuards } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
@@ -20,6 +20,10 @@ import { ApplicationControllerService } from '../services/application.service';
 import { metricsRegistry } from '@/config/metrics.config';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
+import {
+  DiagnosticsOperationsGuard,
+  MetricsOperationsGuard,
+} from '@/common/guards/operations.guard';
 
 @ApiTags('System Operations')
 @Controller()
@@ -42,7 +46,8 @@ export class ApplicationController {
   @Get('/health')
   @ApiOperation({
     summary: 'Report basic process liveness.',
-    description: 'Liveness check — verifies the process is alive.',
+    description:
+      'In-process liveness check only. It does not contact the database or other dependencies.',
   })
   @ApiOkResponse({
     description: 'Liveness information.',
@@ -57,7 +62,7 @@ export class ApplicationController {
   @ApiOperation({
     summary: 'Report application readiness state.',
     description:
-      'Readiness check — verifies that the app has completed startup and all required services are healthy.',
+      'Readiness check — verifies startup and required services, including database connectivity, with bounded checks.',
   })
   @ApiOkResponse({
     description: 'Application is ready.',
@@ -81,6 +86,7 @@ export class ApplicationController {
 
   // GET /info
   @Get('/info')
+  @UseGuards(DiagnosticsOperationsGuard)
   @ApiOperation({
     summary: 'Return application and runtime metadata.',
     description:
@@ -96,6 +102,7 @@ export class ApplicationController {
 
   // GET /system
   @Get('/system')
+  @UseGuards(DiagnosticsOperationsGuard)
   @ApiOperation({
     summary: 'Return system-level diagnostics.',
     description:
@@ -111,6 +118,7 @@ export class ApplicationController {
 
   // GET /metrics
   @Get('/metrics')
+  @UseGuards(MetricsOperationsGuard)
   @ApiOperation({
     summary: 'Expose Prometheus-formatted metrics.',
     description: 'Prometheus metrics in plaintext exposition format. Not JSON.',

@@ -31,7 +31,8 @@ export class DependencyCheckDto {
 
 export class ReadyResponseDto {
   @ApiProperty({
-    description: 'Whether the application can receive traffic.',
+    description:
+      'Whether startup is complete and required services are available.',
     example: true,
   })
   public readonly ready: boolean;
@@ -50,7 +51,8 @@ export class ReadyResponseDto {
   public readonly timestamp: string;
 
   @ApiProperty({
-    description: 'Checks contributing to the aggregate readiness state.',
+    description:
+      'Bounded checks of required services contributing to readiness.',
     type: () => [DependencyCheckDto],
   })
   public readonly checks: DependencyCheckDto[];
