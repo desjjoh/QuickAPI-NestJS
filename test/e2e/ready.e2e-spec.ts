@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { jest } from '@jest/globals';
 import request from 'supertest';
 
 import { LC } from '@/common/handlers/lifecycle.handler';
