@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { IsNull, LessThan, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 
 import {
   RegistrationTokenEntity,
@@ -112,13 +112,16 @@ export class RegistrationTokenService {
   public async consumeVerificationCode(
     challengeId: string,
     code: string,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<RegistrationTokenEntity> {
-    const entity = await this.tokenRepo.findOne({
+    const repo = manager.getRepository(RegistrationTokenEntity);
+    const entity = await repo.findOne({
       where: { id: challengeId, consumed_at: IsNull() },
     });
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired challenge.');
+
     if (
       entity.locked_at ||
       entity.failed_attempts >= MAX_VERIFICATION_CODE_ATTEMPTS
@@ -126,6 +129,7 @@ export class RegistrationTokenService {
       throw new UnauthorizedException('Invalid or expired challenge.');
 
     const codeHash = this.hashToken(code);
+
     if (
       !entity.mfa_code_hash ||
       !/^\d{6}$/.test(code) ||
@@ -136,16 +140,19 @@ export class RegistrationTokenService {
     }
 
     const consumedAt = new Date();
-    const result = await this.tokenRepo.update(
-      {
-        id: entity.id,
-        consumed_at: IsNull(),
-        locked_at: IsNull(),
-        failed_attempts: LessThan(MAX_VERIFICATION_CODE_ATTEMPTS),
-        mfa_code_hash: entity.mfa_code_hash,
-      },
-      { consumed_at: consumedAt },
-    );
+    const result = await repo
+      .createQueryBuilder()
+      .update(RegistrationTokenEntity)
+      .set({ consumed_at: consumedAt })
+      .where('id = :id', { id: entity.id })
+      .andWhere('consumed_at IS NULL')
+      .andWhere('locked_at IS NULL')
+      .andWhere('failed_attempts < :maxAttempts', {
+        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+      })
+      .andWhere('expires_at > :now', { now: consumedAt })
+      .andWhere('mfa_code_hash = :codeHash', { codeHash })
+      .execute();
 
     if (result.affected !== 1)
       throw new UnauthorizedException('Invalid or expired challenge.');

@@ -7,7 +7,7 @@ import {
 import { minute } from '@/common/constants/milliseconds.constants';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 
-import { UserEntity } from '../entities/user.entity';
+import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { AccountTokenService, CreatedAccountToken } from './token.service';
 import { AccountTokenType } from '@/config/token.config';
 import { UserService } from './user.service';
@@ -19,9 +19,13 @@ import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { RegistrationTokenMetadata } from '../entities/registration-token.entity';
 import { RegistrationTokenService } from './registration-token.service';
 import { createHash, randomInt } from 'crypto';
+import { DataSource, EntityManager } from 'typeorm';
 import { RegistrationVerificationTemplate } from '@/modules/system/email/templates/registration-verification.template';
 import { RegistrationSuccessTemplate } from '@/modules/system/email/templates/registration-success.template';
 import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/email-changed.template';
+import { UserSessionEntity } from '../entities/session.entity';
+import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import { RoleEntity } from '../../library/entities/role.entity';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -37,6 +41,7 @@ export class EmailVerificationService {
     private readonly registrationTokenSvc: RegistrationTokenService,
     private readonly userSvc: UserService,
     private readonly emailSvc: EmailService,
+    private readonly dataSource: DataSource,
   ) {}
 
   public async sendVerificationEmail(
@@ -126,28 +131,39 @@ export class EmailVerificationService {
     code: string,
     authenticatedUser: UserEntity,
   ): Promise<UserEntity> {
-    const accountToken: AccountTokenEntity =
-      await this.accountTokenSvc.consumeMfaCode(
-        challengeId,
-        AccountTokenType.EMAIL_VERIFICATION,
-        code,
-        {},
-      );
+    const { user, previousEmail } = await this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        const accountToken: AccountTokenEntity =
+          await this.accountTokenSvc.consumeMfaCode(
+            challengeId,
+            AccountTokenType.EMAIL_VERIFICATION,
+            code,
+            {},
+            authenticatedUser.id,
+            manager,
+          );
+        const tokenUser: UserEntity | undefined = accountToken.user;
 
-    const user: UserEntity | undefined = accountToken.user;
+        if (!tokenUser || authenticatedUser.id !== tokenUser.id)
+          throw new BadRequestException('Invalid verification token.');
 
-    if (!user || authenticatedUser.id !== user.id)
-      throw new BadRequestException('Invalid verification token.');
+        const newEmail = this.getNewEmailFromMetadata(accountToken.metadata);
+        if (!newEmail) {
+          await this.verifyInitialEmail(tokenUser, manager);
+          return { user: tokenUser, previousEmail: null };
+        }
 
-    const newEmail: string | null = this.getNewEmailFromMetadata(
-      accountToken.metadata,
+        const oldEmail = tokenUser.identity.email;
+        const changed = await this.verifyEmailChange(
+          tokenUser,
+          newEmail,
+          manager,
+        );
+        return { user: changed, previousEmail: oldEmail };
+      },
     );
 
-    if (newEmail) {
-      return this.verifyEmailChange(user, newEmail);
-    }
-
-    await this.verifyInitialEmail(user);
+    if (previousEmail) await this.sendEmailChangeSuccess(user, previousEmail);
 
     return user;
   }
@@ -170,53 +186,81 @@ export class EmailVerificationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    const registrationToken =
-      await this.registrationTokenSvc.consumeVerificationCode(
-        challengeId,
-        code,
-      );
+    const user = await this.dataSource.transaction(async (manager) => {
+      const registrationToken =
+        await this.registrationTokenSvc.consumeVerificationCode(
+          challengeId,
+          code,
+          manager,
+        );
+      return this.verifyRegistration(registrationToken.metadata, manager);
+    });
 
-    return this.verifyRegistration(registrationToken.metadata);
+    await this.sendRegistrationSuccess(user);
+    return user;
   }
 
   private async verifyRegistration(
     metadata: RegistrationTokenMetadata,
+    manager: EntityManager,
   ): Promise<UserEntity> {
-    const existingUser: UserEntity | null = await this.repo.findByEmail(
-      metadata.email,
-    );
+    const users = manager.getRepository(UserEntity);
+    const existingUser = await users.findOne({
+      where: { identity: { email: metadata.email } },
+    });
 
     if (existingUser)
       throw new ConflictException(
         'A user with this email address already exists.',
       );
 
-    const user: UserEntity = await this.userSvc.createUser({
-      identity: {
-        email: metadata.email,
-        password: metadata.password,
-      },
-      profile: metadata.profile,
+    const status = await manager.getRepository(AccountStatusEntity).findOne({
+      where: { key: ACCOUNT_STATUS_KEYS.ACTIVE },
     });
-
-    await this.verifyInitialEmail(user);
-
-    await this.emailSvc.sendEmail({
-      to: user.identity.email,
-      template: RegistrationSuccessTemplate,
-      model: {
-        firstName: user.profile.name.preferred ?? user.profile.name.first,
-      },
-      metadata: {
-        userId: user.id,
-      },
+    const role = await manager.getRepository(RoleEntity).findOne({
+      where: { key: ROLE_KEYS.USER },
     });
+    if (!status || !role)
+      throw new BadRequestException('Account cannot be verified.');
 
-    return user;
+    const user = await users.save(
+      users.create({
+        identity: {
+          email: metadata.email,
+          password: metadata.password,
+        },
+        profile: metadata.profile,
+        status,
+        roles: [role],
+        metadata: createUserMetadata(),
+      }),
+    );
+
+    return (await users.findOne({ where: { id: user.id } })) ?? user;
   }
 
-  private async verifyInitialEmail(user: UserEntity): Promise<void> {
+  private async verifyInitialEmail(
+    user: UserEntity,
+    manager?: EntityManager,
+  ): Promise<void> {
     if (user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE) {
+      if (manager) {
+        const role = await manager.getRepository(RoleEntity).findOne({
+          where: { key: ROLE_KEYS.USER },
+        });
+
+        if (!role) throw new BadRequestException('Account cannot be verified.');
+
+        if (!user.roles?.some((item) => item.key === role.key)) {
+          await manager.getRepository(UserEntity).save(
+            manager.getRepository(UserEntity).merge(user, {
+              roles: [...(user.roles ?? []), role],
+            }),
+          );
+        }
+
+        return;
+      }
       await this.userSvc.addUserRoleByKey(user, ROLE_KEYS.USER);
 
       return;
@@ -228,12 +272,15 @@ export class EmailVerificationService {
   private async verifyEmailChange(
     user: UserEntity,
     newEmail: string,
+    manager?: EntityManager,
   ): Promise<UserEntity> {
     if (!this.userSvc.canAuthenticate(user))
       throw new BadRequestException('Account cannot change email address.');
 
-    const existingUser: UserEntity | null =
-      await this.repo.findByEmail(newEmail);
+    const userRepo = manager?.getRepository(UserEntity);
+    const existingUser: UserEntity | null = userRepo
+      ? await userRepo.findOne({ where: { identity: { email: newEmail } } })
+      : await this.repo.findByEmail(newEmail);
 
     if (existingUser && existingUser.id !== user.id)
       throw new ConflictException(
@@ -241,6 +288,27 @@ export class EmailVerificationService {
       );
 
     const previousEmail: string = user.identity.email;
+
+    if (manager) {
+      const changedUser = manager.getRepository(UserEntity).merge(user, {
+        identity: { ...user.identity, email: newEmail },
+        metadata: { ...user.metadata, last_changed_email: new Date() },
+      });
+
+      await manager.getRepository(UserEntity).save(changedUser);
+      await manager
+        .createQueryBuilder()
+        .update(UserSessionEntity)
+        .set({ token_version: () => '`token_version` + 1' })
+        .where('userId = :userId AND active = true', { userId: user.id })
+        .execute();
+
+      if (!manager)
+        await this.sendEmailChangeSuccess(changedUser, previousEmail);
+
+      return changedUser;
+    }
+
     const updatedUser: UserEntity = await this.userSvc.updateUser(user, {
       identity: {
         ...user.identity,
@@ -267,6 +335,35 @@ export class EmailVerificationService {
     });
 
     return changedUser;
+  }
+
+  private async sendEmailChangeSuccess(
+    changedUser: UserEntity,
+    previousEmail: string,
+  ): Promise<void> {
+    await this.emailSvc.sendEmail({
+      to: previousEmail,
+      template: EmailChangeSuccessTemplate,
+      model: {
+        firstName:
+          changedUser.profile.name.preferred ?? changedUser.profile.name.first,
+        email: changedUser.identity.email,
+      },
+      metadata: {
+        userId: changedUser.id,
+      },
+    });
+  }
+
+  private async sendRegistrationSuccess(user: UserEntity): Promise<void> {
+    await this.emailSvc.sendEmail({
+      to: user.identity.email,
+      template: RegistrationSuccessTemplate,
+      model: {
+        firstName: user.profile.name.preferred ?? user.profile.name.first,
+      },
+      metadata: { userId: user.id },
+    });
   }
 
   private async sendEmail({
