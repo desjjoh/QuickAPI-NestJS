@@ -401,6 +401,10 @@ PUBLIC_API_URL="https://api.example.com"
 ## Local Docker Infrastructure
 
 The local Docker setup provides **MySQL**, **Redis**, and an optional **API** container.
+`docker-compose.yml` is explicitly development-only: it publishes database
+ports, contains disposable local credentials, and mounts source-tree folders.
+Never merge or deploy it in staging. The standalone `docker-compose.staging.yml`
+contains the staging topology.
 
 Start MySQL and Redis:
 
@@ -719,6 +723,67 @@ Recommended deployment contract:
   network at the ingress when possible. Temporarily enable documentation or
   detailed diagnostics only when needed.
 - Do not bake `.env`, certificates, runtime uploads, or local temp files into the image.
+
+### Staging Compose contract
+
+Run the staging definition **by itself** after the deployment platform has
+exported its configuration and secrets (for example, from a secret-manager
+sidecar or CI secret context):
+
+```bash
+docker compose -f docker-compose.staging.yml config --quiet
+docker compose -f docker-compose.staging.yml run --rm migration
+docker compose -f docker-compose.staging.yml up -d --no-deps api
+```
+
+Use an immutable tag or digest for `QUICKAPI_IMAGE`. The compose file refuses to
+render without database, Redis, token, operations, email, GeoIP, and object-store
+credentials. It also requires the actual HTTPS `PUBLIC_API_URL`, HTTPS
+`PUBLIC_WEB_URL`/`CORS_ORIGINS`, the external `INGRESS_NETWORK`, and a narrow
+`TRUST_PROXY` ingress address or CIDR allowlist. Do not use localhost, example
+domains, a wildcard CORS origin, or a trust-all proxy setting.
+
+MySQL and Redis are attached only to the internal `private` network and have no
+host-published ports. The API exposes port 4000 to its Docker networks but does
+not publish it on the host. The ingress is the only public entry point: it must
+terminate TLS, strip untrusted forwarding headers, connect through the named
+external network, and proxy plain HTTP to port 4000. Consequently application
+TLS is disabled while secure cookies remain enabled. The API health check probes
+`/health`; configure the ingress/orchestrator readiness probe to use `/ready`.
+
+The one-shot `migration` service uses the same immutable image and database
+configuration as the API. It must complete successfully before API replacement;
+the Compose dependency enforces this for a full `up`, while deployment tooling
+must preserve the ordering for targeted updates. Never enable `DB_SYNC`.
+
+### Persistence, sizing, backups, and rollback
+
+- `quickapi_mysql_data` is the authoritative relational-data volume;
+  `quickapi_redis_data` retains queues and rate-limit state. `quickapi_uploads`
+  holds local-driver assets, `quickapi_geoip` is populated by the GeoIP update
+  job, and `quickapi_tmp` is scratch space and is not backed up. Prefer the R2
+  storage driver for durable user assets and treat Redis as reconstructable
+  unless queue recovery is a business requirement.
+- The platform/database owner owns encrypted MySQL backups, restore tests,
+  retention, and point-in-time recovery. The application owner owns R2/uploads
+  retention and validates restored object/database consistency. The operations
+  owner owns Redis backup policy when queued jobs must survive a total loss.
+  Snapshot persistent volumes only with application-consistent tooling; copying
+  live volume files is not a valid backup.
+- Start staging near the local baseline (API 0.5 CPU/512 MiB, MySQL 1 CPU/2 GiB
+  with a 512 MiB buffer pool, Redis 0.25 CPU/256 MiB), then set platform-level
+  requests and limits from measured latency, connection, queue, and memory data.
+  Compose resource flags are intentionally omitted because enforcement differs
+  between Docker Compose and orchestrators. Keep Node's heap below its container
+  memory limit and size the database pool across all replicas below MySQL's
+  connection ceiling.
+- Before migration, take and verify a restorable database backup and record the
+  current immutable image. Roll back application instances to that image only
+  when migrations are backward compatible. Use a reviewed TypeORM revert only
+  when its data effects are understood; otherwise restore the backup during a
+  maintenance window or deploy a forward-fix migration. A failed migration
+  blocks rollout, and a failed `/ready` check triggers deployment rollback; do
+  not delete or automatically roll back persistent volumes with the application.
 
 ---
 

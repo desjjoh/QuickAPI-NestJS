@@ -341,6 +341,7 @@ export const EnvSchema = z
           });
         }
       }
+
       if (
         env.NODE_ENV === 'production' &&
         env.POSTMARK_SERVER_TOKEN === exampleSentinels.POSTMARK_SERVER_TOKEN
@@ -370,6 +371,7 @@ export const EnvSchema = z
             message: `${name} is required when STORAGE_DRIVER is r2.`,
           });
       }
+
       if (env.NODE_ENV === 'production') {
         for (const name of [
           'R2_ACCOUNT_ID',

@@ -1,3 +1,7 @@
+# LOCAL DEVELOPMENT ONLY.
+# Staging is defined separately in docker-compose.staging.yml; do not layer that
+# file over this one because these credentials and published data-store ports
+# are intentionally convenient local defaults.
 services:
   redis:
     image: redis:7-alpine
@@ -111,6 +115,21 @@ services:
       REDIS_PORT: 6379
 
       NODE_OPTIONS: '--max-old-space-size=384'
+
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--no-check-certificate',
+          '--quiet',
+          '--output-document=/dev/null',
+          'https://localhost:4000/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
     volumes:
       - ./certs:/app/certs:ro

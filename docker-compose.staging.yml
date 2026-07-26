@@ -1,0 +1,150 @@
+x-api-environment: &api-environment
+  NODE_ENV: production
+  PORT: 4000
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_USER: ${DB_USER:?load DB_USER from the deployment secret store}
+  DB_PASSWORD: ${DB_PASSWORD:?load DB_PASSWORD from the deployment secret store}
+  DB_DATABASE: ${DB_DATABASE:?load DB_DATABASE from the deployment secret store}
+  DB_SYNC: 'false'
+  DB_SEED: 'false'
+  DB_SSL: ${DB_SSL:-false}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?load REDIS_PASSWORD from the deployment secret store}
+  PUBLIC_API_URL: ${PUBLIC_API_URL:?set the public staging API HTTPS origin}
+  PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?set the public staging web HTTPS origin}
+  CORS_ORIGINS: ${CORS_ORIGINS:?set the real staging web origin(s)}
+  CORS_METHODS: ${CORS_METHODS:-GET,POST,PUT,PATCH,DELETE}
+  CORS_ALLOWED_HEADERS: ${CORS_ALLOWED_HEADERS:-Content-Type,Authorization,X-CSRF-Token}
+  CORS_EXPOSED_HEADERS: ${CORS_EXPOSED_HEADERS:-Authorization,Set-Cookie}
+  CORS_CREDENTIALS: 'true'
+  CORS_MAX_AGE_SECONDS: ${CORS_MAX_AGE_SECONDS:-86400}
+  ALLOWED_HTTP_METHODS: ${ALLOWED_HTTP_METHODS:-GET,POST,PUT,PATCH,DELETE}
+  ALLOWED_CONTENT_TYPES: ${ALLOWED_CONTENT_TYPES:-application/json,multipart/form-data}
+  TRUST_PROXY: ${TRUST_PROXY:?set the ingress IP/CIDR allowlist}
+  HTTPS_ENABLED: 'false'
+  COOKIE_SECURE: 'true'
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:?load JWT_SECRET_KEY from the deployment secret store}
+  REFRESH_SECRET_KEY: ${REFRESH_SECRET_KEY:?load REFRESH_SECRET_KEY from the deployment secret store}
+  CRYPTO_SECRET: ${CRYPTO_SECRET:?load CRYPTO_SECRET from the deployment secret store}
+  OPERATIONS_TOKEN: ${OPERATIONS_TOKEN:?load OPERATIONS_TOKEN from the deployment secret store}
+  POSTMARK_SERVER_TOKEN: ${POSTMARK_SERVER_TOKEN:?load POSTMARK_SERVER_TOKEN from the deployment secret store}
+  MAXMIND_LICENSE_KEY: ${MAXMIND_LICENSE_KEY:?load MAXMIND_LICENSE_KEY from the deployment secret store}
+  R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:?load R2_ACCOUNT_ID from the deployment secret store}
+  R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?load R2_ACCESS_KEY_ID from the deployment secret store}
+  R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?load R2_SECRET_ACCESS_KEY from the deployment secret store}
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command:
+      [
+        'sh',
+        '-c',
+        'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"',
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?load REDIS_PASSWORD from the deployment secret store}
+    expose:
+      - '6379'
+    volumes:
+      - quickapi_redis_data:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - private
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command:
+      - '--innodb-buffer-pool-size=${MYSQL_INNODB_BUFFER_POOL_SIZE:-512M}'
+      - '--max-connections=${MYSQL_MAX_CONNECTIONS:-50}'
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?load MYSQL_ROOT_PASSWORD from the deployment secret store}
+      MYSQL_DATABASE: ${DB_DATABASE:?load DB_DATABASE from the deployment secret store}
+      MYSQL_USER: ${DB_USER:?load DB_USER from the deployment secret store}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?load DB_PASSWORD from the deployment secret store}
+    expose:
+      - '3306'
+    volumes:
+      - quickapi_mysql_data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - private
+
+  migration:
+    image: ${QUICKAPI_IMAGE:?set an immutable API image tag or digest}
+    restart: 'no'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment: *api-environment
+    command: ['npm', 'run', 'migration:run:prod']
+    networks:
+      - private
+
+  api:
+    image: ${QUICKAPI_IMAGE:?set an immutable API image tag or digest}
+    restart: unless-stopped
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      <<: *api-environment
+      NODE_OPTIONS: ${NODE_OPTIONS:---max-old-space-size=384}
+    expose:
+      - '4000'
+    volumes:
+      - quickapi_uploads:/app/public
+      - quickapi_tmp:/app/tmp
+      - quickapi_geoip:/app/data/geoip:ro
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--output-document=/dev/null',
+          'http://localhost:4000/health',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - private
+      - ingress
+
+volumes:
+  quickapi_mysql_data:
+  quickapi_redis_data:
+  quickapi_uploads:
+  quickapi_tmp:
+  quickapi_geoip:
+
+networks:
+  private:
+    internal: true
+  ingress:
+    external: true
+    name: ${INGRESS_NETWORK:?set the TLS ingress network name}
