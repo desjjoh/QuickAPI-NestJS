@@ -23,6 +23,15 @@ export type CreatedAccountToken = {
   expires_at: Date;
 };
 
+export type AuthorizeAccountTokenOptions = {
+  userId: string;
+  type: AccountTokenType;
+  code: string;
+  pendingMetadata: AccountTokenMetadata;
+  verifiedMetadata: AccountTokenMetadata;
+  expiresInMs: number;
+};
+
 @Injectable()
 export class AccountTokenService {
   public constructor(
@@ -96,10 +105,22 @@ export class AccountTokenService {
     tokenId: string,
     type: AccountTokenType,
     token: string,
+    expectedMetadata?: AccountTokenMetadata,
+    consumedMetadata?: AccountTokenMetadata,
   ): Promise<AccountTokenEntity> {
     const entity = await this.validateToken(tokenId, type, token);
 
-    return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+    if (
+      expectedMetadata &&
+      !this.matchesMetadata(entity.metadata, expectedMetadata)
+    )
+      throw new UnauthorizedException('Invalid or expired token.');
+
+    return this.tokenRepo.save({
+      ...entity,
+      consumed_at: new Date(),
+      metadata: consumedMetadata ?? entity.metadata,
+    });
   }
 
   public async consumeMfaCode(
@@ -127,6 +148,44 @@ export class AccountTokenService {
       throw new UnauthorizedException('Invalid verification code.');
 
     return this.tokenRepo.save({ ...entity, consumed_at: new Date() });
+  }
+
+  public async authorizeMfaCode({
+    userId,
+    type,
+    code,
+    pendingMetadata,
+    verifiedMetadata,
+    expiresInMs,
+  }: AuthorizeAccountTokenOptions): Promise<CreatedAccountToken> {
+    const entity: AccountTokenEntity | null = await this.tokenRepo.findOne({
+      where: { user: { id: userId }, type, consumed_at: IsNull() },
+      relations: { user: true },
+    });
+
+    if (!entity || entity.expires_at.getTime() <= Date.now())
+      throw new UnauthorizedException('Invalid or expired challenge.');
+
+    if (!this.matchesMetadata(entity.metadata, pendingMetadata))
+      throw new UnauthorizedException('Invalid or expired challenge.');
+
+    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code)))
+      throw new UnauthorizedException('Invalid verification code.');
+
+    const token = this.generateToken();
+    const expiresAt = new Date(Date.now() + expiresInMs);
+    const saved = await this.tokenRepo.save({
+      ...entity,
+      token_hash: this.hashToken(token),
+      mfa_code_hash: null,
+      metadata: verifiedMetadata,
+      expires_at: expiresAt,
+    });
+
+    return { id: saved.id, token, expires_at: saved.expires_at };
   }
 
   public async revokeActiveTokens(

@@ -2,7 +2,7 @@ import { EmailTemplate } from '../models/template.model';
 
 export interface PasswordResetTemplateContext {
   firstName: string;
-  resetUrl: string;
+  code: string;
   expiresInMinutes: number;
 }
 
@@ -46,29 +46,23 @@ export const PasswordResetTemplate = new EmailTemplate({
                       </p>
 
                       <p style="margin:0 0 24px 0;font-size:16px;line-height:1.6;">
-                        This link expires in {{expiresInMinutes}} minutes.
+                        This code expires in {{expiresInMinutes}} minutes.
                       </p>
                     </td>
                   </tr>
 
                   <tr>
                     <td align="center" style="padding:8px 32px 32px 32px;">
-                      <a href="{{resetUrl}}" style="display:inline-block;background-color:#111827;color:#ffffff;text-decoration:none;font-size:16px;font-weight:bold;padding:14px 22px;border-radius:8px;">
-                        Reset password
-                      </a>
+                      <div style="font-size:32px;line-height:1.2;letter-spacing:8px;padding-left:8px;font-weight:bold;color:#111827;">
+                        {{code}}
+                      </div>
                     </td>
                   </tr>
 
                   <tr>
                     <td style="padding:0 32px 24px 32px;">
                       <p style="margin:0 0 8px 0;font-size:14px;line-height:1.6;color:#4b5563;">
-                        If the button does not work, copy and paste this link into your browser:
-                      </p>
-
-                      <p style="margin:0;font-size:14px;line-height:1.6;word-break:break-all;color:#374151;">
-                        <a href="{{resetUrl}}" style="color:#2563eb;">
-                          {{resetUrl}}
-                        </a>
+                        Enter this six-digit code to verify your password reset request. Verifying the code does not change your password or sign you in.
                       </p>
                     </td>
                   </tr>
@@ -80,7 +74,7 @@ export const PasswordResetTemplate = new EmailTemplate({
                       </p>
 
                       <p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280;">
-                        Your password will not be changed unless this link is used.
+                        Your password will not be changed unless the reset is verified and completed.
                       </p>
                     </td>
                   </tr>

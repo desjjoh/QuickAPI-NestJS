@@ -21,18 +21,28 @@ export class RequestPasswordResetDto {
   public readonly email!: string;
 }
 
-export class ValidatePasswordResetTokenDto {
+export class PasswordResetAuthorizationDto {
   @ApiProperty({
     example: 'A9x4bW8rN2Yp7sQmL6zT0cF3vH1jK5uDqE8iRoP',
     description:
-      'The raw one-time password reset token sent to the user. The API hashes this value before comparison.',
+      'The short-lived authorization returned after successful OTP verification.',
   })
   @IsString()
   @IsNotEmpty()
-  public readonly token!: string;
+  public readonly authorization!: string;
 }
 
-export class ConfirmPasswordResetDto extends ValidatePasswordResetTokenDto {
+export class VerifyPasswordResetCodeDto extends RequestPasswordResetDto {
+  @ApiProperty({
+    example: '123456',
+    description: 'The six-digit code sent to the account email address.',
+  })
+  @IsString()
+  @Matches(/^\d{6}$/)
+  public readonly code!: string;
+}
+
+export class ConfirmPasswordResetDto extends PasswordResetAuthorizationDto {
   @ApiProperty({
     example: 'NJccb2-OaJ0{bs;-',
     description:

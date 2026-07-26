@@ -23,15 +23,26 @@ export class ConfirmPasswordResetResponseDto {
   }
 }
 
-export class ValidatePasswordResetTokenResponseDto {
+export class VerifyPasswordResetCodeResponseDto {
   @ApiProperty({
-    example: true,
-    description:
-      'Indicates the password reset token exists, has not expired, has not been consumed, and matches the provided token value.',
+    example: 'passwordResetChallenge123',
+    description: 'Identifier for the verified password reset challenge.',
   })
-  public readonly valid: boolean;
+  public readonly challenge_id: string;
 
-  public constructor(data: ValidatePasswordResetTokenResponseDto) {
-    this.valid = data.valid;
+  @ApiProperty({
+    example: 'short-lived-reset-authorization',
+    description:
+      'Short-lived authorization that permits only the password change step. It does not authenticate the user.',
+  })
+  public readonly authorization: string;
+
+  @ApiProperty({ example: '2026-07-25T12:10:00.000Z' })
+  public readonly expires_at: Date;
+
+  public constructor(data: VerifyPasswordResetCodeResponseDto) {
+    this.challenge_id = data.challenge_id;
+    this.authorization = data.authorization;
+    this.expires_at = data.expires_at;
   }
 }

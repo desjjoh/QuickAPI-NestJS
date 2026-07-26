@@ -21,13 +21,13 @@ import { minute } from '@/common/constants/milliseconds.constants';
 import {
   ConfirmPasswordResetResponseDto,
   RequestPasswordResetResponseDto,
-  ValidatePasswordResetTokenResponseDto,
+  VerifyPasswordResetCodeResponseDto,
 } from '@/modules/domain/identity/models/password-reset.model';
 import { PasswordResetService } from '@/modules/domain/identity/services/password-reset.service';
 import {
   ConfirmPasswordResetDto,
   RequestPasswordResetDto,
-  ValidatePasswordResetTokenDto,
+  VerifyPasswordResetCodeDto,
 } from '../models/password-reset.model';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { CsrfGuard } from '@/common/guards/csrf.guard';
@@ -57,48 +57,56 @@ export class PasswordResetApiController {
   }
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
-  @Post('validate')
+  @Post('verify')
   @HttpCode(HttpStatus.OK)
-  @ApiQuery({
-    name: 'token_id',
-    description: 'The unique NanoID of the password reset token record.',
-  })
   @ApiOperation({
-    summary: 'Validate password reset token',
+    summary: 'Verify password reset code',
     description:
-      'Checks whether a password reset token is valid without consuming it, allowing clients to render the reset form only for valid links.',
+      'Verifies the emailed six-digit code and returns a short-lived reset authorization. This does not change the password or authenticate the user.',
   })
   @ApiBody({
-    type: ValidatePasswordResetTokenDto,
-    description: 'The raw token from the reset link.',
+    type: VerifyPasswordResetCodeDto,
+    description: 'The account email and emailed six-digit code.',
   })
-  @ApiOkResponse({ type: ValidatePasswordResetTokenResponseDto })
-  public async validatePasswordResetToken(
-    @Query('token_id', NanoIdParamPipe) tokenId: string,
-    @Body() dto: ValidatePasswordResetTokenDto,
-  ): Promise<ValidatePasswordResetTokenResponseDto> {
-    await this.prSvc.validatePasswordResetToken(tokenId, dto.token);
-    return new ValidatePasswordResetTokenResponseDto({ valid: true });
+  @ApiOkResponse({ type: VerifyPasswordResetCodeResponseDto })
+  public async verifyPasswordResetCode(
+    @Body() dto: VerifyPasswordResetCodeDto,
+  ): Promise<VerifyPasswordResetCodeResponseDto> {
+    const authorization = await this.prSvc.verifyPasswordResetCode(
+      dto.email,
+      dto.code,
+    );
+
+    return new VerifyPasswordResetCodeResponseDto({
+      challenge_id: authorization.id,
+      authorization: authorization.token,
+      expires_at: authorization.expires_at,
+    });
   }
 
   @Throttle({ default: { limit: 10, ttl: 1 * minute } })
   @Patch('confirm')
   @HttpCode(HttpStatus.OK)
   @ApiQuery({
-    name: 'token_id',
-    description: 'The unique NanoID of the password reset token record.',
+    name: 'challenge_id',
+    description: 'The identifier returned after the OTP is verified.',
   })
   @ApiOperation({
     summary: 'Confirm password reset',
     description:
-      'Consumes a valid password reset token and updates the account password.',
+      'Consumes a verified, short-lived password reset authorization and updates the account password. The authorization cannot be reused.',
   })
   @ApiOkResponse({ type: ConfirmPasswordResetResponseDto })
   public async confirmPasswordReset(
-    @Query('token_id', NanoIdParamPipe) tokenId: string,
+    @Query('challenge_id', NanoIdParamPipe) challengeId: string,
     @Body() dto: ConfirmPasswordResetDto,
   ): Promise<ConfirmPasswordResetResponseDto> {
-    await this.prSvc.confirmPasswordReset(tokenId, dto.token, dto.password);
+    await this.prSvc.confirmPasswordReset(
+      challengeId,
+      dto.authorization,
+      dto.password,
+    );
+
     return new ConfirmPasswordResetResponseDto({
       message: 'Password reset successfully.',
     });
