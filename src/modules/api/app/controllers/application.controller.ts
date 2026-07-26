@@ -1,8 +1,9 @@
-import { Controller, Get, Res } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import {
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
+  ApiServiceUnavailableResponse,
   ApiTags,
 } from '@nestjs/swagger';
 
@@ -62,8 +63,20 @@ export class ApplicationController {
     description: 'Application is ready.',
     type: ReadyResponseDto,
   })
-  async get_ready(): Promise<ReadyResponseDto> {
-    return this.svc.get_ready();
+  @ApiServiceUnavailableResponse({
+    description: 'Application is not ready.',
+    type: ReadyResponseDto,
+  })
+  async get_ready(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<ReadyResponseDto> {
+    const readiness = await this.svc.get_ready();
+
+    res.status(
+      readiness.ready ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE,
+    );
+
+    return readiness;
   }
 
   // GET /info
