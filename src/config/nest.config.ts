@@ -40,7 +40,7 @@ import { rootPath } from '@/common/helpers/path.helper';
 let app: INestApplication | null = null;
 let ready: boolean = false;
 
-function createApp(app: INestApplication): void {
+export function configureNestApplication(app: INestApplication): void {
   configureTrustProxy(app as NestExpressApplication, env.TRUST_PROXY);
   // Resolve and attach request context store
   const requestContext = app.get(RequestContext);
@@ -157,7 +157,7 @@ export async function startNest(): Promise<void> {
 
   app = await NestFactory.create(AppModule, createNestOptions(appLogger));
 
-  createApp(app);
+  configureNestApplication(app);
 
   await app.listen(env.PORT);
   ready = true;

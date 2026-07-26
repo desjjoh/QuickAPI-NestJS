@@ -165,9 +165,9 @@ export class RegistrationTokenService {
       .createQueryBuilder()
       .update(RegistrationTokenEntity)
       .set({
-        failed_attempts: () => '`failed_attempts` + 1',
         locked_at: () =>
           `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
+        failed_attempts: () => '`failed_attempts` + 1',
       })
       .where('id = :id', { id })
       .andWhere('consumed_at IS NULL')

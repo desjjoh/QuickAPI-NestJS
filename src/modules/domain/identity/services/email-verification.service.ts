@@ -186,15 +186,15 @@ export class EmailVerificationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    const user = await this.dataSource.transaction(async (manager) => {
-      const registrationToken =
-        await this.registrationTokenSvc.consumeVerificationCode(
-          challengeId,
-          code,
-          manager,
-        );
-      return this.verifyRegistration(registrationToken.metadata, manager);
-    });
+    const registrationToken =
+      await this.registrationTokenSvc.consumeVerificationCode(
+        challengeId,
+        code,
+      );
+
+    const user = await this.dataSource.transaction((manager) =>
+      this.verifyRegistration(registrationToken.metadata, manager),
+    );
 
     await this.sendRegistrationSuccess(user);
     return user;

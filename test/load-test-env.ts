@@ -13,6 +13,12 @@ else if (existsSync(envExamplePath))
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
 
+// Supertest uses an in-process HTTP server. Ensure its cookie jar can return
+// the CSRF cookie instead of inheriting production-only Secure/domain flags
+// from a developer's local environment.
+process.env.COOKIE_SECURE = 'false';
+process.env.COOKIE_DOMAIN = '';
+
 // Unit and E2E suites mock these external clients. Explicitly use inert test
 // credentials so a developer's real Postmark or Cloudflare secrets can never
 // be consumed by an accidentally constructed client.
