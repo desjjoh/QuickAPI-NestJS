@@ -74,7 +74,7 @@ export class ImageDto {
   }
 
   private static buildPublicUrl(storageKey: string): string {
-    const baseUrl = env.R2_PUBLIC_BASE_URL.replace(/\/$/, '');
+    const baseUrl = env.R2_PUBLIC_BASE_URL!.replace(/\/$/, '');
     const normalizedKey = storageKey.replace(/^\/+/, '');
 
     return `${baseUrl}/${normalizedKey}`;

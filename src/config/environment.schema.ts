@@ -16,6 +16,25 @@ export type log_level =
 
 export type mode = 'development' | 'test' | 'production';
 
+const exampleSentinels = {
+  JWT_SECRET_KEY: '__INJECT_JWT_SECRET_KEY_FROM_SECRET_MANAGER__',
+  REFRESH_SECRET_KEY: '__INJECT_REFRESH_SECRET_KEY_FROM_SECRET_MANAGER__',
+  CRYPTO_SECRET: '__INJECT_CRYPTO_SECRET_FROM_SECRET_MANAGER__',
+  POSTMARK_SERVER_TOKEN: '__INJECT_POSTMARK_SERVER_TOKEN_FROM_SECRET_MANAGER__',
+  R2_ACCOUNT_ID: '__INJECT_R2_ACCOUNT_ID_FROM_SECRET_MANAGER__',
+  R2_ACCESS_KEY_ID: '__INJECT_R2_ACCESS_KEY_ID_FROM_SECRET_MANAGER__',
+  R2_SECRET_ACCESS_KEY: '__INJECT_R2_SECRET_ACCESS_KEY_FROM_SECRET_MANAGER__',
+} as const;
+
+const generatedSecret = z
+  .string()
+  .refine(
+    (value) =>
+      /^[a-f\d]{64,}$/i.test(value) ||
+      /^(?:[A-Za-z\d+/]{43,}={0,2}|[A-Za-z\d_-]{43,})$/.test(value),
+    'must be generated from at least 32 random bytes and encoded as hex, base64, or base64url',
+  );
+
 const req: NodeJS.Require = createRequire(path.join(rootPath, 'package.json'));
 
 const pkgPath: string = path.join(rootPath, 'package.json');
@@ -220,8 +239,7 @@ export const EnvSchema = z
     // # ============================================================
     // # Auth / Tokens
     // #
-    // # Replace these in every real environment.
-    // # Minimum length: 32 characters.
+    // # Generate each from at least 32 random bytes and keep them distinct.
     // # ============================================================
 
     JWT_SECRET_KEY: z.string().min(32),
@@ -246,8 +264,8 @@ export const EnvSchema = z
     // # Email / Postmark
     // # ============================================================
 
-    POSTMARK_SERVER_TOKEN: z.string().min(1),
-    POSTMARK_FROM_EMAIL: z.email(),
+    POSTMARK_SERVER_TOKEN: z.string().min(1).optional(),
+    POSTMARK_FROM_EMAIL: z.email().optional(),
     POSTMARK_MESSAGE_STREAM: z
       .enum(['outbound', 'broadcast'])
       .default('outbound'),
@@ -258,12 +276,12 @@ export const EnvSchema = z
 
     STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
 
-    R2_ACCOUNT_ID: z.string(),
-    R2_ENDPOINT: z.url(),
-    R2_ACCESS_KEY_ID: z.string(),
-    R2_SECRET_ACCESS_KEY: z.string(),
-    R2_BUCKET_NAME: z.string(),
-    R2_PUBLIC_BASE_URL: z.url(),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ENDPOINT: z.url().optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_BUCKET_NAME: z.string().min(1).optional(),
+    R2_PUBLIC_BASE_URL: z.url().optional(),
 
     // # ============================================================
     // # Redis
@@ -281,6 +299,90 @@ export const EnvSchema = z
     BULL_BOARD_ROUTE: z.string().default('/admin/queues'),
   })
   .superRefine((env, ctx) => {
+    const secrets = [
+      ['JWT_SECRET_KEY', env.JWT_SECRET_KEY],
+      ['REFRESH_SECRET_KEY', env.REFRESH_SECRET_KEY],
+      ['CRYPTO_SECRET', env.CRYPTO_SECRET],
+    ] as const;
+
+    if (env.NODE_ENV === 'production') {
+      for (const [name, value] of secrets) {
+        const result = generatedSecret.safeParse(value);
+        if (!result.success || value === exampleSentinels[name]) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [name],
+            message: `${name} must be a generated secret of at least 32 random bytes in production and must not use the .env.example sentinel.`,
+          });
+        }
+      }
+
+      if (new Set(secrets.map(([, value]) => value)).size !== secrets.length) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['JWT_SECRET_KEY'],
+          message:
+            'JWT_SECRET_KEY, REFRESH_SECRET_KEY, and CRYPTO_SECRET must be distinct in production.',
+        });
+      }
+    }
+
+    for (const name of [
+      'POSTMARK_SERVER_TOKEN',
+      'POSTMARK_FROM_EMAIL',
+    ] as const) {
+      if (!env[name]) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [name],
+          message: `${name} is required when POSTMARK_ENABLED is true.`,
+        });
+      }
+    }
+    if (
+      env.NODE_ENV === 'production' &&
+      env.POSTMARK_SERVER_TOKEN === exampleSentinels.POSTMARK_SERVER_TOKEN
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['POSTMARK_SERVER_TOKEN'],
+        message:
+          'POSTMARK_SERVER_TOKEN must not use the .env.example sentinel in production.',
+      });
+    }
+
+    if (env.STORAGE_DRIVER === 'r2') {
+      for (const name of [
+        'R2_ACCOUNT_ID',
+        'R2_ENDPOINT',
+        'R2_ACCESS_KEY_ID',
+        'R2_SECRET_ACCESS_KEY',
+        'R2_BUCKET_NAME',
+        'R2_PUBLIC_BASE_URL',
+      ] as const) {
+        if (!env[name])
+          ctx.addIssue({
+            code: 'custom',
+            path: [name],
+            message: `${name} is required when STORAGE_DRIVER is r2.`,
+          });
+      }
+      if (env.NODE_ENV === 'production') {
+        for (const name of [
+          'R2_ACCOUNT_ID',
+          'R2_ACCESS_KEY_ID',
+          'R2_SECRET_ACCESS_KEY',
+        ] as const) {
+          if (env[name] === exampleSentinels[name])
+            ctx.addIssue({
+              code: 'custom',
+              path: [name],
+              message: `${name} must not use the .env.example sentinel in production.`,
+            });
+        }
+      }
+    }
+
     if (
       env.NODE_ENV !== 'development' &&
       (env.METRICS_ENABLED || env.DETAILED_DIAGNOSTICS_ENABLED) &&

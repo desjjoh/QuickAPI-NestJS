@@ -19,10 +19,10 @@ import {
 export class CloudflareStorageService extends StorageService {
   private readonly client: S3Client = new S3Client({
     region: 'auto',
-    endpoint: env.R2_ENDPOINT,
+    endpoint: env.R2_ENDPOINT!,
     credentials: {
-      accessKeyId: env.R2_ACCESS_KEY_ID,
-      secretAccessKey: env.R2_SECRET_ACCESS_KEY,
+      accessKeyId: env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: env.R2_SECRET_ACCESS_KEY!,
     },
   });
 
@@ -72,7 +72,7 @@ export class CloudflareStorageService extends StorageService {
   }
 
   private buildPublicUrl(key: string): string {
-    const baseUrl = env.R2_PUBLIC_BASE_URL.replace(/\/$/, '');
+    const baseUrl = env.R2_PUBLIC_BASE_URL!.replace(/\/$/, '');
     const normalizedKey = key.replace(/^\/+/, '');
 
     return `${baseUrl}/${normalizedKey}`;
