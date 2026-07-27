@@ -202,7 +202,9 @@ describe('EmailVerificationService', () => {
       user.id,
       expect.objectContaining({ identity: { email: 'new@test.dev' } }),
     );
-    expect(users.save).toHaveBeenCalled();
+    expect(users.findOneOrFail).toHaveBeenCalledWith({
+      where: { id: user.id },
+    });
     expect(query.execute).toHaveBeenCalled();
     expect(emailSvc.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({ to: 'old@test.dev' }),
