@@ -44,7 +44,11 @@ export class CapturingEmailService {
   public verificationCodeFor(challengeId: string): string {
     const message = [...this.messages]
       .reverse()
-      .find((candidate) => candidate.metadata.tokenId === challengeId);
+      .find(
+        (candidate) =>
+          candidate.metadata.tokenId === challengeId ||
+          candidate.metadata.challengeId === challengeId,
+      );
 
     const code = message?.model.mfaCode ?? message?.model.code;
 
