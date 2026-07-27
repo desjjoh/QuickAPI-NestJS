@@ -144,9 +144,40 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "src/**/*.service.ts",
+      "src/**/*.processor.ts",
+      "src/**/*.guard.ts",
+      "src/**/*.repository.ts",
+      "!src/**/*.spec.ts",
+      "!src/**/*.d.ts",
+      "!src/**/dto/**",
+      "!src/database/migrations/**",
+      "!src/**/migrations/**",
+      "!src/main.ts",
+      "!src/**/*.generated.ts",
+      "!src/**/__generated__/**"
     ],
     "coverageDirectory": "<rootDir>/coverage",
+    "coverageThreshold": {
+      "global": {
+        "branches": 40,
+        "functions": 45,
+        "lines": 65,
+        "statements": 65
+      },
+      "src/modules/domain/identity/services/": {
+        "branches": 75
+      },
+      "src/common/guards/permission.guard.ts": {
+        "branches": 90
+      },
+      "src/modules/api/v1/authentication/services/": {
+        "branches": 75
+      },
+      "src/modules/api/v1/account/services/": {
+        "branches": 75
+      }
+    },
     "testEnvironment": "node",
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/src/$1"

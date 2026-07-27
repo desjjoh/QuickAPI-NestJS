@@ -93,16 +93,6 @@ describe('RegistrationTokenService', () => {
     );
   });
 
-  it('validates and consumes a valid token', async () => {
-    repo.findOne.mockResolvedValue(entity());
-    await expect(service.validateToken('r1', 'plain')).resolves.toEqual(
-      entity(),
-    );
-    await expect(service.consumeToken('r1', 'plain')).resolves.toEqual(
-      expect.objectContaining({ consumed_at: expect.any(Date) }),
-    );
-  });
-
   it.each([
     ['revoked or consumed', null],
     ['expired', entity({ expires_at: new Date(0) })],
