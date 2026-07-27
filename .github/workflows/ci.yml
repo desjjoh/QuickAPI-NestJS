@@ -2,134 +2,314 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - staging
-      - dev
+    branches: [main, staging, dev]
   pull_request:
-    branches:
-      - main
-      - staging
-      - dev
+    branches: [main, staging, dev]
+  workflow_dispatch:
+    inputs:
+      container-smoke:
+        description: Build and smoke-test the production container
+        type: boolean
+        default: false
+
+# These are deliberately inert, test-only values. CI never copies .env.example,
+# so adding a development or production secret there cannot affect a test run.
+env:
+  NODE_ENV: test
+  LOG_LEVEL: silent
+  PORT: '4000'
+  PUBLIC_API_URL: http://127.0.0.1:4000
+  PUBLIC_WEB_URL: http://127.0.0.1:5173
+  CORS_ORIGINS: http://127.0.0.1:5173
+  CORS_METHODS: GET,POST,PUT,PATCH,DELETE
+  CORS_ALLOWED_HEADERS: Content-Type,Authorization,X-CSRF-Token
+  CORS_EXPOSED_HEADERS: Authorization,Set-Cookie
+  CORS_CREDENTIALS: 'true'
+  CORS_MAX_AGE_SECONDS: '60'
+  HTTPS_ENABLED: 'false'
+  COOKIE_SECURE: 'false'
+  COOKIE_SAME_SITE: strict
+  COOKIE_PATH: /
+  RATE_LIMIT_WINDOW_MS: '60000'
+  RATE_LIMIT_MAX: '200'
+  REQUEST_TIMEOUT_MS: '5000'
+  REQUEST_BODY_LIMIT_BYTES: '1048576'
+  HEADER_MAX_COUNT: '100'
+  HEADER_MAX_SINGLE_BYTES: '4096'
+  HEADER_MAX_TOTAL_BYTES: '8192'
+  HEADER_ALLOW_CHUNKED: 'false'
+  ALLOWED_HTTP_METHODS: GET,POST,PUT,PATCH,DELETE
+  ALLOWED_CONTENT_TYPES: application/json,multipart/form-data
+  GLOBAL_THROTTLE_TTL_MINUTES: '1'
+  GLOBAL_THROTTLE_LIMIT: '200'
+  DB_SYNC: 'false'
+  DB_SEED: 'false'
+  DB_SSL: 'false'
+  JWT_SECRET_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+  REFRESH_SECRET_KEY: 2222222222222222222222222222222222222222222222222222222222222222
+  CRYPTO_SECRET: 3333333333333333333333333333333333333333333333333333333333333333
+  POSTMARK_ENABLED: 'false'
+  POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
+  POSTMARK_FROM_EMAIL: noreply@test.example.com
+  STORAGE_DRIVER: local
+  R2_ACCOUNT_ID: cloudflare-test-account
+  R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
+  R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID
+  R2_SECRET_ACCESS_KEY: R2_TEST_SECRET_ACCESS_KEY
+  R2_BUCKET_NAME: quickapi-test
+  R2_PUBLIC_BASE_URL: https://assets.test.example.com
+  BULL_BOARD_ENABLED: 'false'
 
 jobs:
-  check:
-    name: Check
+  formatting:
+    name: Formatting
     runs-on: ubuntu-latest
-    env:
-      POSTMARK_ENABLED: 'false'
-      POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
-      POSTMARK_FROM_EMAIL: noreply@test.example.com
-      R2_ACCOUNT_ID: cloudflare-test-account
-      R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
-      R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID
-      R2_SECRET_ACCESS_KEY: R2_TEST_SECRET_ACCESS_KEY
-      R2_BUCKET_NAME: quickapi-test
-      R2_PUBLIC_BASE_URL: https://assets.test.example.com
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - run: npm ci
+      - run: npm run format:check
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run project checks
-        run: npm run check
-
-  migration-check:
-    name: Migration Check
+  linting:
+    name: Linting
     runs-on: ubuntu-latest
-    needs: check
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run lint
 
+  type-checking:
+    name: Type checking and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  unit-tests:
+    name: Unit tests (no infrastructure)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEST_DB_ENABLED: 'true'
+      TEST_DB_DATABASE: unit_${{ github.run_id }}_${{ github.run_attempt }}
+      DB_DATABASE: unit_${{ github.run_id }}_${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Verify database safety guard
+        run: npm run test:db:safety
+      - name: Run isolated unit tests with coverage
+        run: npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
+      - name: Upload unit Jest results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-results-${{ github.run_attempt }}
+          path: |
+            junit/unit-jest.json
+            coverage/
+          if-no-files-found: warn
+
+  migration-validation:
+    name: Migration forward / revert / forward
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       mysql:
         image: mysql:8.4
-        ports:
-          - 3306:3306
         env:
           MYSQL_ROOT_PASSWORD: root_password
-          MYSQL_DATABASE: quickapi_test
-          MYSQL_USER: quickapi_app
-          MYSQL_PASSWORD: quickapi_password
+          MYSQL_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
+          MYSQL_USER: quickapi_test
+          MYSQL_PASSWORD: quickapi_test_password
+        ports: ['3306:3306']
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-          --health-start-period=20s
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-          --health-start-period=5s
-
+          --health-interval=5s --health-timeout=5s --health-retries=20
     env:
       DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_USER: quickapi_app
-      DB_PASSWORD: quickapi_password
-      DB_DATABASE: quickapi_test
-      TEST_DB_ENABLED: true
-      TEST_DB_HOST: 127.0.0.1
-      TEST_DB_PORT: 3306
-      TEST_DB_USER: quickapi_app
-      TEST_DB_PASSWORD: quickapi_password
-      TEST_DB_DATABASE: quickapi_test
-      POSTMARK_ENABLED: 'false'
-      POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
-      POSTMARK_FROM_EMAIL: noreply@test.example.com
-      R2_ACCOUNT_ID: cloudflare-test-account
-      R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
-      R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID
-      R2_SECRET_ACCESS_KEY: R2_TEST_SECRET_ACCESS_KEY
-      R2_BUCKET_NAME: quickapi-test
-      R2_PUBLIC_BASE_URL: https://assets.test.example.com
-
+      DB_PORT: '3306'
+      DB_USER: quickapi_test
+      DB_PASSWORD: quickapi_test_password
+      DB_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
+      TEST_DB_ENABLED: 'true'
+      TEST_DB_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:db:safety
+      - run: npm run migration:run
+      - run: npm run migration:show
+      - run: npm run test:db:safety
+      - run: npm run migration:revert
+      - run: npm run migration:show
+      - run: npm run test:db:safety
+      - run: npm run migration:run
+      - name: Capture service logs on failure
+        if: failure()
+        run: docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: migration-failure-logs, path: '*.log' }
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: integration_test
+          MYSQL_USER: quickapi_test
+          MYSQL_PASSWORD: quickapi_test_password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s
+          --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: quickapi_test
+      DB_PASSWORD: quickapi_test_password
+      DB_DATABASE: integration_test
+      TEST_DB_ENABLED: 'true'
+      TEST_DB_DATABASE: integration_test
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:db:safety
+      - name: Run integration tests
+        run: npm test -- --testPathPatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/integration-jest.json
+      - name: Capture service logs on failure
+        if: failure()
+        run: |
+          docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
+          docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
         with:
-          node-version: 22
-          cache: npm
+          name: integration-results
+          path: |
+            junit/integration-jest.json
+            *.log
+          if-no-files-found: warn
 
-      - name: Install dependencies
-        run: npm ci
+  e2e-tests:
+    name: E2E shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/2', '2/2']
+        include:
+          - shard: '1/2'
+            database: e2e_shard_1
+            artifact: '1'
+          - shard: '2/2'
+            database: e2e_shard_2
+            artifact: '2'
+    # Matrix jobs receive separate service containers, and each shard gets an
+    # independently named schema as an additional guard against shared state.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_password
+          MYSQL_DATABASE: ${{ matrix.database }}
+          MYSQL_USER: quickapi_test
+          MYSQL_PASSWORD: quickapi_test_password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping" --health-interval=5s
+          --health-timeout=5s --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: quickapi_test
+      DB_PASSWORD: quickapi_test_password
+      DB_DATABASE: ${{ matrix.database }}
+      TEST_DB_ENABLED: 'true'
+      TEST_DB_DATABASE: ${{ matrix.database }}
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: '6379'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run test:db:safety
+      - name: Run E2E shard
+        run: npm run test:e2e -- --shard=${{ matrix.shard }} --detectOpenHandles --json --outputFile=junit/e2e-${{ matrix.artifact }}.json
+      - name: Capture service logs on failure
+        if: failure()
+        run: |
+          docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
+          docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-shard-${{ matrix.artifact }}
+          path: |
+            junit/e2e-${{ matrix.artifact }}.json
+            *.log
+          if-no-files-found: warn
 
-      - name: Create CI environment file
-        run: cp .env.example .env
+  container-smoke:
+    name: Optional production container smoke test
+    if: github.event_name == 'workflow_dispatch' && inputs.container-smoke
+    needs: [type-checking, migration-validation, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --tag quickapi-nestjs:ci .
+      - name: Verify the runtime image contains the built entry point
+        run: docker run --rm --entrypoint node quickapi-nestjs:ci -e "require.resolve('./dist/main.js')"
 
-      - name: Run migrations
-        run: npm run migration:run
-
-      - name: Show migration status
-        run: npm run migration:show
-
-      - name: Revert migrations
-        run: npm run migration:revert
-
-      - name: Show reverted migration status
-        run: npm run migration:show
-
-      - name: Run migrations again
-        run: npm run migration:run
-
-      - name: Show final migration status
-        run: npm run migration:show
-
-      - name: Run E2E tests
-        run: npm run test:e2e
+  staging-deployment-gate:
+    name: Staging deployment gate
+    if: always() && (github.ref == 'refs/heads/staging' || github.base_ref == 'staging')
+    needs: [migration-validation, e2e-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require migration validation and every E2E shard
+        env:
+          MIGRATIONS: ${{ needs.migration-validation.result }}
+          E2E: ${{ needs.e2e-tests.result }}
+        run: test "$MIGRATIONS" = success -a "$E2E" = success
