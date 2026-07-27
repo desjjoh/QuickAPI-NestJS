@@ -9,6 +9,7 @@ import {
   closeAllTestDataSources,
   resetMutableTables,
 } from './database/test-database';
+import { QueueEventsProvider } from '@/common/providers/queue.provider';
 
 export async function createTestApp(
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
@@ -16,6 +17,15 @@ export async function createTestApp(
   let builder = Test.createTestingModule({
     imports: [AppModule],
   });
+
+  // Queue delivery is outside the scope of the in-process E2E application.
+  // More importantly, constructing BullMQ's QueueEventsProvider makes a real
+  // Redis connection and deliberately terminates the process if Redis is not
+  // available. E2E runs must remain deterministic (and must never call
+  // process.exit), so replace only the queue event listener while keeping the
+  // rest of the application graph intact.
+  builder = builder.overrideProvider(QueueEventsProvider).useValue({});
+
   if (configure) builder = configure(builder);
   const moduleRef = await builder.compile();
 
