@@ -11,10 +11,14 @@ import {
   UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
 import {
+  Body,
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  Patch,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -31,6 +35,7 @@ import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { UserAdminService } from '../service/users.service';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
+import { UpdateUserAdministrationDto } from '../models/update-user.model';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
@@ -58,6 +63,21 @@ export class UserAdministrationController {
     @Query() pageOptions: UserPaginationOptions,
   ): Promise<PaginationDto<UserDto>> {
     return this.svc.paginateUsers(pageOptions);
+  }
+
+  @Patch(':id')
+  @Throttle({ default: throttlePolicies.administrationMutation })
+  @ApiOperation({ summary: 'Update a user account' })
+  @ApiOkResponse({ type: UserDto })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].UPDATE_USERS,
+  )
+  @EntityIdParam
+  public async updateUserById(
+    @Param('id', NanoIdParamPipe) id: string,
+    @Body() dto: UpdateUserAdministrationDto,
+  ): Promise<UserDto> {
+    return this.svc.updateUser(id, dto);
   }
 
   // GET /:id
@@ -96,6 +116,7 @@ export class UserAdministrationController {
   @ApiNoContentResponse({
     description: 'User account deleted successfully.',
   })
+  @HttpCode(HttpStatus.NO_CONTENT)
   @ApiNotFoundResponse({
     description: 'No user account was found for the provided ID.',
   })

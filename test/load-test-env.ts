@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { config as loadEnv } from 'dotenv';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const envPath = resolve(process.cwd(), '.env');
 const envExamplePath = resolve(process.cwd(), '.env.example');
@@ -12,6 +14,10 @@ else if (existsSync(envExamplePath))
 
 process.env.NODE_ENV = 'test';
 process.env.LOG_LEVEL = 'silent';
+
+// Multer must never inherit a developer's shared upload directory. Individual
+// suites remove this process-local directory during teardown.
+process.env.UPLOAD_TMP_DIR = join(tmpdir(), `quickapi-e2e-${process.pid}`);
 
 // Supertest uses an in-process HTTP server. Ensure its cookie jar can return
 // the CSRF cookie instead of inheriting production-only Secure/domain flags

@@ -1,5 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  DataSource,
+  DeepPartial,
+  EntityManager,
+  In,
+  Repository,
+} from 'typeorm';
 
 import { Base } from '@/common/models/base.model';
 
@@ -8,6 +18,8 @@ import { UserPaginationOptions } from '../models/user.model';
 import { UserProfileEntity } from '../entities/profile.entity';
 import { ImageService } from '../../media/services/image.service';
 import { UserSessionEntity } from '../entities/session.entity';
+import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import { RoleEntity } from '../../library/entities/role.entity';
 
 @Injectable()
 export class UserRepository extends Repository<UserEntity> {
@@ -113,5 +125,39 @@ export class UserRepository extends Repository<UserEntity> {
     });
 
     if (avatar) await this.imageSvc.remove(avatar);
+  }
+
+  public async updateUserAdministration(
+    id: string,
+    input: { status_id?: string; role_ids?: string[] },
+  ): Promise<UserEntity> {
+    const user = await this.findByIdOrFail(id);
+
+    if (input.status_id) {
+      const status = await this.manager.findOneBy(AccountStatusEntity, {
+        id: input.status_id,
+      });
+      if (!status) throw new BadRequestException('Account status not found.');
+      await this.manager
+        .createQueryBuilder()
+        .relation(UserEntity, 'status')
+        .of(user.id)
+        .set(status.id);
+    }
+
+    if (input.role_ids) {
+      const roles = await this.manager.findBy(RoleEntity, {
+        id: In(input.role_ids),
+      });
+      if (roles.length !== new Set(input.role_ids).size)
+        throw new BadRequestException('One or more roles were not found.');
+      await this.manager
+        .createQueryBuilder()
+        .relation(UserEntity, 'roles')
+        .of(user.id)
+        .addAndRemove(roles, user.roles ?? []);
+    }
+
+    return this.findByIdOrFail(id);
   }
 }

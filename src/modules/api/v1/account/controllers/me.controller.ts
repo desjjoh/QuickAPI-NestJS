@@ -1,6 +1,15 @@
 import type { Response } from 'express';
 
-import { Controller, UseGuards, Patch, Res, Body, Post } from '@nestjs/common';
+import {
+  Controller,
+  UseGuards,
+  Patch,
+  Res,
+  Body,
+  Post,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiBody,
@@ -65,6 +74,7 @@ export class MeApiController {
   @ApiNoContentResponse({
     description: 'Account deleted successfully.',
   })
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].DELETE_ACCOUNT,
   )

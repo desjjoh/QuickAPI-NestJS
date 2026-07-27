@@ -10,6 +10,7 @@ import {
   PaginationMeta,
 } from '@/common/models/pagination.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { UpdateUserAdministrationDto } from '../models/update-user.model';
 
 @Injectable()
 export class UserAdminService {
@@ -34,5 +35,12 @@ export class UserAdminService {
 
   public async removeUser(id: string): Promise<void> {
     return this.repo.removeUser(id);
+  }
+
+  public async updateUser(
+    id: string,
+    dto: UpdateUserAdministrationDto,
+  ): Promise<UserDto> {
+    return new UserDto(await this.repo.updateUserAdministration(id, dto));
   }
 }
