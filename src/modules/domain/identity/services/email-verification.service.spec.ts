@@ -34,9 +34,11 @@ describe('EmailVerificationService', () => {
   const emailSvc = { sendEmail: jest.fn() };
   const users = {
     findOne: jest.fn(),
+    findOneOrFail: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
     merge: jest.fn(),
+    update: jest.fn(),
   };
   const statuses = { findOne: jest.fn() };
   const roles = { findOne: jest.fn() };
@@ -69,6 +71,12 @@ describe('EmailVerificationService', () => {
     users.save.mockImplementation(async (x) => ({
       id: x.id ?? 'new-user',
       ...x,
+    }));
+    users.update.mockResolvedValue({ affected: 1 });
+    users.findOneOrFail.mockImplementation(async () => ({
+      ...user,
+      identity: { ...user.identity, email: 'new@test.dev' },
+      metadata: { ...user.metadata, last_changed_email: new Date() },
     }));
     statuses.findOne.mockResolvedValue({
       id: 'active',
@@ -190,6 +198,10 @@ describe('EmailVerificationService', () => {
     users.findOne.mockResolvedValue(null);
     const changed = await service.verifyEmail('v1', '123456', user as never);
     expect(changed.identity.email).toBe('new@test.dev');
+    expect(users.update).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ identity: { email: 'new@test.dev' } }),
+    );
     expect(users.save).toHaveBeenCalled();
     expect(query.execute).toHaveBeenCalled();
     expect(emailSvc.sendEmail).toHaveBeenCalledWith(

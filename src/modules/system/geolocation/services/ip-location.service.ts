@@ -69,11 +69,10 @@ export async function assertGeoLiteDatabasesAvailable(): Promise<void> {
     return !existsSync(path.join(env.IP_LOCATION_DATA_DIR, filename));
   });
 
-  if (missing.length > 0) {
+  if (missing.length > 0)
     throw new ConfigurationError(
       `GeoLite2 database files are unavailable in ${env.IP_LOCATION_DATA_DIR}: ${missing.join(', ')}. Run npm run geoip:update before starting the API.`,
     );
-  }
 
   try {
     const maxmind = await loadMaxMind();

@@ -290,12 +290,13 @@ export class EmailVerificationService {
     const previousEmail: string = user.identity.email;
 
     if (manager) {
-      const changedUser = manager.getRepository(UserEntity).merge(user, {
-        identity: { ...user.identity, email: newEmail },
-        metadata: { ...user.metadata, last_changed_email: new Date() },
+      const users = manager.getRepository(UserEntity);
+
+      await users.update(user.id, {
+        identity: { email: newEmail },
+        metadata: { last_changed_email: new Date() },
       });
 
-      await manager.getRepository(UserEntity).save(changedUser);
       await manager
         .createQueryBuilder()
         .update(UserSessionEntity)
@@ -303,10 +304,7 @@ export class EmailVerificationService {
         .where('userId = :userId AND active = true', { userId: user.id })
         .execute();
 
-      if (!manager)
-        await this.sendEmailChangeSuccess(changedUser, previousEmail);
-
-      return changedUser;
+      return users.findOneOrFail({ where: { id: user.id } });
     }
 
     const updatedUser: UserEntity = await this.userSvc.updateUser(user, {

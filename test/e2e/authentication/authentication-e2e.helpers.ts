@@ -46,7 +46,7 @@ export class CapturingEmailService {
       .reverse()
       .find((candidate) => candidate.metadata.tokenId === challengeId);
 
-    const code = message?.model.mfaCode;
+    const code = message?.model.mfaCode ?? message?.model.code;
 
     if (typeof code !== 'string')
       throw new Error('No structured verification message was captured.');
