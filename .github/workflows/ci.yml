@@ -127,7 +127,9 @@ jobs:
       - name: Verify database safety guard
         run: npm run test:db:safety
       - name: Run isolated unit tests with coverage
-        run: npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
+        run: |
+          mkdir -p junit
+          npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
       - name: Upload unit Jest results and coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -211,6 +213,10 @@ jobs:
       DB_PASSWORD: quickapi_test_password
       DB_DATABASE: integration_test
       TEST_DB_ENABLED: 'true'
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: '3306'
+      TEST_DB_USER: quickapi_test
+      TEST_DB_PASSWORD: quickapi_test_password
       TEST_DB_DATABASE: integration_test
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
@@ -221,7 +227,9 @@ jobs:
       - run: npm ci
       - run: npm run test:db:safety
       - name: Run integration tests
-        run: npm test -- --testPathPatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/integration-jest.json
+        run: |
+          mkdir -p junit
+          npm test -- --testPathPatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/integration-jest.json
       - name: Capture service logs on failure
         if: failure()
         run: |
@@ -278,6 +286,10 @@ jobs:
       DB_PASSWORD: quickapi_test_password
       DB_DATABASE: ${{ matrix.database }}
       TEST_DB_ENABLED: 'true'
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_PORT: '3306'
+      TEST_DB_USER: quickapi_test
+      TEST_DB_PASSWORD: quickapi_test_password
       TEST_DB_DATABASE: ${{ matrix.database }}
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
@@ -288,7 +300,9 @@ jobs:
       - run: npm ci
       - run: npm run test:db:safety
       - name: Run E2E shard
-        run: npm run test:e2e -- --shard=${{ matrix.shard }} --detectOpenHandles --json --outputFile=junit/e2e-${{ matrix.artifact }}.json
+        run: |
+          mkdir -p junit
+          npm run test:e2e -- --shard=${{ matrix.shard }} --detectOpenHandles --json --outputFile=junit/e2e-${{ matrix.artifact }}.json
       - name: Capture service logs on failure
         if: failure()
         run: |
