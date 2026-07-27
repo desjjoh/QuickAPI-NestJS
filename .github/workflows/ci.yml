@@ -132,7 +132,7 @@ jobs:
           npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
       - name: Upload unit Jest results and coverage
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: unit-results-${{ github.run_attempt }}
           path: |
@@ -181,7 +181,7 @@ jobs:
         if: failure()
         run: docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
       - if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with: { name: migration-failure-logs, path: '*.log' }
 
   integration-tests:
@@ -236,7 +236,7 @@ jobs:
           docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
           docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
       - if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: integration-results
           path: |
@@ -309,7 +309,7 @@ jobs:
           docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
           docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
       - if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: e2e-results-shard-${{ matrix.artifact }}
           path: |
