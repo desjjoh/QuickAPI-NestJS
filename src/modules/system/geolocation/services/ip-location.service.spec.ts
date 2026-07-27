@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import type { Request } from 'express';
 
 import { IpLocationService } from './ip-location.service';
+import { env } from '@/config/environment.config';
 
 type MaxMindRecord = {
   country?: { iso_code?: string; names?: { en?: string } };
@@ -126,6 +127,7 @@ describe('IpLocationService', () => {
   });
 
   it('does not log an error when databases are intentionally absent in tests', async () => {
+    jest.replaceProperty(env, 'NODE_ENV', 'test');
     const service = new TestIpLocationService({});
 
     await expect(service.resolve(request('8.8.8.8'))).resolves.toMatchObject({

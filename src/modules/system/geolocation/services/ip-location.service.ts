@@ -110,8 +110,6 @@ export class IpLocationService {
   private readerInitialization: Promise<Reader | null> | undefined;
 
   public async resolve(req: Request): Promise<SessionIpLocation> {
-    // Preserve the transport-derived address exactly as supplied by Express/socket
-    // for session debugging; only public, syntactically valid addresses are looked up.
     const ip = req.ip ?? req.socket.remoteAddress ?? null;
     const resolvedAt = new Date();
 
@@ -169,11 +167,6 @@ export class IpLocationService {
       'GeoLite2 City database is unavailable; falling back to GeoLite2 Country database.',
     );
 
-    if (env.NODE_ENV !== 'test')
-      this.logger.error(
-        'No readable GeoLite2 database is available; location lookups will return unknown.',
-      );
-
     const countryReader = await this.tryOpenReader('GeoLite2-Country.mmdb');
 
     if (countryReader) {
@@ -182,9 +175,11 @@ export class IpLocationService {
       return this.reader;
     }
 
-    this.logger.error(
-      'No readable GeoLite2 database is available; location lookups will return unknown.',
-    );
+    if (env.NODE_ENV !== 'test') {
+      this.logger.error(
+        'No readable GeoLite2 database is available; location lookups will return unknown.',
+      );
+    }
 
     this.reader = null;
 

@@ -9,6 +9,8 @@ import { CountryEntity } from '@/modules/domain/library/entities/country.entity'
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import { setupTestSuite, type TestSuite } from '../../helpers/test-app';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 const SECURITY_ROOT = '/api/v1/security';
 export const REGISTRATION_ROOT = '/api/v1/authentication/registration';
@@ -42,20 +44,40 @@ export class CapturingEmailService {
   public verificationCodeFor(challengeId: string): string {
     const message = [...this.messages]
       .reverse()
-      .find(
-        (candidate) =>
-          candidate.templateKey === 'registration-verification' &&
-          candidate.metadata.tokenId === challengeId,
-      );
+      .find((candidate) => candidate.metadata.tokenId === challengeId);
+
     const code = message?.model.mfaCode;
+
     if (typeof code !== 'string')
       throw new Error('No structured verification message was captured.');
+
     return code;
   }
 
   public clear(): void {
     this.messages.length = 0;
   }
+}
+
+export async function createRegisteredUser(
+  app: INestApplication,
+  suite: TestSuite,
+  email: CapturingEmailService,
+): Promise<UserEntity> {
+  const pending = await requestRegistration(app, suite.dataSource);
+  const challengeId = pending.response.body.challenge_id as string;
+  await pending.agent
+    .post(`${REGISTRATION_ROOT}/confirm`)
+    .set('x-csrf-token', pending.csrf)
+    .send({
+      challenge_id: challengeId,
+      code: email.verificationCodeFor(challengeId),
+    })
+    .expect(200);
+  await suite.dataSource.getRepository(UserSessionEntity).clear();
+  return suite.dataSource.getRepository(UserEntity).findOneOrFail({
+    where: { identity: { email: 'person@example.test' } },
+  });
 }
 
 export async function setupAuthenticationSuite(): Promise<{

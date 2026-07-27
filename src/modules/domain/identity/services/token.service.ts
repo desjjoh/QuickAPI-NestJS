@@ -237,11 +237,21 @@ export class AccountTokenService {
     if (!this.matchesMetadata(entity.metadata, pendingMetadata))
       throw new UnauthorizedException('Invalid or expired challenge.');
 
-    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code))
-      throw new UnauthorizedException('Invalid verification code.');
+    if (
+      entity.locked_at ||
+      entity.failed_attempts >= MAX_VERIFICATION_CODE_ATTEMPTS
+    )
+      throw new UnauthorizedException('Invalid or expired challenge.');
 
-    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code)))
+    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code)) {
+      await this.recordFailedAttempt(entity.id);
       throw new UnauthorizedException('Invalid verification code.');
+    }
+
+    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code))) {
+      await this.recordFailedAttempt(entity.id);
+      throw new UnauthorizedException('Invalid verification code.');
+    }
 
     const token = this.generateToken();
     const expiresAt = new Date(Date.now() + expiresInMs);
@@ -251,6 +261,7 @@ export class AccountTokenService {
         id: entity.id,
         consumed_at: IsNull(),
         mfa_code_hash: entity.mfa_code_hash,
+        locked_at: IsNull(),
       },
       {
         token_hash: tokenHash,
