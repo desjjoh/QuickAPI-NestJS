@@ -133,30 +133,35 @@ export class UserRepository extends Repository<UserEntity> {
   ): Promise<UserEntity> {
     const user = await this.findByIdOrFail(id);
 
-    if (input.status_id) {
-      const status = await this.manager.findOneBy(AccountStatusEntity, {
-        id: input.status_id,
-      });
-      if (!status) throw new BadRequestException('Account status not found.');
-      await this.manager
-        .createQueryBuilder()
-        .relation(UserEntity, 'status')
-        .of(user.id)
-        .set(status.id);
-    }
+    await this.manager.transaction(async (manager: EntityManager) => {
+      const status = input.status_id
+        ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
+        : null;
 
-    if (input.role_ids) {
-      const roles = await this.manager.findBy(RoleEntity, {
-        id: In(input.role_ids),
-      });
-      if (roles.length !== new Set(input.role_ids).size)
+      if (input.status_id && !status)
+        throw new BadRequestException('Account status not found.');
+
+      const roles = input.role_ids
+        ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })
+        : null;
+
+      if (roles && roles.length !== new Set(input.role_ids).size)
         throw new BadRequestException('One or more roles were not found.');
-      await this.manager
-        .createQueryBuilder()
-        .relation(UserEntity, 'roles')
-        .of(user.id)
-        .addAndRemove(roles, user.roles ?? []);
-    }
+
+      if (status)
+        await manager
+          .createQueryBuilder()
+          .relation(UserEntity, 'status')
+          .of(user.id)
+          .set(status.id);
+
+      if (roles)
+        await manager
+          .createQueryBuilder()
+          .relation(UserEntity, 'roles')
+          .of(user.id)
+          .addAndRemove(roles, user.roles ?? []);
+    });
 
     return this.findByIdOrFail(id);
   }

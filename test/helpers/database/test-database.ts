@@ -41,16 +41,26 @@ export const MUTABLE_TABLE_DELETE_ORDER = [
 
 const initializedConnections = new Set<DataSource>();
 
-export function createTestDataSource(): DataSource {
+export function createTestDataSource({
+  includeMigrations = false,
+}: { includeMigrations?: boolean } = {}): DataSource {
   assertSafeTestDatabase();
   return new DataSource({
     ...applicationDataSource.options,
     synchronize: false,
+    // Jest already runs migrations in global setup. Omitting the migration
+    // glob from worker connections also prevents TypeORM from trying to
+    // require transformed ESM migration files on Windows.
+    migrations: includeMigrations
+      ? applicationDataSource.options.migrations
+      : [],
   });
 }
 
-export async function initializeTestDataSource(): Promise<DataSource> {
-  const dataSource = createTestDataSource();
+export async function initializeTestDataSource(
+  options: { includeMigrations?: boolean } = {},
+): Promise<DataSource> {
+  const dataSource = createTestDataSource(options);
   await dataSource.initialize();
   initializedConnections.add(dataSource);
   return dataSource;
@@ -59,7 +69,9 @@ export async function initializeTestDataSource(): Promise<DataSource> {
 export async function migrateAndSeedEmptyTestSchema(): Promise<void> {
   // No schema operation is allowed above this assertion.
   assertSafeTestDatabase();
-  const dataSource = await initializeTestDataSource();
+  const dataSource = await initializeTestDataSource({
+    includeMigrations: true,
+  });
 
   try {
     await dataSource.dropDatabase();
