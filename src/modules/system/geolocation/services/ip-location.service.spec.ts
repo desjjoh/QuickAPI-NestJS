@@ -27,6 +27,12 @@ class TestIpLocationService extends IpLocationService {
   }
 }
 
+class BaseReaderIpLocationService extends IpLocationService {
+  public open(filename: string): Promise<Reader> {
+    return super.openReader(filename);
+  }
+}
+
 function request(ip: string | null): Request {
   return {
     ip,
@@ -89,6 +95,34 @@ describe('IpLocationService', () => {
       'GeoLite2-City.mmdb',
       'GeoLite2-Country.mmdb',
     ]);
+  });
+
+  it('does not load MaxMind when the requested database is absent', async () => {
+    const service = new BaseReaderIpLocationService();
+
+    await expect(service.open('not-installed.mmdb')).rejects.toThrow(
+      'not-installed.mmdb does not exist',
+    );
+  });
+
+  it('shares reader initialization between concurrent lookups', async () => {
+    const reader = {
+      get: jest.fn().mockReturnValue({
+        country: { iso_code: 'CA', names: { en: 'Canada' } },
+      }),
+    };
+    const service = new TestIpLocationService({
+      'GeoLite2-City.mmdb': reader,
+    });
+
+    const locations = await Promise.all([
+      service.resolve(request('8.8.8.8')),
+      service.resolve(request('1.1.1.1')),
+    ]);
+
+    expect(locations).toHaveLength(2);
+    expect(service.opened).toEqual(['GeoLite2-City.mmdb']);
+    expect(reader.get).toHaveBeenCalledTimes(2);
   });
 
   it('preserves private and loopback addresses without looking them up', async () => {

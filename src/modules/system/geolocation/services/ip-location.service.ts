@@ -107,6 +107,7 @@ export class IpLocationService {
   private readonly logger = new Logger(IpLocationService.name);
 
   private reader: Reader | null | undefined;
+  private readerInitialization: Promise<Reader | null> | undefined;
 
   public async resolve(req: Request): Promise<SessionIpLocation> {
     // Preserve the transport-derived address exactly as supplied by Express/socket
@@ -148,6 +149,17 @@ export class IpLocationService {
   private async getReader(): Promise<Reader | null> {
     if (this.reader !== undefined) return this.reader;
 
+    // Share initialization between concurrent authentication requests. Besides
+    // avoiding duplicate file opens, this ensures every caller waits for the
+    // same import/open operation before the application can be torn down.
+    this.readerInitialization ??= this.initializeReader();
+
+    return this.readerInitialization;
+  }
+
+  private async initializeReader(): Promise<Reader | null> {
+    if (this.reader !== undefined) return this.reader;
+
     const cityReader = await this.tryOpenReader('GeoLite2-City.mmdb');
 
     if (cityReader) {
@@ -178,11 +190,14 @@ export class IpLocationService {
   }
 
   protected async openReader(filename: string): Promise<Reader> {
+    const databasePath = path.join(env.IP_LOCATION_DATA_DIR, filename);
+
+    if (!existsSync(databasePath))
+      throw new Error(`${databasePath} does not exist`);
+
     const maxmind = await loadMaxMind();
 
-    return maxmind.open<MaxMindRecord>(
-      path.join(env.IP_LOCATION_DATA_DIR, filename),
-    );
+    return maxmind.open<MaxMindRecord>(databasePath);
   }
 
   private async tryOpenReader(filename: string): Promise<Reader | null> {
