@@ -158,18 +158,28 @@ describe('user administration authorization and lifecycle', () => {
       .send({ role_ids: [] })
       .expect(403);
   });
-
   it('allows only update_users (or all permissions) to update users', async () => {
     const updater = await register('updater@example.test');
+    const reader = await register('update-reader@example.test');
     const superuser = await register('all@example.test');
     const target = await register('target@example.test');
     const assigned = await grant(target, 'e2e-target-role', []);
     await grant(updater, 'e2e-updater', ['update_users']);
+    await grant(reader, 'e2e-update-reader', ['read_users']);
     await grant(superuser, 'e2e-all', ['has_all_permissions']);
     await suite.dataSource.getRepository(UserSessionEntity).clear();
     const disabled = await suite.dataSource
       .getRepository(AccountStatusEntity)
       .findOneByOrFail({ key: 'disabled' });
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .send({ status_id: disabled.id })
+      .expect(401);
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .set(await signIn('update-reader@example.test'))
+      .send({ status_id: disabled.id })
+      .expect(403);
     const updated = await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('updater@example.test'))
@@ -195,6 +205,9 @@ describe('user administration authorization and lifecycle', () => {
     await grant(reader, 'e2e-delete-reader', ['read_users']);
     await grant(deleter, 'e2e-deleter', ['delete_users']);
     await suite.dataSource.getRepository(UserSessionEntity).clear();
+    await request(app.getHttpServer())
+      .delete(`${ROOT}/${target.id}`)
+      .expect(401);
     await request(app.getHttpServer())
       .delete(`${ROOT}/${target.id}`)
       .set(await signIn('reader@example.test'))
