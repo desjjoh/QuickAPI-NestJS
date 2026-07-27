@@ -80,8 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -93,8 +93,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run lint
@@ -104,8 +104,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run typecheck
@@ -120,8 +120,8 @@ jobs:
       TEST_DB_DATABASE: unit_${{ github.run_id }}_${{ github.run_attempt }}
       DB_DATABASE: unit_${{ github.run_id }}_${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - name: Verify database safety guard
@@ -132,7 +132,7 @@ jobs:
           npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
       - name: Upload unit Jest results and coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: unit-results-${{ github.run_attempt }}
           path: |
@@ -165,8 +165,8 @@ jobs:
       TEST_DB_ENABLED: 'true'
       TEST_DB_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run test:db:safety
@@ -181,7 +181,7 @@ jobs:
         if: failure()
         run: docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with: { name: migration-failure-logs, path: '*.log' }
 
   integration-tests:
@@ -221,8 +221,8 @@ jobs:
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run test:db:safety
@@ -236,7 +236,7 @@ jobs:
           docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
           docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: integration-results
           path: |
@@ -294,8 +294,8 @@ jobs:
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
       - run: npm run test:db:safety
@@ -309,7 +309,7 @@ jobs:
           docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
           docker logs $(docker ps -aq --filter ancestor=redis:7-alpine) > redis.log 2>&1 || true
       - if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-results-shard-${{ matrix.artifact }}
           path: |
@@ -324,7 +324,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: docker build --tag quickapi-nestjs:ci .
       - name: Verify the runtime image contains the built entry point
         run: docker run --rm --entrypoint node quickapi-nestjs:ci -e "require.resolve('./dist/main.js')"
