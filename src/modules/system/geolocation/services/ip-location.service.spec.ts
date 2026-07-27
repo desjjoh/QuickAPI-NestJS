@@ -125,6 +125,16 @@ describe('IpLocationService', () => {
     expect(reader.get).toHaveBeenCalledTimes(2);
   });
 
+  it('does not log an error when databases are intentionally absent in tests', async () => {
+    const service = new TestIpLocationService({});
+
+    await expect(service.resolve(request('8.8.8.8'))).resolves.toMatchObject({
+      source: 'unknown',
+    });
+
+    expect(Logger.prototype.error).not.toHaveBeenCalled();
+  });
+
   it('preserves private and loopback addresses without looking them up', async () => {
     const service = new TestIpLocationService({});
 

@@ -149,9 +149,6 @@ export class IpLocationService {
   private async getReader(): Promise<Reader | null> {
     if (this.reader !== undefined) return this.reader;
 
-    // Share initialization between concurrent authentication requests. Besides
-    // avoiding duplicate file opens, this ensures every caller waits for the
-    // same import/open operation before the application can be torn down.
     this.readerInitialization ??= this.initializeReader();
 
     return this.readerInitialization;
@@ -171,6 +168,11 @@ export class IpLocationService {
     this.logger.warn(
       'GeoLite2 City database is unavailable; falling back to GeoLite2 Country database.',
     );
+
+    if (env.NODE_ENV !== 'test')
+      this.logger.error(
+        'No readable GeoLite2 database is available; location lookups will return unknown.',
+      );
 
     const countryReader = await this.tryOpenReader('GeoLite2-Country.mmdb');
 
