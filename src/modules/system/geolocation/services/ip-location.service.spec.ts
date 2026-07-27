@@ -140,7 +140,13 @@ describe('IpLocationService', () => {
   it('preserves private and loopback addresses without looking them up', async () => {
     const service = new TestIpLocationService({});
 
-    for (const ip of ['127.0.0.1', '10.0.0.8', '::1']) {
+    for (const ip of [
+      '127.0.0.1',
+      '10.0.0.8',
+      '::1',
+      '::ffff:127.0.0.1',
+      '::ffff:10.0.0.8',
+    ]) {
       await expect(service.resolve(request(ip))).resolves.toMatchObject({
         ip,
         countryCode: null,

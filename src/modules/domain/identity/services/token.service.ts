@@ -201,21 +201,33 @@ export class AccountTokenService {
   }
 
   private async recordFailedAttempt(id: string): Promise<void> {
-    await this.tokenRepo
-      .createQueryBuilder()
-      .update(AccountTokenEntity)
-      .set({
-        failed_attempts: () => '`failed_attempts` + 1',
-        locked_at: () =>
-          `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
-      })
-      .where('id = :id', { id })
-      .andWhere('consumed_at IS NULL')
-      .andWhere('locked_at IS NULL')
-      .andWhere('failed_attempts < :maxAttempts', {
-        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-      })
-      .execute();
+    await this.tokenRepo.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(AccountTokenEntity);
+
+      await repo
+        .createQueryBuilder()
+        .update(AccountTokenEntity)
+        .set({ failed_attempts: () => '`failed_attempts` + 1' })
+        .where('id = :id', { id })
+        .andWhere('consumed_at IS NULL')
+        .andWhere('locked_at IS NULL')
+        .andWhere('failed_attempts < :maxAttempts', {
+          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+        })
+        .execute();
+
+      await repo
+        .createQueryBuilder()
+        .update(AccountTokenEntity)
+        .set({ locked_at: () => 'CURRENT_TIMESTAMP' })
+        .where('id = :id', { id })
+        .andWhere('consumed_at IS NULL')
+        .andWhere('locked_at IS NULL')
+        .andWhere('failed_attempts >= :maxAttempts', {
+          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+        })
+        .execute();
+    });
   }
 
   public async authorizeMfaCode({

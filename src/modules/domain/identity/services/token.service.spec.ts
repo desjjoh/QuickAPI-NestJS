@@ -27,7 +27,7 @@ describe('AccountTokenService', () => {
     findOne: jest.fn(),
     update: jest.fn(),
     createQueryBuilder: jest.fn(),
-    manager: { getRepository: jest.fn() },
+    manager: { getRepository: jest.fn(), transaction: jest.fn() },
   };
   let service: AccountTokenService;
 
@@ -38,6 +38,9 @@ describe('AccountTokenService', () => {
     query.execute.mockResolvedValue({ affected: 1 });
     repo.createQueryBuilder.mockReturnValue(query);
     repo.manager.getRepository.mockReturnValue(repo);
+    repo.manager.transaction.mockImplementation(async (callback) =>
+      callback(repo.manager),
+    );
     repo.create.mockImplementation((value) => value);
     repo.save.mockImplementation(async (value) => ({ id: 't1', ...value }));
     repo.update.mockResolvedValue({ affected: 1 });
@@ -182,12 +185,12 @@ describe('AccountTokenService', () => {
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(repo.createQueryBuilder).toHaveBeenCalled();
-    expect(query.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        failed_attempts: expect.any(Function),
-        locked_at: expect.any(Function),
-      }),
-    );
+    expect(query.set).toHaveBeenNthCalledWith(1, {
+      failed_attempts: expect.any(Function),
+    });
+    expect(query.set).toHaveBeenNthCalledWith(2, {
+      locked_at: expect.any(Function),
+    });
   });
 
   it('authorizes a valid MFA challenge and stores a hash, never the returned token', async () => {

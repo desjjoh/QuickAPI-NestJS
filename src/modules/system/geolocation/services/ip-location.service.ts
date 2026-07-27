@@ -216,6 +216,10 @@ export class IpLocationService {
 
   private isNonPublic(ip: string): boolean {
     if (ip.includes(':')) {
+      const mappedIpv4 = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip)?.[1];
+
+      if (mappedIpv4) return this.isNonPublic(mappedIpv4);
+
       return (
         ip === '::1' ||
         ip === '::' ||

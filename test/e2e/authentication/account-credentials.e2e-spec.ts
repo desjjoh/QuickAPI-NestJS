@@ -180,7 +180,7 @@ describe('Authenticated credential and email changes', () => {
     expect(email.messages).toContainEqual(
       expect.objectContaining({
         to: 'person@example.test',
-        templateKey: 'email-changed',
+        templateKey: 'email-change-success',
         model: expect.objectContaining({ email: 'new.address@example.test' }),
       }),
     );
