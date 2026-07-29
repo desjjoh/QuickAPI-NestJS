@@ -21,16 +21,20 @@ services:
       [
         'sh',
         '-c',
-        'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"',
+        'if [ -n "$$REDIS_PASSWORD" ]; then exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"; else exec redis-server --appendonly yes; fi',
       ]
     env_file:
-      - .env
+      - .env.staging
     expose:
       - '6379'
     volumes:
       - quickapi_redis_data:/data
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep PONG']
+      test:
+        [
+          'CMD-SHELL',
+          'if [ -n "$$REDIS_PASSWORD" ]; then REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping 2>/dev/null; else redis-cli ping; fi | grep -q PONG',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
