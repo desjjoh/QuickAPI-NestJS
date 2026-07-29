@@ -28,7 +28,6 @@
     "test:e2e:local": "TEST_DB_ENABLED=true TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3308 TEST_DB_USER=quickapi_test_app TEST_DB_PASSWORD=quickapi_test_password TEST_DB_DATABASE=quickapi_test REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_PASSWORD=quickapi_test_redis_password npm run test:e2e",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "check:e2e": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build",
-    "staging:preflight": "node scripts/staging-preflight.mjs",
     "typeorm": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:create": "npm run typeorm -- migration:create src/database/migrations/migration",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/migration -d src/database/typeorm.datasource.ts",
@@ -55,7 +54,8 @@
     "docker:status": "docker compose ps",
     "dev:db": "npm run docker:mysql:up && npm run migration:run",
     "geoip:seed": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts",
-    "geoip:update": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts"
+    "geoip:update": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts",
+    "geoip:update:prod": "node dist/modules/system/geolocation/scripts/seed-geolite2.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1052.0",

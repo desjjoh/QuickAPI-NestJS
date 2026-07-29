@@ -57,8 +57,8 @@ COPY package*.json ./
 
 RUN addgroup -S nodeapp \
   && adduser -S nodeapp -G nodeapp \
-  && mkdir -p /app/public /app/tmp \
-  && chown -R nodeapp:nodeapp /app/public /app/tmp
+  && mkdir -p /app/public /app/tmp /app/data/geoip \
+  && chown -R nodeapp:nodeapp /app/public /app/tmp /app/data
 
 USER nodeapp
 

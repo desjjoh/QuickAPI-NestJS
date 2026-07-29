@@ -82,6 +82,22 @@ services:
     networks:
       - private
 
+  geoip-init:
+    image: ${QUICKAPI_IMAGE:-quickapi-nestjs:staging}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    env_file:
+      - .env.staging
+    environment:
+      IP_LOCATION_DATA_DIR: /app/data/geoip
+    command: ['npm', 'run', 'geoip:update:prod']
+    volumes:
+      - quickapi_geoip:/app/data/geoip
+    networks:
+      - private
+
   api:
     image: ${QUICKAPI_IMAGE:-quickapi-nestjs:staging}
     build:
@@ -89,6 +105,8 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      geoip-init:
+        condition: service_completed_successfully
       migration:
         condition: service_completed_successfully
       mysql:

@@ -788,6 +788,27 @@ configuration as the API. It must complete successfully before API replacement;
 the Compose dependency enforces this for a full `up`, while deployment tooling
 must preserve the ordering for targeted updates. Never enable `DB_SYNC`.
 
+The one-shot `geoip-init` service uses that same immutable API image and writes
+validated GeoLite2 Country and City databases to `quickapi_geoip` before the API
+starts. Populate a new staging volume (or update an existing one) with:
+
+```bash
+docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm geoip-init
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d api
+```
+
+Set `MAXMIND_ACCOUNT_ID`, `MAXMIND_LICENSE_KEY`, and
+`IP_LOCATION_DATA_DIR=/app/data/geoip` in `.env.staging`. Schedule the first
+command as a weekly one-shot staging job (MaxMind publishes GeoLite updates on
+Tuesdays), then restart the API so its readers open the new files. A failed
+download, archive extraction, or database validation exits nonzero and leaves
+the last valid pair in place. The updater alone has read-write volume access;
+the API keeps its mount read-only.
+
+For local development, `npm run geoip:update` loads the repository `.env`
+automatically. `MAXMIND_LICENSE_KEY` is required; `MAXMIND_ACCOUNT_ID` is
+optional for the GeoLite download endpoint.
+
 ### Persistence, sizing, backups, and rollback
 
 - `quickapi_mysql_data` is the authoritative relational-data volume;
