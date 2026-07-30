@@ -68,7 +68,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          'mysqladmin ping -h localhost -u root -p"$$MYSQL_ROOT_PASSWORD"',
+          'mysqladmin ping --protocol=TCP -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD"',
         ]
       interval: 10s
       timeout: 5s

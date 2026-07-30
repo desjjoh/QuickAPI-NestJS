@@ -6,7 +6,7 @@ services:
       test:
         [
           CMD-SHELL,
-          'mysqladmin ping -h localhost -uroot -p"$$MYSQL_ROOT_PASSWORD"',
+          'mysqladmin ping --protocol=TCP -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD"',
         ]
       interval: 2s
       timeout: 5s
