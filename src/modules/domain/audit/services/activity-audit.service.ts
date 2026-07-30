@@ -168,10 +168,6 @@ export class ActivityAuditService {
     manager?: EntityManager,
   ): Promise<ActivityAuditEntity> {
     const context = this.requestContext.getStore();
-    const request = context?.request;
-    const requestUser = request?.user as
-      | { sessionEntity?: { id?: unknown }; sessionId?: unknown }
-      | undefined;
     const metadata = this.asRecord(
       this.redaction.redactMetadata(input.metadata),
     );
@@ -184,25 +180,20 @@ export class ActivityAuditService {
       ...data,
       event: input.event,
       outcome: input.outcome,
-      actor_type: input.actorType,
+      actor_type: input.actorType ?? context?.actorType,
       actor_user_id: input.actorUserId ?? context?.userId ?? null,
       subject_user_id: input.subjectUserId ?? null,
       entity_type: input.entityType ?? null,
       entity_id: input.entityId ?? null,
       request_id: input.requestId ?? context?.requestId ?? null,
-      session_id:
-        input.sessionId ??
-        this.stringValue(requestUser?.sessionEntity?.id) ??
-        this.stringValue(requestUser?.sessionId) ??
-        null,
+      session_id: input.sessionId ?? context?.sessionId ?? null,
       ip_address: input.ipAddress ?? context?.ip ?? null,
-      user_agent:
-        input.userAgent ?? this.headerValue(request?.headers?.['user-agent']),
+      user_agent: input.userAgent ?? context?.userAgent ?? null,
       http_method: (input.httpMethod ?? context?.method ?? null)?.toUpperCase(),
-      route: input.route ?? context?.path ?? null,
+      route: input.route ?? context?.route ?? null,
       failure_reason: input.failureReason ?? null,
       failure_code: input.failureCode ?? null,
-      source: input.source,
+      source: input.source ?? context?.source,
       occurred_at: input.occurredAt ?? new Date(),
       metadata,
     });
@@ -273,13 +264,5 @@ export class ActivityAuditService {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? value
       : {};
-  }
-
-  private stringValue(value: unknown): string | undefined {
-    return typeof value === 'string' && value.length > 0 ? value : undefined;
-  }
-
-  private headerValue(value: string | string[] | undefined): string | null {
-    return Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
   }
 }

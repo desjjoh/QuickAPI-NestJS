@@ -1,33 +1,62 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable } from '@nestjs/common';
 
-import { Request } from 'express';
+export type ContextActorType =
+  | 'user'
+  | 'anonymous'
+  | 'service'
+  | 'admin'
+  | 'system';
+export type ContextSource =
+  | 'http'
+  | 'queue'
+  | 'scheduled_job'
+  | 'seed'
+  | 'migration'
+  | 'system';
+export type NonHttpContextSource = Exclude<ContextSource, 'http' | 'migration'>;
 
+/** Deliberately contains only allowlisted correlation and audit attributes. */
 export type RequestContextStore = {
-  request: Request;
   requestId: string;
-
-  method: string;
-  path: string;
-
-  ip: string | undefined;
+  method?: string;
+  path?: string;
+  route?: string;
+  ip?: string;
   userId?: string;
+  sessionId?: string;
+  actorType?: ContextActorType;
+  userAgent?: string;
+  source?: ContextSource;
+};
+
+export type NonHttpContext = Omit<
+  RequestContextStore,
+  'method' | 'path' | 'route' | 'ip' | 'userAgent' | 'source'
+> & {
+  source: NonHttpContextSource;
 };
 
 @Injectable()
 export class RequestContext {
   private readonly storage = new AsyncLocalStorage<RequestContextStore>();
 
-  public run(store: RequestContextStore, callback: () => void): void {
-    this.storage.run(store, callback);
+  public run<T>(store: RequestContextStore, callback: () => T): T {
+    return this.storage.run(store, callback);
+  }
+
+  /** Run background work in an isolated, explicitly identified context. */
+  public runNonHttp<T>(context: NonHttpContext, callback: () => T): T {
+    return this.run(
+      { actorType: context.actorType ?? 'system', ...context },
+      callback,
+    );
   }
 
   public get<T extends keyof RequestContextStore>(
     key: T,
   ): RequestContextStore[T] | undefined {
-    const store = this.storage.getStore();
-
-    return store?.[key];
+    return this.storage.getStore()?.[key];
   }
 
   public set<K extends keyof RequestContextStore>(
@@ -35,15 +64,11 @@ export class RequestContext {
     value: RequestContextStore[K],
   ): void {
     const store = this.storage.getStore();
-    if (!store) return;
-
-    store[key] = value;
+    if (store) store[key] = value;
   }
 
   public getStore(): RequestContextStore | undefined {
-    const store = this.storage.getStore();
-
-    return store;
+    return this.storage.getStore();
   }
 }
 

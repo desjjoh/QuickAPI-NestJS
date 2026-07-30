@@ -129,7 +129,8 @@ describe('RefreshService', () => {
   });
 
   it('rotates the session obtained from RequestContext', async () => {
-    requestContext.get.mockReturnValue({ user: { sessionEntity: session } });
+    requestContext.get.mockReturnValue('s1');
+    manager.findOne.mockResolvedValue(session);
 
     await service.issueTokens(user as never, res as never);
 
@@ -154,7 +155,7 @@ describe('RefreshService', () => {
   it('creates a session without request metadata or a location lookup when the request is missing', async () => {
     await service.issueTokens(user as never, res as never);
 
-    expect(requestContext.get).toHaveBeenCalledWith('request');
+    expect(requestContext.get).toHaveBeenCalledWith('sessionId');
     expect(ipLocation.resolve).not.toHaveBeenCalled();
     expect(manager.create).toHaveBeenCalledWith(UserSessionEntity, {
       user,
@@ -177,10 +178,15 @@ describe('RefreshService', () => {
           })[header],
       ),
     };
-    requestContext.get.mockReturnValue(req);
+
     ipLocation.resolve.mockResolvedValue(null);
 
-    await service.issueTokens(user as never, res as never);
+    await service.issueTokens(
+      user as never,
+      res as never,
+      undefined,
+      req as never,
+    );
 
     expect(ipLocation.resolve).toHaveBeenCalledWith(req);
     expect(manager.create).toHaveBeenCalledWith(
@@ -210,7 +216,7 @@ describe('RefreshService', () => {
   it('persists every field from a fully resolved geolocation', async () => {
     const req = { ip: '8.8.8.8', socket: {}, get: jest.fn() };
     const resolvedAt = new Date('2026-07-27T12:00:00.000Z');
-    requestContext.get.mockReturnValue(req);
+
     ipLocation.resolve.mockResolvedValue({
       countryCode: 'US',
       countryName: 'United States',
@@ -221,7 +227,12 @@ describe('RefreshService', () => {
       resolvedAt,
     });
 
-    await service.issueTokens(user as never, res as never);
+    await service.issueTokens(
+      user as never,
+      res as never,
+      undefined,
+      req as never,
+    );
 
     expect(manager.create).toHaveBeenCalledWith(
       UserSessionEntity,
@@ -241,10 +252,15 @@ describe('RefreshService', () => {
 
   it('falls back to null for each missing optional location property', async () => {
     const req = { ip: '8.8.4.4', socket: {}, get: jest.fn() };
-    requestContext.get.mockReturnValue(req);
+
     ipLocation.resolve.mockResolvedValue({});
 
-    await service.issueTokens(user as never, res as never);
+    await service.issueTokens(
+      user as never,
+      res as never,
+      undefined,
+      req as never,
+    );
 
     expect(manager.create).toHaveBeenCalledWith(
       UserSessionEntity,

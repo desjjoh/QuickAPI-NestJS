@@ -11,8 +11,20 @@ class RefreshTokenGuard extends AuthGuard('jwt-refresh') {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const result = await super.canActivate(context);
 
-    const { user } = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest();
+    const { user } = request;
     if (user?.sub) this.requestContext.set('userId', user.sub);
+    this.requestContext.set('actorType', 'user');
+    this.requestContext.set('source', 'http');
+    const sessionId = user?.sessionEntity?.id ?? user?.sid ?? user?.sessionId;
+    if (typeof sessionId === 'string')
+      this.requestContext.set('sessionId', sessionId);
+    const normalizedRoute = request.route?.path;
+    if (typeof normalizedRoute === 'string')
+      this.requestContext.set(
+        'route',
+        `${request.baseUrl ?? ''}${normalizedRoute}`,
+      );
 
     return result as boolean;
   }

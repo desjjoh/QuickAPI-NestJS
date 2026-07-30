@@ -1,10 +1,11 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   Body,
   Controller,
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -70,9 +71,11 @@ export class AuthApiController {
   @UseGuards(LocalAuthGuard)
   async signIn(
     @CurrentUser() user: UserEntity,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto | MfaChallengeResponseDto> {
-    const result = await this.svc.signIn(user, res);
+    const result = await this.svc.signIn(user, res, req);
+
     if (result instanceof MfaChallengeResponseDto)
       res.status(HttpStatus.ACCEPTED);
 
@@ -92,9 +95,10 @@ export class AuthApiController {
   @ApiOkResponse({ type: JWTDto })
   public async verifyMfa(
     @Body() dto: VerifyMfaChallengeDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    return this.svc.verifyMfa(dto.challenge_id, dto.code, res);
+    return this.svc.verifyMfa(dto.challenge_id, dto.code, res, req);
   }
 
   // POST /refresh

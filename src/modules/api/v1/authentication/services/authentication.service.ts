@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -21,6 +21,7 @@ export class AuthService {
   public async signIn(
     user: UserEntity,
     res: Response,
+    req?: Request,
   ): Promise<JWTDto | MfaChallengeResponseDto> {
     const challenge = await this.mfaSvc.createSignInChallenge(user);
 
@@ -31,22 +32,26 @@ export class AuthService {
         expires_at: challenge.expires_at,
       });
 
-    return this.completeSignIn(user, res);
+    return this.completeSignIn(user, res, req);
   }
 
   public async completeSignIn(
     user: UserEntity,
     res: Response,
+    req?: Request,
   ): Promise<JWTDto> {
     const updated = await this.userSvc.recordSignIn(user);
 
-    return this.refreshSvc.issueTokens(updated, res);
+    return req
+      ? this.refreshSvc.issueTokens(updated, res, undefined, req)
+      : this.refreshSvc.issueTokens(updated, res);
   }
 
   public async verifyMfa(
     challengeId: string,
     code: string,
     res: Response,
+    req?: Request,
   ): Promise<JWTDto> {
     const user = await this.mfaSvc.verifyChallenge(
       challengeId,
@@ -56,7 +61,7 @@ export class AuthService {
 
     this.userSvc.assertCanAuthenticate(user);
 
-    return this.completeSignIn(user, res);
+    return this.completeSignIn(user, res, req);
   }
 
   public async verify(

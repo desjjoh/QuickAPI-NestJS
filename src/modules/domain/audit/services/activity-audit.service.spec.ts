@@ -111,20 +111,19 @@ describe(ActivityAuditService.name, () => {
   });
 
   it('enriches an activity from the active request context', async () => {
-    const request = {
-      headers: { 'user-agent': 'test-agent' },
-      user: { sessionEntity: { id: 'session-1' } },
-    } as never;
-
     await new Promise<void>((resolve, reject) => {
       context.run(
         {
-          request,
           requestId: 'request-1',
           method: 'post',
           path: '/api/users/:id',
           ip: '127.0.0.1',
           userId: 'context-user',
+          sessionId: 'session-1',
+          userAgent: 'test-agent',
+          actorType: 'user',
+          source: 'http',
+          route: '/api/users/:id',
         },
         () => {
           service
@@ -144,6 +143,40 @@ describe(ActivityAuditService.name, () => {
         user_agent: 'test-agent',
         http_method: 'POST',
         route: '/api/users/:id',
+      }),
+    );
+  });
+
+  it('prefers explicit audit input over active context values', async () => {
+    await context.run(
+      {
+        requestId: 'context-request',
+        sessionId: 'context-session',
+        userId: 'context-user',
+        actorType: 'anonymous',
+        source: 'queue',
+        route: '/context/:id',
+      },
+      () =>
+        service.recordActivity({
+          ...activity,
+          requestId: 'explicit-request',
+          sessionId: 'explicit-session',
+          actorUserId: 'explicit-user',
+          actorType: 'admin',
+          source: 'system',
+          route: '/explicit/:id',
+        }),
+    );
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request_id: 'explicit-request',
+        session_id: 'explicit-session',
+        actor_user_id: 'explicit-user',
+        actor_type: 'admin',
+        source: 'system',
+        route: '/explicit/:id',
       }),
     );
   });

@@ -3,29 +3,23 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { requestContextRef } from '@/common/store/request-context.store';
 import { generateRequestId } from '@/common/helpers/nanoid.helper';
 
-type context = {
-  request: Request;
-  requestId: string;
-
-  method: string;
-  path: string;
-  ip: string | undefined;
-
-  userId?: string;
-};
-
 export function requestContextMiddleware(): RequestHandler {
   return function requestContext(
     req: Request,
     _res: Response,
     next: NextFunction,
   ): void {
-    const ctx: context = {
-      request: req,
+    const userAgent = req.get('user-agent');
+    const route = req.path;
+    const ctx = {
       requestId: generateRequestId(),
       method: req.method,
-      path: req.originalUrl ?? req.url,
+      path: route,
+      route,
       ip: req.ip,
+      ...(userAgent ? { userAgent } : {}),
+      actorType: 'anonymous' as const,
+      source: 'http' as const,
     };
 
     if (!requestContextRef) return next();

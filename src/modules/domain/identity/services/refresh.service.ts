@@ -33,15 +33,19 @@ export class RefreshService {
     user: UserEntity,
     res: Response,
     existingSession?: UserSessionEntity,
+    req?: Request,
   ): Promise<JWTDto> {
-    const currentSession = (
-      this.requestContext.get('request')?.user as
-        | { sessionEntity?: UserSessionEntity }
-        | undefined
-    )?.sessionEntity;
+    const contextSessionId = this.requestContext.get('sessionId');
+    const currentSession = contextSessionId
+      ? await this.userRepo.manager.findOne(UserSessionEntity, {
+          where: { id: contextSessionId, user: { id: user.id } },
+        })
+      : null;
 
     const session =
-      existingSession ?? currentSession ?? (await this.createSession(user));
+      existingSession ??
+      currentSession ??
+      (await this.createSession(user, req));
 
     const rotatedSession = await this.rotateSession(session);
     const tokens = await this.tokenSvc.createTokenPair({
@@ -138,9 +142,10 @@ export class RefreshService {
 
     await this.revokeSession(session);
   }
-
-  private async createSession(user: UserEntity): Promise<UserSessionEntity> {
-    const req = this.requestContext.get('request');
+  private async createSession(
+    user: UserEntity,
+    req?: Request,
+  ): Promise<UserSessionEntity> {
     const info: SessionInfo | null = createSessionInfoFromRequest(req);
     const location = req ? await this.ipLocation.resolve(req) : null;
 
