@@ -26,6 +26,8 @@ import {
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { UnauthorizedException } from '@nestjs/common';
 import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
+import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 @Injectable()
 export class MeApiService {
@@ -35,6 +37,7 @@ export class MeApiService {
     private readonly evSvc: EmailVerificationService,
     private readonly emailSvc: EmailService,
     private readonly mfaSvc: MfaService,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async deleteMe(
@@ -45,6 +48,17 @@ export class MeApiService {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
     await this.userSvc.deleteUser(user, res);
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.ACCOUNT_DELETED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
   }
 
   public async updateMfa(
@@ -56,11 +70,33 @@ export class MeApiService {
     if (!dto.enabled) {
       await this.mfaSvc.disable(user);
       await this.userSvc.updateMetadata(user, { mfa_enabled: false });
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.MFA_DISABLED,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorUserId: user.id,
+        subjectUserId: user.id,
+        entityType: 'user',
+        entityId: user.id,
+        source: 'http',
+        metadata: {},
+      });
 
       return;
     }
 
     const challenge = await this.mfaSvc.requestEnable(user);
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.MFA_ENROLLMENT_REQUESTED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
     return new MfaChallengeResponseDto({
       challenge_id: challenge.id,
       method: MfaMethod.EMAIL_OTP,
@@ -85,6 +121,18 @@ export class MeApiService {
     await this.mfaSvc.enable(user);
     await this.userSvc.updateMetadata(user, { mfa_enabled: true });
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.MFA_ENABLED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      sessionId: currentSession.id,
+      source: 'http',
+      metadata: {},
+    });
   }
 
   public async updateEmail(
@@ -119,6 +167,33 @@ export class MeApiService {
     });
 
     const updated = await this.userSvc.recordPasswordChanged(user);
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: updated.id,
+      subjectUserId: updated.id,
+      entityType: 'user',
+      entityId: updated.id,
+      sessionId: currentSession.id,
+      source: 'http',
+      metadata: {},
+    });
+    await this.auditSvc.recordEntityChange({
+      event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: updated.id,
+      subjectUserId: updated.id,
+      entityType: 'user',
+      entityId: updated.id,
+      sessionId: currentSession.id,
+      source: 'http',
+      metadata: {},
+      before: { id: updated.id },
+      after: { id: updated.id, identity: { password: true } },
+    });
 
     await this.refreshSvc.revokeOtherSessions(updated.id, currentSession.id);
 

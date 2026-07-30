@@ -100,6 +100,7 @@ export class RefreshService {
     res: Response,
   ): Promise<void> {
     await this.revokeSession(session);
+    await this.recordSessionRevoked(session.user?.id, session.id);
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
@@ -111,7 +112,21 @@ export class RefreshService {
   }
 
   public async revokeAllSessions(userId: string, res: Response): Promise<void> {
+    const sessionIds = ((await this.findSessions(userId)) ?? []).map(
+      ({ id }) => id,
+    );
     await this.userRepo.revokeAllSessions(userId);
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: userId,
+      subjectUserId: userId,
+      entityType: 'user',
+      entityId: userId,
+      source: 'http',
+      metadata: { session_ids: sessionIds },
+    });
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
@@ -119,6 +134,11 @@ export class RefreshService {
     userId: string,
     currentSessionId: string,
   ): Promise<void> {
+    const sessions = (await this.findSessions(userId)) ?? [];
+    const revokedIds = sessions
+      .filter(({ id }) => id !== currentSessionId)
+      .map(({ id }) => id);
+
     await this.userRepo.manager
       .createQueryBuilder()
       .update(UserSessionEntity)
@@ -128,6 +148,20 @@ export class RefreshService {
         currentSessionId,
       })
       .execute();
+
+    if (revokedIds.length > 0)
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorUserId: userId,
+        subjectUserId: userId,
+        entityType: 'user',
+        entityId: userId,
+        sessionId: currentSessionId,
+        source: 'http',
+        metadata: { session_ids: revokedIds },
+      });
   }
 
   public async findSessions(userId: string): Promise<UserSessionEntity[]> {
@@ -157,6 +191,25 @@ export class RefreshService {
     if (!session) throw new NotFoundException('Session not found.');
 
     await this.revokeSession(session);
+    await this.recordSessionRevoked(userId, session.id);
+  }
+
+  private async recordSessionRevoked(
+    userId: string | undefined,
+    sessionId: string,
+  ): Promise<void> {
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.SESSION_REVOKED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: userId,
+      subjectUserId: userId,
+      entityType: 'session',
+      entityId: sessionId,
+      sessionId,
+      source: 'http',
+      metadata: {},
+    });
   }
   private async createSession(
     user: UserEntity,

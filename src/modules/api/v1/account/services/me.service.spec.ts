@@ -53,6 +53,10 @@ describe('MeApiService', () => {
       verifyChallenge: jest.fn().mockResolvedValue(user),
       enable: jest.fn(),
     };
+    const auditSvc = {
+      recordActivity: jest.fn().mockResolvedValue({}),
+      recordEntityChange: jest.fn().mockResolvedValue({}),
+    };
     return {
       service: new MeApiService(
         userSvc as unknown as UserService,
@@ -60,12 +64,14 @@ describe('MeApiService', () => {
         evSvc as unknown as EmailVerificationService,
         emailSvc as unknown as EmailService,
         mfaSvc as unknown as MfaService,
+        auditSvc as never,
       ),
       userSvc,
       refreshSvc,
       evSvc,
       emailSvc,
       mfaSvc,
+      auditSvc,
     };
   };
 

@@ -51,7 +51,10 @@ describe('EmailVerificationService', () => {
   };
   const manager = { getRepository: jest.fn(), createQueryBuilder: jest.fn() };
   const dataSource = { transaction: jest.fn() };
-  const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
+  const auditSvc = {
+    recordActivity: jest.fn().mockResolvedValue({}),
+    recordEntityChange: jest.fn().mockResolvedValue({}),
+  };
   let service: EmailVerificationService;
 
   beforeEach(() => {

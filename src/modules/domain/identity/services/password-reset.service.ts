@@ -12,6 +12,9 @@ import { AccountTokenService, CreatedAccountToken } from './token.service';
 import { AccountTokenType } from '@/config/token.config';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { UserEntity } from '../entities/user.entity';
+import { UserSessionEntity } from '../entities/session.entity';
+import { ActivityAuditService } from '../../audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 const PASSWORD_RESET_CODE_EXPIRES_IN_MINUTES = 10;
 const PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES = 10;
@@ -29,6 +32,7 @@ export class PasswordResetService {
     private readonly emailSvc: EmailService,
     private readonly userRepo: UserRepository,
     private readonly userSvc: UserService,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async requestPasswordReset(email: string): Promise<void> {
@@ -59,6 +63,17 @@ export class PasswordResetService {
         tokenId: reset.id,
       },
     });
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_REQUESTED,
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
   }
 
   public async verifyPasswordResetCode(
@@ -66,17 +81,56 @@ export class PasswordResetService {
     code: string,
   ): Promise<CreatedAccountToken> {
     const user = await this.userRepo.findByEmail(email);
-    if (!user || !this.userSvc.canAuthenticate(user))
+    if (!user || !this.userSvc.canAuthenticate(user)) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        source: 'http',
+        metadata: {},
+        failureCode: 'InvalidChallenge',
+      });
       throw new UnauthorizedException('Invalid or expired challenge.');
+    }
 
-    return this.accountTokenSvc.authorizeMfaCode({
-      userId: user.id,
-      type: AccountTokenType.PASSWORD_RESET,
-      code,
-      pendingMetadata: { state: PasswordResetChallengeState.PENDING },
-      verifiedMetadata: { state: PasswordResetChallengeState.VERIFIED },
-      expiresInMs: PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES * minute,
-    });
+    try {
+      const authorization = await this.accountTokenSvc.authorizeMfaCode({
+        userId: user.id,
+        type: AccountTokenType.PASSWORD_RESET,
+        code,
+        pendingMetadata: { state: PasswordResetChallengeState.PENDING },
+        verifiedMetadata: { state: PasswordResetChallengeState.VERIFIED },
+        expiresInMs: PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES * minute,
+      });
+
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_ACCEPTED,
+        outcome: 'succeeded',
+        actorType: 'anonymous',
+        subjectUserId: user.id,
+        entityType: 'user',
+        entityId: user.id,
+        source: 'http',
+        metadata: {},
+      });
+
+      return authorization;
+    } catch (error) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        subjectUserId: user.id,
+        entityType: 'user',
+        entityId: user.id,
+        source: 'http',
+        metadata: {},
+        failureCode:
+          error instanceof Error ? error.constructor.name : 'UnknownError',
+      });
+
+      throw error;
+    }
   }
 
   public async confirmPasswordReset(
@@ -100,7 +154,49 @@ export class PasswordResetService {
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
     await this.userSvc.recordPasswordChanged(user);
+
+    const sessionIds = (
+      await this.userRepo.manager.find(UserSessionEntity, {
+        where: { user: { id: user.id }, active: true },
+      })
+    ).map(({ id }) => id);
+
     await this.userRepo.revokeAllSessions(user.id);
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
+    await this.auditSvc.recordEntityChange({
+      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+      before: { id: user.id },
+      after: { id: user.id, identity: { password: true } },
+    });
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: { session_ids: sessionIds },
+    });
 
     await this.emailSvc.sendEmail({
       to: user.identity.email,

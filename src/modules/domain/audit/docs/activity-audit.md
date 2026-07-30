@@ -50,8 +50,20 @@ describing rows written by that action. Initial event keys include:
 | `identity.refresh.failed`                      | A refresh attempt is rejected after its outcome is known                                    |
 | `identity.sign_out.completed`                  | The active session is revoked and sign-out completes                                        |
 | `identity.password_reset.requested`            | A password reset is requested, regardless of whether the public response reveals an account |
+| `identity.password_reset.code_accepted`        | A password-reset code is accepted                                                           |
+| `identity.password_reset.code_rejected`        | A password-reset code is rejected without retaining the submitted code                      |
+| `identity.password_reset.completed`            | A verified password reset changes the password                                              |
+| `identity.password.changed`                    | An authenticated user changes their password                                                |
+| `identity.email_verification.requested`        | Initial email verification is requested                                                     |
+| `identity.email_verification.completed`        | Initial email verification completes                                                        |
+| `identity.email_change.requested`              | Verification of a new email address is requested                                            |
+| `identity.email_change.completed`              | A verified email change completes                                                           |
+| `identity.mfa.enrollment_requested`            | MFA enrollment is requested                                                                 |
 | `identity.mfa.enabled`                         | MFA enrollment is successfully completed                                                    |
+| `identity.mfa.disabled`                        | MFA is disabled                                                                             |
 | `identity.session.revoked`                     | A session is revoked by its owner, an administrator, or the system                          |
+| `identity.session.all_revoked`                 | All applicable sessions are revoked; metadata contains session IDs only                     |
+| `identity.account.deleted`                     | A user deletes their own account                                                            |
 | `identity.profile.updated`                     | A user profile update succeeds                                                              |
 | `admin.user.deleted`                           | An administrator deletes or soft-deletes a user                                             |
 

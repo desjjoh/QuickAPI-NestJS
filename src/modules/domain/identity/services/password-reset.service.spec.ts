@@ -21,13 +21,21 @@ describe('PasswordResetService', () => {
     consumeToken: jest.fn(),
   };
   const emailSvc = { sendEmail: jest.fn() };
-  const userRepo = { findByEmail: jest.fn(), revokeAllSessions: jest.fn() };
+  const userRepo = {
+    findByEmail: jest.fn(),
+    revokeAllSessions: jest.fn(),
+    manager: { find: jest.fn().mockResolvedValue([]) },
+  };
   const userSvc = {
     canAuthenticate: jest.fn(),
     assertCanAuthenticate: jest.fn(),
     hashPassword: jest.fn(),
     updateUser: jest.fn(),
     recordPasswordChanged: jest.fn(),
+  };
+  const auditSvc = {
+    recordActivity: jest.fn().mockResolvedValue({}),
+    recordEntityChange: jest.fn().mockResolvedValue({}),
   };
   let service: PasswordResetService;
 
@@ -45,6 +53,7 @@ describe('PasswordResetService', () => {
       emailSvc as never,
       userRepo as never,
       userSvc as never,
+      auditSvc as never,
     );
   });
 

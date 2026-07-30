@@ -61,6 +61,18 @@ export class EmailVerificationService {
       mfaCode,
     });
 
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_REQUESTED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
     return verification;
   }
 
@@ -96,6 +108,18 @@ export class EmailVerificationService {
       to: normalizedEmail,
       tokenId: verification.id,
       mfaCode,
+    });
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_REQUESTED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
     });
 
     return verification;
@@ -167,6 +191,37 @@ export class EmailVerificationService {
     );
 
     if (previousEmail) await this.sendEmailChangeSuccess(user, previousEmail);
+
+    const event = previousEmail
+      ? IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_COMPLETED
+      : IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_COMPLETED;
+
+    await this.auditSvc.recordActivity({
+      event,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      entityType: 'user',
+      entityId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
+    if (previousEmail)
+      await this.auditSvc.recordEntityChange({
+        event,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorUserId: user.id,
+        subjectUserId: user.id,
+        entityType: 'user',
+        entityId: user.id,
+        source: 'http',
+        metadata: {},
+        before: { id: user.id, identity: { email: previousEmail } },
+        after: { id: user.id, identity: { email: user.identity.email } },
+      });
 
     return user;
   }

@@ -72,7 +72,7 @@ const ENTITY_FIELDS: Readonly<Record<AuditEntityType, FieldTree>> = {
   // array if a country policy is introduced.
   user: {
     id: scalar,
-    identity: nestedObject({ email: maskedEmail }),
+    identity: nestedObject({ email: maskedEmail, password: changedOnly }),
     // One-to-one: retain only this explicitly allowlisted profile summary.
     profile: nestedObject({
       id: scalar,
@@ -87,7 +87,7 @@ const ENTITY_FIELDS: Readonly<Record<AuditEntityType, FieldTree>> = {
     created_at: scalar,
     updated_at: scalar,
     deleted_at: scalar,
-    metadata: nestedObject({ mfa_enabled: scalar }),
+    metadata: nestedObject({ mfa_enabled: changedOnly }),
   },
   profile: {
     id: scalar,
@@ -143,6 +143,7 @@ const METADATA_FIELDS: FieldTree = {
   method: scalar,
   status: scalar,
   status_code: scalar,
+  session_ids: relationshipIds,
   ip: hashed,
   ip_address: hashed,
   user_agent: changedOnly,
@@ -244,7 +245,7 @@ export class AuditRedactionService {
       const policy = tree[key];
       // This guard is deliberately applied even to allowlisted future fields.
       if (SECRET_KEY.test(key) || RAW_CONTAINER_KEY.test(key)) {
-        result[key] = OMITTED;
+        result[key] = policy.kind === 'changed-only' ? CHANGED : OMITTED;
       } else {
         result[key] = this.applyPolicy(source[key], policy, seen, depth + 1);
       }

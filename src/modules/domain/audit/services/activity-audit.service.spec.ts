@@ -82,6 +82,47 @@ describe(ActivityAuditService.name, () => {
     );
   });
 
+  it('recursively excludes known credentials, codes, and tokens from every stored payload', async () => {
+    const secrets = [
+      'KnownPassword!23',
+      '$2b$12$known-password-hash',
+      '123456',
+      'known-verification-token',
+      'known-refresh-token',
+      'known-mfa-secret',
+    ];
+
+    await service.recordActivity({
+      ...activity,
+      metadata: {
+        password: secrets[0],
+        verification_code: secrets[2],
+        refresh_token: secrets[4],
+        mfa_secret: secrets[5],
+      },
+    });
+    await service.recordEntityChange({
+      ...activity,
+      event: 'identity.password.changed',
+      entityType: 'user',
+      entityId: 'user-1',
+      before: {
+        id: 'user-1',
+        sessions: [{ id: 'session-1', refresh: secrets[4] }],
+      },
+      after: {
+        id: 'user-1',
+        identity: { password: secrets[0] },
+        sessions: [{ id: 'session-2', refresh: secrets[4] }],
+      },
+    });
+
+    for (const [stored] of repository.insert.mock.calls) {
+      const serialized = JSON.stringify(stored);
+      for (const secret of secrets) expect(serialized).not.toContain(secret);
+    }
+  });
+
   it('does not persist an entity record without a meaningful safe change', async () => {
     const result = await service.recordEntityChange({
       ...activity,
