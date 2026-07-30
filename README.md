@@ -1,6 +1,6 @@
 # QuickAPI-NestJS
 
-A modular, production-minded NestJS API template designed for rapid backend service creation and long-term maintainability. Implements consistent architecture patterns from the **QuickAPI family** — including Express, FastAPI, and others — emphasizing layered modules, strict validation, observability, authentication, persistence, and graceful lifecycle management.
+An opinionated NestJS application foundation developed for my own projects and published openly as reference material. It includes production-minded patterns and working implementations, but every deployment still requires project-specific configuration, review, and operational validation.
 
 ---
 
