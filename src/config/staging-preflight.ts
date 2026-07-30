@@ -42,8 +42,11 @@ function isPlaceholder(value: string): boolean {
 
 function assertPublicHttps(name: string, value: string): void {
   const url = new URL(value);
+
   if (url.protocol !== 'https:') throw new Error(`${name} must use HTTPS`);
+
   const host = url.hostname.toLowerCase();
+
   if (
     host === 'localhost' ||
     host.endsWith('.localhost') ||
@@ -66,11 +69,15 @@ function isNarrowProxy(value: string): boolean {
         ['true', '*', '0.0.0.0/0', '::/0'].includes(entry.toLowerCase())
       )
         return false;
+
       const [address, prefix, extra] = entry.split('/');
+
       if (extra !== undefined || net.isIP(address) === 0) return false;
       if (prefix === undefined) return true;
       if (!/^\d+$/.test(prefix)) return false;
+
       const bits = Number(prefix);
+
       return net.isIP(address) === 4
         ? bits >= 8 && bits <= 32
         : bits >= 32 && bits <= 128;
@@ -85,6 +92,7 @@ function isImmutableImage(value: string): boolean {
 export function validateStagingEnv(input: NodeJS.ProcessEnv): AppEnv {
   const env = EnvSchema.parse(input);
   const missingCompose = composeRequired.filter((name) => !input[name]?.trim());
+
   if (missingCompose.length)
     throw new Error(
       `Missing staging deployment variables: ${missingCompose.join(', ')}. ` +
@@ -93,41 +101,54 @@ export function validateStagingEnv(input: NodeJS.ProcessEnv): AppEnv {
 
   for (const name of secretRequired) {
     const value = input[name]?.trim() ?? '';
+
     if (!value) throw new Error(`${name} must not be blank`);
+
     if (isPlaceholder(value))
       throw new Error(
         `${name} still contains a placeholder; set a real value in the ignored .env.staging file`,
       );
   }
+
   assertPublicHttps('PUBLIC_API_URL', env.PUBLIC_API_URL);
   assertPublicHttps('PUBLIC_WEB_URL', env.PUBLIC_WEB_URL);
+
   if (env.CORS_ORIGINS.some((origin) => origin === '*' || origin.includes('*')))
     throw new Error('CORS_ORIGINS must not contain a wildcard');
+
   for (const origin of env.CORS_ORIGINS)
     assertPublicHttps('CORS_ORIGINS', origin);
+
   if (!isNarrowProxy(env.TRUST_PROXY))
     throw new Error(
       'TRUST_PROXY must be a narrow IP address or CIDR allowlist',
     );
+
   if (!isImmutableImage(input.QUICKAPI_IMAGE!))
     throw new Error('QUICKAPI_IMAGE must use an immutable sha256 digest');
+
   if (env.DB_SYNC !== false)
     throw new Error('DB_SYNC must be false in staging');
+
   if (input.MYSQL_DATABASE !== env.DB_DATABASE)
     throw new Error('MYSQL_DATABASE must match DB_DATABASE');
+
   if (input.MYSQL_USER !== env.DB_USER)
     throw new Error('MYSQL_USER must match DB_USER');
+
   if (input.MYSQL_PASSWORD !== env.DB_PASSWORD)
     throw new Error('MYSQL_PASSWORD must match DB_PASSWORD');
+
   return env;
 }
 
 export function runStagingPreflight(file = '.env.staging'): AppEnv {
   const filename = path.resolve(file);
+
   if (!fs.existsSync(filename)) throw new Error(`${file} does not exist`);
+
   const values = parseEnvFile(fs.readFileSync(filename, 'utf8'));
-  // Validate the deployment file deterministically. Ambient shell variables must
-  // not silently change what Compose will load through its env_file entries.
+
   return validateStagingEnv(values);
 }
 
@@ -140,6 +161,7 @@ if (require.main === module) {
       'Staging preflight failed:',
       error instanceof Error ? error.message : error,
     );
+
     process.exitCode = 1;
   }
 }
