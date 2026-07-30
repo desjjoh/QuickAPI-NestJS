@@ -42,7 +42,7 @@ describe('AuthService', () => {
       issueTokens: jest.fn().mockResolvedValue(tokens),
       revokeTokens: jest.fn().mockResolvedValue(undefined),
     };
-    const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
+    const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     const mfaSvc = {
       createSignInChallenge: jest.fn().mockResolvedValue(null),
       verifyChallenge: jest.fn().mockResolvedValue(user),
@@ -66,7 +66,7 @@ describe('AuthService', () => {
     await expect(service.signIn(user, res)).resolves.toBe(tokens);
     expect(userSvc.recordSignIn).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -108,7 +108,7 @@ describe('AuthService', () => {
     });
     expect(userSvc.recordSignIn).not.toHaveBeenCalled();
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
       domain: 'identity',
       outcome: 'pending',
@@ -133,7 +133,7 @@ describe('AuthService', () => {
     );
     expect(userSvc.assertCanAuthenticate).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
-    expect(auditSvc.recordActivity).toHaveBeenNthCalledWith(1, {
+    expect(auditSvc.record).toHaveBeenNthCalledWith(1, {
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -156,7 +156,7 @@ describe('AuthService', () => {
       error,
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
       domain: 'identity',
       outcome: 'failed',
@@ -175,7 +175,7 @@ describe('AuthService', () => {
       'verification failed',
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+    expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({ failureCode: 'UnknownError' }),
     );
   });
@@ -184,7 +184,7 @@ describe('AuthService', () => {
     const { service, refreshSvc, auditSvc } = setup();
     await expect(service.verify(user, res, session)).resolves.toBe(tokens);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -202,7 +202,7 @@ describe('AuthService', () => {
     const { service, refreshSvc, auditSvc } = setup();
     await expect(service.signOut(session, res)).resolves.toBeUndefined();
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -221,7 +221,7 @@ describe('AuthService', () => {
     await expect(service.verify(user, res, session)).rejects.toThrow(
       'rotation failed',
     );
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
       domain: 'identity',
       outcome: 'failed',
@@ -243,7 +243,7 @@ describe('AuthService', () => {
     await expect(service.verify(user, res, session)).rejects.toBe(
       'rotation failed',
     );
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+    expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({ failureCode: 'UnknownError' }),
     );
   });

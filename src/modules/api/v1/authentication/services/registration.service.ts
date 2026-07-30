@@ -15,7 +15,7 @@ import { UserRepository } from '@/modules/domain/identity/repositories/user.repo
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
-import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
@@ -26,7 +26,7 @@ export class RegistrationService {
     private readonly emailSvc: EmailVerificationService,
     private readonly userRepo: UserRepository,
     private readonly registrationTokenSvc: RegistrationTokenService,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {}
 
   public async register(dto: RegisterDto): Promise<RegistrationPendingDto> {
@@ -47,7 +47,7 @@ export class RegistrationService {
       ),
     );
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
       domain: 'identity',
       outcome: 'pending',
@@ -88,7 +88,7 @@ export class RegistrationService {
       pendingToken.metadata,
     );
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
       domain: 'identity',
       outcome: 'pending',

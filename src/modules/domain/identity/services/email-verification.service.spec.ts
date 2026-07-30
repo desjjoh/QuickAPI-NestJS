@@ -52,8 +52,7 @@ describe('EmailVerificationService', () => {
   const manager = { getRepository: jest.fn(), createQueryBuilder: jest.fn() };
   const dataSource = { transaction: jest.fn() };
   const auditSvc = {
-    recordActivity: jest.fn().mockResolvedValue({}),
-    recordEntityChange: jest.fn().mockResolvedValue({}),
+    record: jest.fn().mockResolvedValue({}),
   };
   let service: EmailVerificationService;
 
@@ -259,7 +258,7 @@ describe('EmailVerificationService', () => {
       }),
     );
     expect(emailSvc.sendEmail).toHaveBeenCalled();
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+    expect(auditSvc.record).toHaveBeenCalledWith(
       {
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
         domain: 'identity',
@@ -301,7 +300,7 @@ describe('EmailVerificationService', () => {
       );
       expect(users.save).not.toHaveBeenCalled();
       expect(emailSvc.sendEmail).not.toHaveBeenCalled();
-      expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      expect(auditSvc.record).toHaveBeenCalledWith({
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
         domain: 'identity',
         outcome: 'failed',

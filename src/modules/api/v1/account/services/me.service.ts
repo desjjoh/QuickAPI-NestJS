@@ -26,7 +26,7 @@ import {
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { UnauthorizedException } from '@nestjs/common';
 import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
-import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 @Injectable()
@@ -37,7 +37,7 @@ export class MeApiService {
     private readonly evSvc: EmailVerificationService,
     private readonly emailSvc: EmailService,
     private readonly mfaSvc: MfaService,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {}
 
   public async deleteMe(
@@ -48,7 +48,7 @@ export class MeApiService {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
     await this.userSvc.deleteUser(user, res);
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.ACCOUNT_DELETED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -72,7 +72,7 @@ export class MeApiService {
     if (!dto.enabled) {
       await this.mfaSvc.disable(user);
       await this.userSvc.updateMetadata(user, { mfa_enabled: false });
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.MFA_DISABLED,
         domain: 'identity',
         outcome: 'succeeded',
@@ -90,7 +90,7 @@ export class MeApiService {
     }
 
     const challenge = await this.mfaSvc.requestEnable(user);
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.MFA_ENROLLMENT_REQUESTED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -127,7 +127,7 @@ export class MeApiService {
     await this.mfaSvc.enable(user);
     await this.userSvc.updateMetadata(user, { mfa_enabled: true });
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.MFA_ENABLED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -176,7 +176,7 @@ export class MeApiService {
 
     const updated = await this.userSvc.recordPasswordChanged(user);
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -191,7 +191,7 @@ export class MeApiService {
       metadata: {},
     });
 
-    await this.auditSvc.recordEntityChange({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
       domain: 'identity',
       outcome: 'succeeded',

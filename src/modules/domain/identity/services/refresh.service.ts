@@ -19,7 +19,7 @@ import { IpLocationService } from '@/modules/system/geolocation/services/ip-loca
 import { MoreThan, Not, IsNull } from 'typeorm';
 import { day } from '@/common/constants/milliseconds.constants';
 import { env } from '@/config/environment.config';
-import { ActivityAuditService } from '../../audit/services/activity-audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class RefreshService {
     private readonly userRepo: UserRepository,
     private readonly requestContext: RequestContext,
     private readonly ipLocation: IpLocationService,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {}
 
   public async issueTokens(
@@ -72,7 +72,7 @@ export class RefreshService {
       getRefreshCookieOptions(),
     );
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -118,7 +118,7 @@ export class RefreshService {
       ({ id }) => id,
     );
     await this.userRepo.revokeAllSessions(userId);
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -154,7 +154,7 @@ export class RefreshService {
       .execute();
 
     if (revokedIds.length > 0)
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
         domain: 'identity',
         outcome: 'succeeded',
@@ -204,7 +204,7 @@ export class RefreshService {
     userId: string | undefined,
     sessionId: string,
   ): Promise<void> {
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.SESSION_REVOKED,
       domain: 'identity',
       outcome: 'succeeded',

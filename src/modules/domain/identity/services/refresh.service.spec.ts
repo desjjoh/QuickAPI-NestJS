@@ -43,7 +43,7 @@ describe('RefreshService', () => {
   const requestContext = { get: jest.fn() };
   const ipLocation = { resolve: jest.fn() };
   const res = { cookie: jest.fn(), clearCookie: jest.fn() };
-  const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
+  const auditSvc = { record: jest.fn().mockResolvedValue({}) };
   let service: RefreshService;
 
   const expectIssuedFromSession = (sessionId: string, version: number) => {
@@ -129,7 +129,7 @@ describe('RefreshService', () => {
         }),
       }),
     );
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
       domain: 'identity',
       outcome: 'succeeded',

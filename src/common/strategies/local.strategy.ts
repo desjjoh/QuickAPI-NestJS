@@ -3,7 +3,7 @@ import { UserService } from '@/modules/domain/identity/services/user.service';
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
-import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
@@ -17,7 +17,7 @@ export interface ValidationPayload {
 class LocalStrategy extends PassportStrategy(Strategy) {
   constructor(
     private svc: UserService,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {
     super({
       usernameField: 'email',
@@ -31,7 +31,7 @@ class LocalStrategy extends PassportStrategy(Strategy) {
       user = await this.svc.validateUser(email, password);
       this.svc.assertCanAuthenticate(user);
     } catch (error) {
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.SIGN_IN_FAILED,
         domain: 'identity',
         outcome: 'failed',

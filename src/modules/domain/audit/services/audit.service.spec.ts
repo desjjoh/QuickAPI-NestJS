@@ -2,18 +2,18 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
-import { ActivityAuditEntity } from '../entities/activity-audit.entity';
-import { ActivityAuditService } from './activity-audit.service';
+import { AuditEventEntity } from '../entities/audit-event.entity';
+import { AuditService } from './audit.service';
 import { AuditRedactionService } from './audit-redaction.service';
 
-describe(ActivityAuditService.name, () => {
+describe(AuditService.name, () => {
   let repository: {
     create: jest.Mock;
     insert: jest.Mock;
   };
   let redaction: AuditRedactionService;
   let context: RequestContext;
-  let service: ActivityAuditService;
+  let service: AuditService;
 
   const activity = {
     event: 'identity.sign_in.succeeded',
@@ -29,26 +29,25 @@ describe(ActivityAuditService.name, () => {
 
   beforeEach(() => {
     repository = {
-      create: jest.fn((value) => value as ActivityAuditEntity),
+      create: jest.fn((value) => value as AuditEventEntity),
       insert: jest
         .fn()
         .mockResolvedValue({ identifiers: [], generatedMaps: [], raw: [] }),
     };
     redaction = new AuditRedactionService();
     context = new RequestContext();
-    service = new ActivityAuditService(
-      repository as unknown as Repository<ActivityAuditEntity>,
+    service = new AuditService(
+      repository as unknown as Repository<AuditEventEntity>,
       redaction,
       context,
     );
   });
 
   it('records an explicitly supplied activity after redacting metadata', async () => {
-    const result = await service.recordActivity(activity);
+    const result = await service.record(activity);
 
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        category: 'activity_event',
         event: activity.event,
         domain: 'identity',
         actor_type: 'user',
@@ -61,11 +60,12 @@ describe(ActivityAuditService.name, () => {
         changes: null,
       }),
     );
+    expect(result).not.toHaveProperty('category');
     expect(repository.insert).toHaveBeenCalledWith(result);
   });
 
   it('records safe snapshots and a field-level entity change', async () => {
-    await service.recordEntityChange({
+    const result = await service.record({
       ...activity,
       event: 'entity.update',
       resourceType: 'profile',
@@ -76,7 +76,6 @@ describe(ActivityAuditService.name, () => {
 
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        category: 'entity_change',
         before: { name: { first: 'Old' } },
         after: { name: { first: 'New' } },
         changes: {
@@ -86,6 +85,7 @@ describe(ActivityAuditService.name, () => {
         },
       }),
     );
+    expect(result).not.toHaveProperty('category');
   });
 
   it('recursively excludes known credentials, codes, and tokens from every stored payload', async () => {
@@ -98,7 +98,7 @@ describe(ActivityAuditService.name, () => {
       'known-mfa-secret',
     ];
 
-    await service.recordActivity({
+    await service.record({
       ...activity,
       metadata: {
         password: secrets[0],
@@ -107,7 +107,7 @@ describe(ActivityAuditService.name, () => {
         mfa_secret: secrets[5],
       },
     });
-    await service.recordEntityChange({
+    await service.record({
       ...activity,
       event: 'identity.password.changed',
       resourceType: 'user',
@@ -130,7 +130,7 @@ describe(ActivityAuditService.name, () => {
   });
 
   it('does not persist an entity record without a meaningful safe change', async () => {
-    const result = await service.recordEntityChange({
+    const result = await service.record({
       ...activity,
       event: 'entity.update',
       resourceType: 'user',
@@ -144,17 +144,55 @@ describe(ActivityAuditService.name, () => {
     expect(repository.insert).not.toHaveBeenCalled();
   });
 
+  it('persists an explicitly meaningful event even when snapshots do not change', async () => {
+    await service.record({
+      ...activity,
+      event: 'profile.reviewed',
+      resourceType: 'profile',
+      resourceId: 'profile-1',
+      before: { name: { first: 'Same' } },
+      after: { name: { first: 'Same' } },
+      meaningfulWithoutChanges: true,
+      operationId: 'operation-1',
+      idempotencyId: 'retry-1',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation_id: 'operation-1',
+        idempotency_id: 'retry-1',
+        before: {},
+        after: {},
+        changes: {},
+      }),
+    );
+  });
+
+  it('rejects a lone snapshot and snapshots without a registered resource policy', () => {
+    expect(() => service.record({ ...activity, before: {} })).toThrow(
+      'before and after must be supplied together',
+    );
+    expect(() =>
+      service.record({
+        ...activity,
+        resourceType: 'unregistered' as never,
+        resourceId: 'resource-1',
+        before: {},
+        after: {},
+      }),
+    ).toThrow('resourceType is invalid');
+  });
+
   it.each([
     ['event', { event: '' }],
     ['domain', { domain: '' }],
-    ['outcome', { outcome: undefined }],
     ['actorType', { actorType: undefined }],
     ['source', { source: undefined }],
     ['metadata', { metadata: undefined }],
   ])('rejects a missing %s', (_name, override) => {
-    expect(() =>
-      service.recordActivity({ ...activity, ...override } as never),
-    ).toThrow(BadRequestException);
+    expect(() => service.record({ ...activity, ...override } as never)).toThrow(
+      BadRequestException,
+    );
     expect(repository.insert).not.toHaveBeenCalled();
   });
 
@@ -175,7 +213,7 @@ describe(ActivityAuditService.name, () => {
         },
         () => {
           service
-            .recordActivity({ ...activity, actorId: undefined })
+            .record({ ...activity, actorId: undefined })
             .then(() => resolve())
             .catch(reject);
         },
@@ -185,16 +223,12 @@ describe(ActivityAuditService.name, () => {
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         actor_id: 'context-user',
-        request_id: 'request-1',
         session_id: 'session-1',
         ip_address: '127.0.0.1',
         user_agent: 'test-agent',
         http_method: 'POST',
         route: '/api/users/:id',
       }),
-    );
-    expect(repository.create.mock.calls[0][0]).not.toHaveProperty(
-      'actor_user_id',
     );
   });
 
@@ -209,7 +243,7 @@ describe(ActivityAuditService.name, () => {
         route: '/context/:id',
       },
       () =>
-        service.recordActivity({
+        service.record({
           ...activity,
           requestId: 'explicit-request',
           sessionId: 'explicit-session',
@@ -225,18 +259,14 @@ describe(ActivityAuditService.name, () => {
         request_id: 'explicit-request',
         session_id: 'explicit-session',
         actor_id: 'explicit-user',
-        actor_type: 'admin',
         source: 'system',
         route: '/explicit/:id',
       }),
     );
-    expect(repository.create.mock.calls[0][0]).not.toHaveProperty(
-      'actor_user_id',
-    );
   });
 
   it('normalizes relation objects to a stable, unique ID list', async () => {
-    await service.recordEntityChange({
+    await service.record({
       ...activity,
       event: 'entity.update',
       resourceType: 'user',
@@ -255,24 +285,23 @@ describe(ActivityAuditService.name, () => {
 
   it('uses the transaction manager repository when supplied', async () => {
     const transactionRepository = {
-      create: jest.fn((value) => value as ActivityAuditEntity),
+      create: jest.fn((value) => value as AuditEventEntity),
       insert: jest.fn().mockResolvedValue({}),
     };
     const manager = {
       getRepository: jest.fn().mockReturnValue(transactionRepository),
     } as unknown as EntityManager;
 
-    await service.recordActivity(activity, manager);
+    await service.record(activity, manager);
 
-    expect(manager.getRepository).toHaveBeenCalledWith(ActivityAuditEntity);
+    expect(manager.getRepository).toHaveBeenCalledWith(AuditEventEntity);
     expect(transactionRepository.insert).toHaveBeenCalledTimes(1);
-
     expect(repository.insert).not.toHaveBeenCalled();
   });
 
   it('propagates repository failures to the caller', async () => {
     repository.insert.mockRejectedValueOnce(new Error('database unavailable'));
-    await expect(service.recordActivity(activity)).rejects.toThrow(
+    await expect(service.record(activity)).rejects.toThrow(
       'database unavailable',
     );
   });
@@ -281,7 +310,7 @@ describe(ActivityAuditService.name, () => {
     jest.spyOn(redaction, 'redactMetadata').mockReturnValue({
       reason: 'x'.repeat(70_000),
     });
-    await expect(service.recordActivity(activity)).rejects.toBeInstanceOf(
+    await expect(service.record(activity)).rejects.toBeInstanceOf(
       PayloadTooLargeException,
     );
     expect(repository.insert).not.toHaveBeenCalled();

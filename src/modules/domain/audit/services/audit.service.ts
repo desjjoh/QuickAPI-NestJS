@@ -7,7 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
-import { ActivityAuditEntity } from '../entities/activity-audit.entity';
+import { AuditEventEntity } from '../entities/audit-event.entity';
 import {
   AuditEntityType,
   AuditRedactionService,
@@ -34,7 +34,7 @@ export type AuditSource =
   | 'migration'
   | 'system';
 
-interface AuditInputBase {
+export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
   readonly domain: string;
   readonly event: string;
@@ -59,15 +59,13 @@ interface AuditInputBase {
   readonly failureReason?: string | null;
   readonly failureCode?: string | null;
   readonly occurredAt?: Date;
-}
-
-export type RecordActivityInput = AuditInputBase;
-
-export interface RecordEntityChangeInput extends AuditInputBase {
-  readonly resourceType: AuditEntityType;
-  readonly resourceId: string;
-  readonly before: unknown;
-  readonly after: unknown;
+  /** Correlates retries or multiple audit events belonging to one operation. */
+  readonly operationId?: string | null;
+  readonly idempotencyId?: string | null;
+  readonly before?: unknown;
+  readonly after?: unknown;
+  /** Persist a semantic event even when its redacted snapshots have no changes. */
+  readonly meaningfulWithoutChanges?: boolean;
 }
 
 const EVENT_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$/;
@@ -104,59 +102,55 @@ const ENTITY_TYPES: readonly AuditEntityType[] = [
 const MAX_JSON_BYTES = 64 * 1024;
 
 @Injectable()
-export class ActivityAuditService {
+export class AuditService {
   public constructor(
-    @InjectRepository(ActivityAuditEntity)
-    private readonly repository: Repository<ActivityAuditEntity>,
+    @InjectRepository(AuditEventEntity)
+    private readonly repository: Repository<AuditEventEntity>,
     private readonly redaction: AuditRedactionService,
     private readonly requestContext: RequestContext,
   ) {}
 
-  public recordActivity(
-    input: RecordActivityInput,
+  public record(
+    input: RecordAuditInput,
     manager?: EntityManager,
-  ): Promise<ActivityAuditEntity> {
+  ): Promise<AuditEventEntity | null> {
     this.validateBase(input);
-    return this.persist(
-      input,
-      {
-        category: 'activity_event',
-        before: null,
-        after: null,
-        changes: null,
-      },
-      manager,
-    );
-  }
+    const hasBefore = Object.prototype.hasOwnProperty.call(input, 'before');
+    const hasAfter = Object.prototype.hasOwnProperty.call(input, 'after');
+    if (hasBefore !== hasAfter)
+      throw new BadRequestException(
+        'before and after must be supplied together',
+      );
 
-  public recordEntityChange(
-    input: RecordEntityChangeInput,
-    manager?: EntityManager,
-  ): Promise<ActivityAuditEntity | null> {
-    this.validateBase(input);
+    if (!hasBefore) {
+      return this.persist(
+        input,
+        { before: null, after: null, changes: null },
+        manager,
+      );
+    }
+
     this.requiredString('resourceType', input.resourceType, 64);
-    if (!ENTITY_TYPES.includes(input.resourceType))
+    if (!ENTITY_TYPES.includes(input.resourceType as AuditEntityType))
       throw new BadRequestException('resourceType is invalid');
     this.requiredString('resourceId', input.resourceId, 255);
-    if (!Object.prototype.hasOwnProperty.call(input, 'before'))
-      throw new BadRequestException('before is required');
-    if (!Object.prototype.hasOwnProperty.call(input, 'after'))
-      throw new BadRequestException('after is required');
-
     const diff = this.redaction.redactDiff(
-      input.resourceType,
+      input.resourceType as AuditEntityType,
       input.before,
       input.after,
     );
     const left = this.asRecord(diff.before);
     const right = this.asRecord(diff.after);
     const changes = this.asRecord(diff.changes);
-    if (Object.keys(changes).length === 0) return Promise.resolve(null);
+    if (
+      Object.keys(changes).length === 0 &&
+      input.meaningfulWithoutChanges !== true
+    )
+      return Promise.resolve(null);
 
     return this.persist(
       input,
       {
-        category: 'entity_change',
         before: left,
         after: right,
         changes,
@@ -166,13 +160,10 @@ export class ActivityAuditService {
   }
 
   private async persist(
-    input: AuditInputBase,
-    data: Pick<
-      ActivityAuditEntity,
-      'category' | 'before' | 'after' | 'changes'
-    >,
+    input: RecordAuditInput,
+    data: Pick<AuditEventEntity, 'before' | 'after' | 'changes'>,
     manager?: EntityManager,
-  ): Promise<ActivityAuditEntity> {
+  ): Promise<AuditEventEntity> {
     const context = this.requestContext.getStore();
     const metadata = this.asRecord(
       this.redaction.redactMetadata(input.metadata),
@@ -180,7 +171,7 @@ export class ActivityAuditService {
     this.enforcePayloadBounds(data.before, data.after, data.changes, metadata);
 
     const repository = manager
-      ? manager.getRepository(ActivityAuditEntity)
+      ? manager.getRepository(AuditEventEntity)
       : this.repository;
     const entity = repository.create({
       ...data,
@@ -193,6 +184,8 @@ export class ActivityAuditService {
       resource_type: input.resourceType ?? null,
       resource_id: input.resourceId ?? null,
       domain: input.domain,
+      operation_id: input.operationId ?? null,
+      idempotency_id: input.idempotencyId ?? null,
       request_id: input.requestId ?? context?.requestId ?? null,
       session_id: input.sessionId ?? context?.sessionId ?? null,
       ip_address: input.ipAddress ?? context?.ip ?? null,
@@ -211,7 +204,7 @@ export class ActivityAuditService {
     return entity;
   }
 
-  private validateBase(input: AuditInputBase): void {
+  private validateBase(input: RecordAuditInput): void {
     if (!input || typeof input !== 'object')
       throw new BadRequestException('audit input is required');
     this.requiredString('event', input.event, 128);
@@ -246,6 +239,8 @@ export class ActivityAuditService {
     this.optionalString('route', input.route, 512);
     this.optionalString('failureReason', input.failureReason, 512);
     this.optionalString('failureCode', input.failureCode, 64);
+    this.optionalString('operationId', input.operationId, 128);
+    this.optionalString('idempotencyId', input.idempotencyId, 128);
     if (
       input.occurredAt !== undefined &&
       (!(input.occurredAt instanceof Date) ||

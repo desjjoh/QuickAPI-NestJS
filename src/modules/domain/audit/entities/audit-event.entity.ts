@@ -24,7 +24,7 @@ type RedactedAuditData = Record<string, unknown>;
   'event',
   'occurred_at',
 ])
-export class ActivityAuditEntity extends BaseEntity {
+export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 32 })
   public readonly category!: string;
 
@@ -51,6 +51,14 @@ export class ActivityAuditEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   public readonly resource_id!: string | null;
+
+  @Index('IDX_activity_audits_operation_id')
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public readonly operation_id!: string | null;
+
+  @Index('IDX_activity_audits_idempotency_id')
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public readonly idempotency_id!: string | null;
 
   @Column({ type: 'varchar', length: 64 })
   public readonly domain!: string;

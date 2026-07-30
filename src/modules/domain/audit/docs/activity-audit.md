@@ -21,13 +21,13 @@ for an investigation may therefore be retained in metadata rather than relying
 on joins to mutable application tables. Audit rows must not use foreign-key
 cascades to users or domain entities.
 
-## Record categories
+## Record forms
 
-Every record has exactly one of the following categories. Both categories are
-manually emitted by the domain or application service that owns the operation;
-neither is inferred from persistence activity.
+Every record is emitted through `AuditService.record(input, manager?)`. A
+record is either a semantic event without snapshots or an event carrying a
+redacted, changed-only snapshot diff; no category discriminator is stored.
 
-### `activity_event`
+### Semantic events
 
 An activity event is explicitly recorded by the owning domain or application
 service and captures a semantic, security-relevant action and its outcome. It
@@ -73,7 +73,7 @@ operation has meaningful requested and completed phases, use separate keys
 `identity.password_reset.completed`) rather than changing the meaning of an
 existing key.
 
-### `entity_change`
+### Events with snapshots
 
 An entity change is also explicitly recorded by the owning domain or
 application service and captures the persistence-level mutations that the
@@ -123,7 +123,6 @@ conventions.
 | Field              | Type                  | Required    | Meaning                                                                                     |
 | ------------------ | --------------------- | ----------- | ------------------------------------------------------------------------------------------- |
 | `audit_record_id`  | string/UUID           | yes         | Globally unique, immutable audit record ID; preferably time-sortable                        |
-| `category`         | enum                  | yes         | `activity_event` or `entity_change`                                                         |
 | `event_action_key` | string                | yes         | Stable machine key from the controlled catalog, never a display message                     |
 | `outcome`          | enum                  | yes         | `succeeded`, `failed`, `denied`, `pending`, or `unknown`                                    |
 | `actor_type`       | enum                  | yes         | `user`, `anonymous`, `service`, `admin`, or `system`                                        |
@@ -133,6 +132,8 @@ conventions.
 | `resource_type`    | string, nullable      | conditional | Type of the specific object affected                                                        |
 | `resource_id`      | string, nullable      | conditional | Identifier of the specific object affected                                                  |
 | `domain`           | string                | yes         | Domain that owns the event definition                                                       |
+| `operation_id`     | string, nullable      | no          | Identifier shared by audit events belonging to one logical operation                        |
+| `idempotency_id`   | string, nullable      | no          | Identifier used to correlate retries of an idempotent operation                             |
 | `request_id`       | string, nullable      | conditional | Request correlation ID; required for HTTP-sourced records and propagated to downstream work |
 | `session_id`       | string, nullable      | no          | Opaque session identifier when available; never a bearer or refresh token                   |
 | `ip_address`       | string, nullable      | no          | Canonical client IP after applying the trusted-proxy policy                                 |
@@ -178,7 +179,7 @@ explicitly allowlisted because they outlive the source record.
 
 ### Change snapshots
 
-For `entity_change`, `before`, `after`, and `changed_fields` include only fields
+When snapshots are supplied, `before`, `after`, and `changed_fields` include only fields
 approved for auditing:
 
 - insert: `after` is populated; `before` is null;
@@ -250,7 +251,7 @@ The store and indexes should support bounded time-range queries for:
 - administrative actions by event key, actor, subject, outcome, and time;
 - session creation/revocation investigations by `session_id`;
 - changes to a named field using `changed_fields`;
-- retention, legal-hold, and compliance exports by time and category.
+- retention, legal-hold, and compliance exports by time and domain/event.
 
 Likely composite indexes begin with `occurred_at` and include
 `(actor_id, occurred_at)`, `(subject_id, occurred_at)`,

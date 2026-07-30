@@ -9,7 +9,7 @@ import { MfaService } from '@/modules/domain/identity/services/mfa.service';
 import { MfaChallengePurpose } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaChallengeResponseDto } from '../models/mfa.model';
-import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class AuthService {
     private readonly userSvc: UserService,
     private readonly refreshSvc: RefreshService,
     private readonly mfaSvc: MfaService,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {}
 
   public async signIn(
@@ -29,7 +29,7 @@ export class AuthService {
     const challenge = await this.mfaSvc.createSignInChallenge(user);
 
     if (challenge) {
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
         domain: 'identity',
         outcome: 'pending',
@@ -61,7 +61,7 @@ export class AuthService {
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
       : this.refreshSvc.issueTokens(updated, res));
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -91,7 +91,7 @@ export class AuthService {
       );
       this.userSvc.assertCanAuthenticate(user);
     } catch (error) {
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
         domain: 'identity',
         outcome: 'failed',
@@ -104,7 +104,7 @@ export class AuthService {
       throw error;
     }
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -127,7 +127,7 @@ export class AuthService {
     try {
       const tokens = await this.refreshSvc.issueTokens(user, res, session);
 
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
         domain: 'identity',
         outcome: 'succeeded',
@@ -142,7 +142,7 @@ export class AuthService {
 
       return tokens;
     } catch (error) {
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
         domain: 'identity',
         outcome: 'failed',
@@ -167,7 +167,7 @@ export class AuthService {
   ): Promise<void> {
     await this.refreshSvc.revokeTokens(session, res);
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
       domain: 'identity',
       outcome: 'succeeded',

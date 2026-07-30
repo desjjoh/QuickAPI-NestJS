@@ -34,8 +34,7 @@ describe('PasswordResetService', () => {
     recordPasswordChanged: jest.fn(),
   };
   const auditSvc = {
-    recordActivity: jest.fn().mockResolvedValue({}),
-    recordEntityChange: jest.fn().mockResolvedValue({}),
+    record: jest.fn().mockResolvedValue({}),
   };
   let service: PasswordResetService;
 

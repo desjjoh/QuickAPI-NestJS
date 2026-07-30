@@ -26,7 +26,7 @@ import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/ema
 import { UserSessionEntity } from '../entities/session.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { RoleEntity } from '../../library/entities/role.entity';
-import { ActivityAuditService } from '../../audit/services/activity-audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
@@ -44,7 +44,7 @@ export class EmailVerificationService {
     private readonly userSvc: UserService,
     private readonly emailSvc: EmailService,
     private readonly dataSource: DataSource,
-    private readonly auditSvc: ActivityAuditService,
+    private readonly auditSvc: AuditService,
   ) {}
 
   public async sendVerificationEmail(
@@ -61,7 +61,7 @@ export class EmailVerificationService {
       mfaCode,
     });
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_REQUESTED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -112,7 +112,7 @@ export class EmailVerificationService {
       mfaCode,
     });
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event: IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_REQUESTED,
       domain: 'identity',
       outcome: 'succeeded',
@@ -200,7 +200,7 @@ export class EmailVerificationService {
       ? IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_COMPLETED
       : IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_COMPLETED;
 
-    await this.auditSvc.recordActivity({
+    await this.auditSvc.record({
       event,
       domain: 'identity',
       outcome: 'succeeded',
@@ -215,7 +215,7 @@ export class EmailVerificationService {
     });
 
     if (previousEmail)
-      await this.auditSvc.recordEntityChange({
+      await this.auditSvc.record({
         event,
         domain: 'identity',
         outcome: 'succeeded',
@@ -265,7 +265,7 @@ export class EmailVerificationService {
           registrationToken.metadata,
           manager,
         );
-        await this.auditSvc.recordActivity(
+        await this.auditSvc.record(
           {
             event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
             domain: 'identity',
@@ -283,7 +283,7 @@ export class EmailVerificationService {
         return created;
       });
     } catch (error) {
-      await this.auditSvc.recordActivity({
+      await this.auditSvc.record({
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
         domain: 'identity',
         outcome: 'failed',

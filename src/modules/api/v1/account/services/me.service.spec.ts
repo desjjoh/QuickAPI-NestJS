@@ -54,8 +54,7 @@ describe('MeApiService', () => {
       enable: jest.fn(),
     };
     const auditSvc = {
-      recordActivity: jest.fn().mockResolvedValue({}),
-      recordEntityChange: jest.fn().mockResolvedValue({}),
+      record: jest.fn().mockResolvedValue({}),
     };
     return {
       service: new MeApiService(

@@ -40,7 +40,7 @@ describe('RegistrationService', () => {
     };
     const userRepo = { findByEmail: jest.fn().mockResolvedValue(null) };
     const registrationTokenSvc = { findPendingByEmail: jest.fn() };
-    const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
+    const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     return {
       service: new RegistrationService(
         userSvc as unknown as UserService,
@@ -72,7 +72,7 @@ describe('RegistrationService', () => {
       'person@example.test',
       expect.objectContaining(metadata),
     );
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
       domain: 'identity',
       outcome: 'pending',
@@ -113,7 +113,7 @@ describe('RegistrationService', () => {
       'person@example.test',
       pendingMetadata,
     );
-    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+    expect(auditSvc.record).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
       domain: 'identity',
       outcome: 'pending',
