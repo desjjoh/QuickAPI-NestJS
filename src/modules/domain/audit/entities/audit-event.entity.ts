@@ -25,9 +25,6 @@ type RedactedAuditData = Record<string, unknown>;
   'occurred_at',
 ])
 export class AuditEventEntity extends BaseEntity {
-  @Column({ type: 'varchar', length: 32 })
-  public readonly category!: string;
-
   @Column({ type: 'varchar', length: 128 })
   public readonly event!: string;
 
