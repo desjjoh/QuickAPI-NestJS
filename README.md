@@ -337,29 +337,27 @@ DB_POOL_QUEUE_LIMIT="100"
 DB_CONNECT_TIMEOUT_MS="10000"
 DB_SLOW_QUERY_LOG_MS="1000"
 
-
 # ============================================================
 # Auth / Tokens
 #
-# Generate three distinct values from at least 32 random bytes. Inject them at
-# runtime through the deployment platform's secret manager; do not commit them
-# or bake them into the container image.
+# Generate three distinct values from at least 32 random bytes. Store them in
+# the gitignored environment file; do not commit them or bake them into the
+# container image.
 # ============================================================
 
-JWT_SECRET_KEY="__INJECT_JWT_SECRET_KEY_FROM_SECRET_MANAGER__"
-REFRESH_SECRET_KEY="__INJECT_REFRESH_SECRET_KEY_FROM_SECRET_MANAGER__"
-CRYPTO_SECRET="__INJECT_CRYPTO_SECRET_FROM_SECRET_MANAGER__"
+JWT_SECRET_KEY="__REPLACE_JWT_SECRET_KEY_BEFORE_DEPLOYMENT__"
+REFRESH_SECRET_KEY="__REPLACE_REFRESH_SECRET_KEY_BEFORE_DEPLOYMENT__"
+CRYPTO_SECRET="__REPLACE_CRYPTO_SECRET_BEFORE_DEPLOYMENT__"
 
 JWT_EXPIRY_TIME="15m"
 REFRESH_EXPIRY_TIME="7d"
-
 
 # ============================================================
 # Email / Postmark
 # ============================================================
 
 POSTMARK_ENABLED="false"
-POSTMARK_SERVER_TOKEN="__INJECT_POSTMARK_SERVER_TOKEN_FROM_SECRET_MANAGER__"
+POSTMARK_SERVER_TOKEN="__REPLACE_POSTMARK_SERVER_TOKEN_BEFORE_DEPLOYMENT__"
 POSTMARK_FROM_EMAIL="noreply@example.com"
 POSTMARK_MESSAGE_STREAM="outbound"
 
@@ -368,10 +366,10 @@ POSTMARK_MESSAGE_STREAM="outbound"
 # ============================================================
 
 STORAGE_DRIVER="local"
-R2_ACCOUNT_ID="__INJECT_R2_ACCOUNT_ID_FROM_SECRET_MANAGER__"
+R2_ACCOUNT_ID="__REPLACE_R2_ACCOUNT_ID_BEFORE_DEPLOYMENT__"
 R2_ENDPOINT="https://r2-account-id.r2.cloudflarestorage.com"
-R2_ACCESS_KEY_ID="__INJECT_R2_ACCESS_KEY_ID_FROM_SECRET_MANAGER__"
-R2_SECRET_ACCESS_KEY="__INJECT_R2_SECRET_ACCESS_KEY_FROM_SECRET_MANAGER__"
+R2_ACCESS_KEY_ID="__REPLACE_R2_ACCESS_KEY_ID_BEFORE_DEPLOYMENT__"
+R2_SECRET_ACCESS_KEY="__REPLACE_R2_SECRET_ACCESS_KEY_BEFORE_DEPLOYMENT__"
 R2_BUCKET_NAME="quickapi-dev"
 R2_PUBLIC_BASE_URL="https://pub-example.r2.dev"
 
@@ -763,9 +761,11 @@ exported its configuration and secrets (for example, from a secret-manager
 sidecar or CI secret context):
 
 ```bash
-docker compose -f docker-compose.staging.yml config --quiet
-docker compose -f docker-compose.staging.yml run --rm migration
-docker compose -f docker-compose.staging.yml up -d --no-deps api
+cp .env.staging.example .env.staging # then inject secrets and deployment values
+npm run staging:preflight
+docker compose --env-file .env.staging -f docker-compose.staging.yml config --quiet
+docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm migration
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d api
 ```
 
 Use an immutable tag or digest for `QUICKAPI_IMAGE`. The compose file refuses to
@@ -782,6 +782,8 @@ terminate TLS, strip untrusted forwarding headers, connect through the named
 external network, and proxy plain HTTP to port 4000. Consequently application
 TLS is disabled while secure cookies remain enabled. The API health check probes
 `/health`; configure the ingress/orchestrator readiness probe to use `/ready`.
+
+The `preflight` service loads and validates `.env.staging` and must finish successfully before the migration or GeoLite jobs can run. Those jobs, in turn, must finish before the API deployment. Targeted deployment automation must run `npm run staging:preflight` first as shown above.
 
 The one-shot `migration` service uses the same immutable image and database
 configuration as the API. It must complete successfully before API replacement;

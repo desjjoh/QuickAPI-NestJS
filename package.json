@@ -55,7 +55,9 @@
     "dev:db": "npm run docker:mysql:up && npm run migration:run",
     "geoip:seed": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts",
     "geoip:update": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts",
-    "geoip:update:prod": "node dist/modules/system/geolocation/scripts/seed-geolite2.js"
+    "geoip:update:prod": "node dist/modules/system/geolocation/scripts/seed-geolite2.js",
+    "staging:preflight": "ts-node -r tsconfig-paths/register src/config/staging-preflight.ts .env.staging",
+    "staging:preflight:prod": "node dist/config/staging-preflight.js .env.staging"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1052.0",
@@ -81,6 +83,7 @@
     "class-validator": "^0.14.2",
     "colorette": "^2.0.20",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^17.4.2",
     "handlebars": "^4.7.9",
     "image-size": "^2.0.2",
     "maxmind": "^5.0.6",
