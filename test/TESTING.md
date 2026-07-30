@@ -58,3 +58,36 @@ security-sensitive branch block release.
 - `npm run test:infra:up && npm run test:db:prepare && npm run test:e2e:local`
   runs E2E tests against disposable MySQL and Redis dependencies.
 - `npm run test:infra:down` removes the disposable dependencies and volumes.
+
+## Production topology smoke test
+
+Run the same production-image test used by the staging gate with one command:
+
+```bash
+npm run test:smoke
+```
+
+The command requires Docker Engine, Docker Compose v2, and outbound HTTPS access
+to GitHub's raw-content host for MaxMind's public test databases. It builds the
+production Dockerfile once, addresses that build by immutable image ID, and then
+runs the following disposable topology in order:
+
+1. healthy MySQL 8.4 and password-authenticated Redis 7;
+2. staging configuration preflight;
+3. initialization of a newly-created GeoLite volume with valid public test data;
+4. production TypeORM migrations;
+5. the API under the image's configured non-root user;
+6. HTTP policy probes and graceful SIGTERM shutdown.
+
+The command removes all smoke containers, its private network, and its volumes
+on success or failure. If it fails, it first writes component logs to
+`smoke-logs/`. To validate only the rendered Compose model without building or
+starting containers, run:
+
+```bash
+npm run test:smoke:config
+```
+
+In GitHub Actions the `Production topology smoke test` job runs the full command
+for every staging push and staging pull request. Its log artifact is uploaded on
+failure, and the staging deployment gate cannot pass unless the smoke job does.

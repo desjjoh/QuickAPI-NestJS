@@ -6,11 +6,6 @@ on:
   pull_request:
     branches: [main, staging, dev]
   workflow_dispatch:
-    inputs:
-      container-smoke:
-        description: Build and smoke-test the production container
-        type: boolean
-        default: false
 
 # These are deliberately inert, test-only values. CI never copies .env.example,
 # so adding a development or production secret there cannot affect a test run.
@@ -319,15 +314,13 @@ jobs:
 
   container-smoke:
     name: Production topology smoke test
-    if: github.ref == 'refs/heads/staging' || github.base_ref == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.container-smoke)
     needs: [type-checking, migration-validation, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - run: docker build --tag quickapi-nestjs:ci .
       - name: Exercise the staging production topology
-        run: .github/scripts/ci-smoke.sh
+        run: npm run test:smoke
       - name: Upload topology logs on failure
         if: failure()
         uses: actions/upload-artifact@v6
@@ -338,7 +331,9 @@ jobs:
 
   staging-deployment-gate:
     name: Staging deployment gate
-    if: always() && (github.ref == 'refs/heads/staging' || github.base_ref == 'staging')
+    # Keep this job present on every CI run so branch protection sees a real
+    # pass/fail check rather than an untested, conditionally skipped job.
+    if: always()
     needs: [migration-validation, e2e-tests, container-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
