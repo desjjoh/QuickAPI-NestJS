@@ -3,6 +3,8 @@ set -Eeuo pipefail
 
 cd "$(dirname "$0")/../.."
 compose=(docker compose --project-name quickapi-smoke --file .github/compose.ci-smoke.yml)
+artifact_dir="${MIGRATION_ARTIFACT_DIR:-migration-artifacts}"
+mkdir -p "$artifact_dir"
 export SMOKE_IMAGE
 SMOKE_IMAGE="$(docker image inspect --format '{{.Id}}' quickapi-nestjs:ci)"
 runtime_user="$(docker image inspect --format '{{.Config.User}}' "$SMOKE_IMAGE")"
@@ -29,6 +31,20 @@ run_one_shot() {
   echo "::endgroup::"
 }
 
+image_migration_names() {
+  docker run --rm --entrypoint sh "$SMOKE_IMAGE" -c \
+    "find /app/dist/database/migrations -maxdepth 1 -type f -name '*-migration.js' -exec basename {} .js \; | sort"
+}
+
+source_migration_names() {
+  find src/database/migrations -maxdepth 1 -type f -name '*-migration.ts' \
+    -printf '%f\n' | sed 's/\.ts$//' | sort
+}
+
+run_migration_cli() {
+  "${compose[@]}" run --rm --no-deps migration "$@"
+}
+
 # Every run starts with new anonymous database state and a newly-created GeoLite volume.
 cleanup
 echo "::group::Smoke: ephemeral dependencies"
@@ -36,7 +52,36 @@ echo "::group::Smoke: ephemeral dependencies"
 echo "::endgroup::"
 run_one_shot preflight
 run_one_shot geoip-init
+
+# Validate exactly what the production image can discover. This catches both a
+# missing compiled migrations directory and stale/extra files in that image.
+source_migration_names >"$artifact_dir/source-migrations.txt"
+image_migration_names >"$artifact_dir/compiled-migrations.txt"
+[[ -s "$artifact_dir/compiled-migrations.txt" || ! -s "$artifact_dir/source-migrations.txt" ]] || {
+  echo 'production image contains zero migrations while source migrations exist' >&2
+  exit 1
+}
+diff -u "$artifact_dir/source-migrations.txt" "$artifact_dir/compiled-migrations.txt"
+expected_count="$(wc -l <"$artifact_dir/source-migrations.txt" | tr -d ' ')"
+
+echo "::group::Smoke: list pending compiled migrations"
+run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/database/typeorm.datasource.js \
+  | tee "$artifact_dir/pending-before.txt"
+echo "::endgroup::"
 run_one_shot migration
+
+# Read release evidence from the same database using only production-image
+# dependencies. TypeORM stores class names here, which are the useful release
+# audit identifiers rather than implementation filenames.
+run_migration_cli node -e '
+  const mysql=require("mysql2/promise");
+  (async()=>{const db=await mysql.createConnection({host:process.env.DB_HOST,port:+process.env.DB_PORT,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_DATABASE});const [rows]=await db.query("SELECT name FROM typeorm_migrations ORDER BY id");for(const row of rows)console.log(row.name);await db.end()})().catch(e=>{console.error(e);process.exit(1)})
+' | tee "$artifact_dir/applied-migrations.txt"
+actual_count="$(wc -l <"$artifact_dir/applied-migrations.txt" | tr -d ' ')"
+[[ "$actual_count" == "$expected_count" ]] || {
+  echo "applied $actual_count migrations; expected $expected_count" >&2
+  exit 1
+}
 echo "::group::Smoke: API probes"
 "${compose[@]}" up -d --no-deps api
 
@@ -65,6 +110,36 @@ expect_status 401 /system
 expect_status 401 /info
 expect_status 401 /metrics --header 'X-Operations-Key: invalid-key'
 expect_status 200 /metrics --header 'X-Operations-Key: ci-operations-key-not-a-production-secret'
+
+echo "::group::Smoke: compiled migration revert / forward"
+run_migration_cli node ./node_modules/typeorm/cli.js migration:revert -d dist/database/typeorm.datasource.js
+run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/database/typeorm.datasource.js \
+  | tee "$artifact_dir/pending-after-revert.txt"
+[[ "$(grep -c '^\[ \]' "$artifact_dir/pending-after-revert.txt" || true)" == 1 ]] || {
+  echo 'expected exactly one pending migration after revert' >&2
+  exit 1
+}
+run_migration_cli npm run migration:run:prod
+run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/database/typeorm.datasource.js \
+  | tee "$artifact_dir/pending-after-reapply.txt"
+[[ "$(grep -c '^\[ \]' "$artifact_dir/pending-after-reapply.txt" || true)" == 0 ]] || {
+  echo 'migrations remain pending after reapply' >&2
+  exit 1
+}
+echo "::endgroup::"
+
+# A failed one-shot migration must preserve its non-zero status. The staging
+# topology's service_completed_successfully dependency then blocks a new API
+# container/replacement from starting.
+if "${compose[@]}" run --rm --no-deps -e DB_PASSWORD=deliberately-wrong migration; then
+  echo 'migration service unexpectedly succeeded with invalid credentials' >&2
+  exit 1
+fi
+staging_api_condition="$(QUICKAPI_IMAGE="$SMOKE_IMAGE" docker compose -f docker-compose.staging.yml config --format json | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>process.stdout.write(JSON.parse(s).services.api.depends_on.migration.condition))')"
+[[ "$staging_api_condition" == service_completed_successfully ]] || {
+  echo 'staging API is not blocked by migration failure' >&2
+  exit 1
+}
 
 api_id="$("${compose[@]}" ps --quiet api)"
 docker kill --signal TERM "$api_id" >/dev/null

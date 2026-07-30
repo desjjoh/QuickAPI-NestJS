@@ -58,6 +58,9 @@ services:
     image: ${SMOKE_IMAGE:?Set SMOKE_IMAGE to the built image ID}
     env_file: ci-smoke.env
     init: true
+    depends_on:
+      migration:
+        condition: service_completed_successfully
     ports: ['127.0.0.1:4000:4000']
     volumes: [geoip:/app/data/geoip:ro]
     stop_grace_period: 20s

@@ -136,48 +136,24 @@ jobs:
           if-no-files-found: warn
 
   migration-validation:
-    name: Migration forward / revert / forward
+    name: Production image migration / readiness validation
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root_password
-          MYSQL_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
-          MYSQL_USER: quickapi_test
-          MYSQL_PASSWORD: quickapi_test_password
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
-          --health-interval=5s --health-timeout=5s --health-retries=20
-    env:
-      DB_HOST: 127.0.0.1
-      DB_PORT: '3306'
-      DB_USER: quickapi_test
-      DB_PASSWORD: quickapi_test_password
-      DB_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
-      TEST_DB_ENABLED: 'true'
-      TEST_DB_DATABASE: migrations_${{ github.run_id }}_${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run test:db:safety
-      - run: npm run migration:run
-      - run: npm run migration:show
-      - run: npm run test:db:safety
-      - run: npm run migration:revert
-      - run: npm run migration:show
-      - run: npm run test:db:safety
-      - run: npm run migration:run
-      - name: Capture service logs on failure
-        if: failure()
-        run: docker logs $(docker ps -aq --filter ancestor=mysql:8.4) > mysql.log 2>&1 || true
-      - if: failure()
+      - name: Build the production image under test
+        run: docker build --tag quickapi-nestjs:ci .
+      - name: Validate compiled migrations and API readiness
+        run: bash .github/scripts/ci-smoke.sh
+      - name: Upload applied migration release evidence
+        if: always()
         uses: actions/upload-artifact@v6
-        with: { name: migration-failure-logs, path: '*.log' }
+        with:
+          name: applied-migrations-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            migration-artifacts/
+            smoke-logs/
+          if-no-files-found: error
 
   integration-tests:
     name: Integration tests
