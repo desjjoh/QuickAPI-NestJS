@@ -17,7 +17,14 @@ export type AuditEntityType =
   | 'account_status'
   | 'image';
 
-type FieldPolicy = 'value' | 'masked-email' | 'hash' | 'changed' | FieldTree;
+type FieldPolicy =
+  | 'value'
+  | 'masked-email'
+  | 'hash'
+  | 'changed'
+  | 'relation-ids'
+  | 'ordered-relation-ids'
+  | FieldTree;
 interface FieldTree {
   readonly [field: string]: FieldPolicy;
 }
@@ -37,7 +44,7 @@ const ENTITY_FIELDS: Readonly<Record<AuditEntityType, FieldTree>> = {
     id: 'value',
     identity: { email: 'masked-email' },
     profile: { id: 'value', name: { first: 'value', last: 'value' } },
-    roles: { id: 'value', name: 'value' },
+    roles: 'relation-ids',
     status: { id: 'value', name: 'value' },
     active: 'value',
     created_at: 'value',
@@ -202,6 +209,8 @@ export class AuditRedactionService {
     if (policy === 'masked-email') return this.maskEmail(value);
     if (policy === 'hash') return this.hash(value);
     if (policy === 'value') return this.scalar(value);
+    if (policy === 'relation-ids' || policy === 'ordered-relation-ids')
+      return this.relationIds(value, policy === 'ordered-relation-ids');
     if (Array.isArray(value)) {
       const selected = value.slice(0, this.limits.maxArrayLength);
       const output = selected.map((item) =>
@@ -211,6 +220,37 @@ export class AuditRedactionService {
       return output;
     }
     return this.applyTree(value, policy, seen, depth);
+  }
+
+  /**
+   * Collection relations are deliberately reduced without traversing an item.
+   * `ordered-relation-ids` is available for relationships whose application
+   * order is meaningful; ordinary relation sets are sorted for stable diffs.
+   */
+  private relationIds(value: unknown, preserveOrder: boolean): AuditValue[] {
+    if (!Array.isArray(value)) return [];
+
+    const ids: string[] = [];
+    const unique = new Set<string>();
+    for (const item of value) {
+      const candidate =
+        typeof item === 'string'
+          ? item
+          : item !== null && typeof item === 'object' && 'id' in item
+            ? (item as { id?: unknown }).id
+            : undefined;
+      if (typeof candidate !== 'string' || candidate.trim().length === 0)
+        continue;
+      const id = this.safeString(candidate);
+      if (!unique.has(id)) {
+        unique.add(id);
+        ids.push(id);
+      }
+    }
+
+    if (!preserveOrder) ids.sort();
+    if (ids.length <= this.limits.maxArrayLength) return ids;
+    return [...ids.slice(0, this.limits.maxArrayLength), TRUNCATED];
   }
 
   private scalar(value: unknown): AuditValue {

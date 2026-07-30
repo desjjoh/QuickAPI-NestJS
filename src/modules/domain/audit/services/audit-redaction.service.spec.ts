@@ -111,12 +111,16 @@ describe(AuditRedactionService.name, () => {
     );
   });
 
-  it('is recursive, cycle-safe, deterministic, and handles dates, relations, arrays, and buffers', () => {
+  it('normalizes relationship objects and ID strings without retaining related details', () => {
     const service = new AuditRedactionService({ maxArrayLength: 2 });
-    const role = { name: 'reader', id: 'role-1', secret: 'role-secret' };
+    const role = {
+      name: 'reader',
+      id: 'role-2',
+      permissions: [{ id: 'permission-1' }],
+    };
     const entity: Record<string, unknown> = {
       updated_at: new Date('2026-01-02T03:04:05.000Z'),
-      roles: [role, { id: 'role-2', name: 'writer' }, { id: 'role-3' }],
+      roles: [role, 'role-1'],
       id: 'user-1',
       profile: Buffer.from('raw bytes'),
     };
@@ -128,14 +132,78 @@ describe(AuditRedactionService.name, () => {
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
     expect(first).toMatchObject({
       id: 'user-1',
-      roles: [
-        { id: 'role-1', name: 'reader' },
-        { id: 'role-2', name: 'writer' },
-        '[TRUNCATED]',
-      ],
+      roles: ['role-1', 'role-2'],
       updated_at: '2026-01-02T03:04:05.000Z',
     });
-    expect(JSON.stringify(first)).not.toContain('role-secret');
+    expect(JSON.stringify(first)).not.toMatch(/reader|permission-1|users/);
+  });
+
+  it('removes duplicate and unusable relationship IDs', () => {
+    const service = new AuditRedactionService();
+
+    expect(
+      service.redactSnapshot('user', {
+        roles: [
+          'role-2',
+          { id: 'role-1', label: 'User' },
+          { id: 'role-2', nested: { private: true } },
+          { label: 'missing ID' },
+          { id: 42 },
+          '',
+          null,
+        ],
+      }),
+    ).toEqual({ roles: ['role-1', 'role-2'] });
+  });
+
+  it('does not report reordered unordered relationships as changed', () => {
+    const service = new AuditRedactionService();
+    const diff = service.redactDiff(
+      'user',
+      { id: 'user-1', roles: ['role-2', 'role-1'] },
+      { id: 'user-1', roles: [{ id: 'role-1' }, { id: 'role-2' }] },
+    );
+
+    expect(diff.changed_fields).toEqual([]);
+    expect(diff.before).toEqual(diff.after);
+  });
+
+  it('reports added and removed relationship IDs with useful snapshots', () => {
+    const service = new AuditRedactionService();
+    const diff = service.redactDiff(
+      'user',
+      { id: 'user-1', roles: ['role-1', 'role-2'] },
+      { id: 'user-1', roles: ['role-2', 'role-3'] },
+    );
+
+    expect(diff).toEqual({
+      before: { id: 'user-1', roles: ['role-1', 'role-2'] },
+      after: { id: 'user-1', roles: ['role-2', 'role-3'] },
+      changed_fields: ['roles'],
+    });
+  });
+
+  it('truncates normalized relationship IDs at the configured limit', () => {
+    const service = new AuditRedactionService({ maxArrayLength: 2 });
+
+    expect(
+      service.redactSnapshot('user', {
+        roles: ['role-3', 'role-1', 'role-2', 'role-2'],
+      }),
+    ).toEqual({ roles: ['role-1', 'role-2', '[TRUNCATED]'] });
+  });
+
+  it('cannot leak cyclic relation graphs through an ID-only policy', () => {
+    const service = new AuditRedactionService();
+    const user: Record<string, unknown> = { id: 'user-1' };
+    const role = { id: 'role-1', label: 'Admin', users: [user] };
+    user.roles = [role];
+    role.users.push(role);
+
+    const snapshot = service.redactSnapshot('user', user);
+
+    expect(snapshot).toEqual({ id: 'user-1', roles: ['role-1'] });
+    expect(JSON.stringify(snapshot)).not.toMatch(/Admin|users|CIRCULAR/);
   });
 
   it('replaces oversized output with a deterministic marker', () => {
