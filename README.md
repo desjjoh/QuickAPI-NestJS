@@ -775,6 +775,33 @@ credentials. It also requires the actual HTTPS `PUBLIC_API_URL`, HTTPS
 `TRUST_PROXY` ingress address or CIDR allowlist. Do not use localhost, example
 domains, a wildcard CORS origin, or a trust-all proxy setting.
 
+### Release images and supply-chain evidence
+
+After the `CI` workflow succeeds on `main` or `staging`, the
+`.github/workflows/release-image.yml` workflow builds the production image once
+and pushes that manifest with the full commit SHA and `package.json` version
+tags. Set the repository variables `CONTAINER_REGISTRY` and
+`CONTAINER_REPOSITORY` to select a registry/repository (they default to GHCR and
+the GitHub repository name). Non-GHCR registries require the environment secrets
+`REGISTRY_USERNAME` and `REGISTRY_PASSWORD`.
+
+For a named staging release, dispatch the workflow with the full SHA of a commit
+that already passed CI and an optional OCI-compatible `staging-release` tag.
+Automated runs can instead read `STAGING_RELEASE_IDENTIFIER` from repository
+variables. Tags are convenient discovery aliases only: deployment automation
+must download the `release-image.env` evidence artifact and inject its
+`QUICKAPI_IMAGE=registry/repository@sha256:...` value into `.env.staging`. The
+migration, GeoLite initializer, preflight, and API services all pull that exact
+digest; the staging Compose definition has no local build fallback.
+
+The image carries OCI source, revision, version, and creation-time labels and a
+BuildKit provenance/SBOM attestation. The workflow also publishes an SPDX JSON
+SBOM, high-severity report, critical SARIF report, and the exception register as
+release evidence. Any critical vulnerability fails the release. High-severity
+exceptions must be recorded in
+`security/container-vulnerability-exceptions.md` with an owner, approval,
+mitigation, and expiry; currently no exceptions are accepted.
+
 MySQL and Redis are attached only to the internal `private` network and have no
 host-published ports. The API exposes port 4000 to its Docker networks but does
 not publish it on the host. The ingress is the only public entry point: it must

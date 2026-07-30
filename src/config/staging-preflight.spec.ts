@@ -31,7 +31,8 @@ const valid = (): NodeJS.ProcessEnv => ({
   CRYPTO_SECRET: 'c'.repeat(64),
   TRUST_PROXY: '172.20.0.0/24',
   INGRESS_NETWORK: 'staging-ingress',
-  QUICKAPI_IMAGE: 'registry.acme.test/quickapi:git-abcdef123456',
+  QUICKAPI_IMAGE:
+    'registry.acme.test/quickapi@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   MAXMIND_ACCOUNT_ID: '123456',
   MAXMIND_LICENSE_KEY: 'maxmind-secret',
 });
@@ -100,7 +101,11 @@ describe('staging preflight', () => {
     [{ CORS_ORIGINS: '*' }, /CORS_ORIGINS/],
     [{ TRUST_PROXY: '0.0.0.0/0' }, /TRUST_PROXY/],
     [{ TRUST_PROXY: 'true' }, /TRUST_PROXY/],
-    [{ QUICKAPI_IMAGE: 'quickapi:staging' }, /commit-specific tag/],
+    [{ QUICKAPI_IMAGE: 'quickapi:staging' }, /immutable sha256 digest/],
+    [
+      { QUICKAPI_IMAGE: 'registry.acme.test/quickapi:git-abcdef123456' },
+      /immutable sha256 digest/,
+    ],
     [{ DB_SYNC: 'true' }, /DB_SYNC/],
   ])('rejects unsafe staging input %#', (change, message) =>
     rejects(change, message),

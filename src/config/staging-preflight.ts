@@ -69,10 +69,7 @@ function isNarrowProxy(value: string): boolean {
 }
 
 function isImmutableImage(value: string): boolean {
-  return (
-    /@sha256:[a-f\d]{64}$/i.test(value) ||
-    /:[^:@]*(?:sha-|git-)?[a-f\d]{7,40}$/i.test(value)
-  );
+  return /@sha256:[a-f\d]{64}$/i.test(value);
 }
 
 export function validateStagingEnv(input: NodeJS.ProcessEnv): AppEnv {
@@ -103,7 +100,7 @@ export function validateStagingEnv(input: NodeJS.ProcessEnv): AppEnv {
       'TRUST_PROXY must be a narrow IP address or CIDR allowlist',
     );
   if (!isImmutableImage(input.QUICKAPI_IMAGE!))
-    throw new Error('QUICKAPI_IMAGE must use a digest or commit-specific tag');
+    throw new Error('QUICKAPI_IMAGE must use an immutable sha256 digest');
   if (env.DB_SYNC !== false)
     throw new Error('DB_SYNC must be false in staging');
   return env;
