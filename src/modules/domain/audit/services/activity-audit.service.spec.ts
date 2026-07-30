@@ -147,6 +147,7 @@ describe(ActivityAuditService.name, () => {
   it.each([
     ['event', { event: '' }],
     ['domain', { domain: '' }],
+    ['outcome', { outcome: undefined }],
     ['actorType', { actorType: undefined }],
     ['source', { source: undefined }],
     ['metadata', { metadata: undefined }],
@@ -183,14 +184,17 @@ describe(ActivityAuditService.name, () => {
 
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        actor_user_id: 'context-user',
         actor_id: 'context-user',
+        request_id: 'request-1',
         session_id: 'session-1',
         ip_address: '127.0.0.1',
         user_agent: 'test-agent',
         http_method: 'POST',
         route: '/api/users/:id',
       }),
+    );
+    expect(repository.create.mock.calls[0][0]).not.toHaveProperty(
+      'actor_user_id',
     );
   });
 
@@ -220,11 +224,14 @@ describe(ActivityAuditService.name, () => {
       expect.objectContaining({
         request_id: 'explicit-request',
         session_id: 'explicit-session',
-        actor_user_id: 'explicit-user',
         actor_id: 'explicit-user',
+        actor_type: 'admin',
         source: 'system',
         route: '/explicit/:id',
       }),
+    );
+    expect(repository.create.mock.calls[0][0]).not.toHaveProperty(
+      'actor_user_id',
     );
   });
 
@@ -259,6 +266,7 @@ describe(ActivityAuditService.name, () => {
 
     expect(manager.getRepository).toHaveBeenCalledWith(ActivityAuditEntity);
     expect(transactionRepository.insert).toHaveBeenCalledTimes(1);
+
     expect(repository.insert).not.toHaveBeenCalled();
   });
 
