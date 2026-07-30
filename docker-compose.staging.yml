@@ -94,9 +94,6 @@ services:
 
   geoip-init:
     image: ${QUICKAPI_IMAGE:?Set QUICKAPI_IMAGE to the release image digest}
-    build:
-      context: .
-      dockerfile: Dockerfile
     restart: 'no'
     depends_on:
       preflight:
@@ -113,9 +110,6 @@ services:
 
   api:
     image: ${QUICKAPI_IMAGE:?Set QUICKAPI_IMAGE to the release image digest}
-    build:
-      context: .
-      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       geoip-init:

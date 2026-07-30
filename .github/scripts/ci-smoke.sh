@@ -147,8 +147,28 @@ if [[ ! -e .env.staging ]]; then
   cp .github/ci-smoke.env .env.staging
   staging_env_created=true
 fi
-QUICKAPI_IMAGE="$SMOKE_IMAGE" docker compose -f docker-compose.staging.yml config --format json \
+export QUICKAPI_IMAGE="$SMOKE_IMAGE"
+docker compose -f docker-compose.staging.yml config --format json \
   >"$artifact_dir/staging-compose.json"
+node - "$artifact_dir/staging-compose.json" <<'NODE'
+const fs = require('fs');
+
+const model = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+for (const [name, service] of Object.entries(model.services)) {
+  if (Object.hasOwn(service, 'build')) {
+    throw new Error(`staging service ${name} contains a build property`);
+  }
+}
+
+for (const name of ['preflight', 'migration', 'geoip-init', 'api']) {
+  if (model.services[name]?.image !== process.env.QUICKAPI_IMAGE) {
+    throw new Error(
+      `staging service ${name} image ${JSON.stringify(model.services[name]?.image)} ` +
+        `does not match QUICKAPI_IMAGE ${JSON.stringify(process.env.QUICKAPI_IMAGE)}`,
+    );
+  }
+}
+NODE
 staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(model.services.api.depends_on.migration.condition)' "$artifact_dir/staging-compose.json")"
 [[ "$staging_api_condition" == service_completed_successfully ]] || {
   echo 'staging API is not blocked by migration failure' >&2

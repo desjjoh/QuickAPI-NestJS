@@ -35,50 +35,50 @@ An opinionated NestJS application foundation developed for my own projects and p
 
 ```bash
 src/
-├── common/                    # Shared framework primitives used across the application
-│   ├── constants/             # Time and byte constants
-│   ├── decorators/            # Auth, permission, upload, and parameter decorators
-│   ├── entities/              # Shared entity base classes and value objects
-│   ├── errors/                # Non-HTTP operational/config errors
-│   ├── exceptions/            # HTTP/application exception models
-│   ├── filters/               # Global and not-found exception filters
-│   ├── guards/                # CSRF, JWT, refresh, local, and permission guards
-│   ├── handlers/              # Lifecycle and file handlers
-│   ├── helpers/               # Small utilities shared across modules
-│   ├── interceptors/          # Global request timeout interceptor
-│   ├── loggers/               # Nest-compatible logger implementation
-│   ├── middleware/            # Logging, security, metrics, CORS, limits, and context middleware
-│   ├── models/                # Shared DTO/model helpers
-│   ├── pipes/                 # Parameter and upload validation pipes
-│   ├── store/                 # Request-scoped context store
-│   ├── strategies/            # Passport access, refresh, and local strategies
-│   └── validators/            # Custom class-validator validators
-├── config/                    # Environment, database, docs, logging, metrics, permissions, storage config
+├── common/                     # Shared framework primitives used across the application
+│   ├── constants/              # Time and byte constants
+│   ├── decorators/             # Auth, permission, upload, and parameter decorators
+│   ├── entities/               # Shared entity base classes and value objects
+│   ├── errors/                 # Non-HTTP operational/config errors
+│   ├── exceptions/             # HTTP/application exception models
+│   ├── filters/                # Global and not-found exception filters
+│   ├── guards/                 # CSRF, JWT, refresh, local, and permission guards
+│   ├── handlers/               # Lifecycle and file handlers
+│   ├── helpers/                # Small utilities shared across modules
+│   ├── interceptors/           # Global request timeout interceptor
+│   ├── loggers/                # Nest-compatible logger implementation
+│   ├── middleware/             # Logging, security, metrics, CORS, limits, and context middleware
+│   ├── models/                 # Shared DTO/model helpers
+│   ├── pipes/                  # Parameter and upload validation pipes
+│   ├── store/                  # Request-scoped context store
+│   ├── strategies/             # Passport access, refresh, and local strategies
+│   └── validators/             # Custom class-validator validators
+├── config/                     # Environment, database, docs, logging, metrics, permissions, storage config
 ├── modules/
-│   ├── api/                   # HTTP-facing modules and controllers
-│   │   ├── app/               # Root, health, readiness, info, system, metrics, and test endpoints
-│   │   └── v1/                # Versioned API modules
-│   │       ├── account/       # Authenticated account/profile management endpoints
-│   │       ├── administration/# Platform/admin endpoints
-│   │       ├── authentication/# Register, sign-in, sign-out, and refresh endpoints
-│   │       ├── library/       # Reference-data endpoints
-│   │       └── security/      # CSRF/security endpoints
-│   ├── domain/                # Business/domain modules
-│   │   ├── identity/          # Users, credentials, profiles, addresses, auth models, repository, service
-│   │   └── library/           # Countries, regions, time zones, genders, account statuses, roles, permissions
-│   └── system/                # Infrastructure modules
-│       ├── configuration/     # Global Nest config module and typed env provider
-│       ├── database/          # TypeORM module and database status service
-│       ├── email/             # Postmark provider, email service, templates, and email models
-│       ├── seeder/            # Reusable database seeding infrastructure
-│       └── tokens/            # JWT/refresh/CSRF token services and configuration
-└── main.ts                    # Application entrypoint and lifecycle startup
+│   ├── api/                    # HTTP-facing modules and controllers
+│   │   ├── app/                # Root, health, readiness, info, system, metrics, and test endpoints
+│   │   └── v1/                 # Versioned API modules
+│   │       ├── account/        # Authenticated account/profile management endpoints
+│   │       ├── administration/ # Platform/admin endpoints
+│   │       ├── authentication/ # Register, sign-in, sign-out, and refresh endpoints
+│   │       ├── library/        # Reference-data endpoints
+│   │       └── security/       # CSRF/security endpoints
+│   ├── domain/                 # Business/domain modules
+│   │   ├── identity/           # Users, credentials, profiles, addresses, auth models, repository, service
+│   │   └── library/            # Countries, regions, time zones, genders, account statuses, roles, permissions
+│   └── system/                 # Infrastructure modules
+│       ├── configuration/      # Global Nest config module and typed env provider
+│       ├── database/           # TypeORM module and database status service
+│       ├── email/              # Postmark provider, email service, templates, and email models
+│       ├── seeder/             # Reusable database seeding infrastructure
+│       └── tokens/             # JWT/refresh/CSRF token services and configuration
+└── main.ts                     # Application entrypoint and lifecycle startup
 
 test/
-├── e2e/                       # E2E tests
-├── helpers/                   # Test app helpers
-├── jest-e2e.json              # E2E Jest config
-└── setup-env.ts               # Test environment bootstrap
+├── e2e/                        # E2E tests
+├── helpers/                    # Test app helpers
+├── jest-e2e.json               # E2E Jest config
+└── setup-env.ts                # Test environment bootstrap
 ```
 
 ---
