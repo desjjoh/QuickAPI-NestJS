@@ -21,6 +21,7 @@ import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/regi
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
+import { ActivityAuditEntity } from '@/modules/domain/audit/entities/activity-audit.entity';
 
 const sourceMigrationDirectory = path.resolve(
   process.cwd(),
@@ -61,6 +62,8 @@ const dataSourceOptions: DataSourceOptions = {
     UserEntity,
     AccountTokenEntity,
     RegistrationTokenEntity,
+    // AUDIT MODULE
+    ActivityAuditEntity,
   ],
   migrations: [path.join(migrationDirectory, '*{.ts,.js}')],
   ssl: env.DB_SSL
