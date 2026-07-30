@@ -9,6 +9,8 @@ import type { UserService } from '@/modules/domain/identity/services/user.servic
 import { userFixture } from '@/../test/helpers/identity.fixtures';
 import type { RegisterDto } from '../models/register.model';
 import { RegistrationService } from './registration.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 describe('RegistrationService', () => {
   const dto = {
@@ -38,22 +40,25 @@ describe('RegistrationService', () => {
     };
     const userRepo = { findByEmail: jest.fn().mockResolvedValue(null) };
     const registrationTokenSvc = { findPendingByEmail: jest.fn() };
+    const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
     return {
       service: new RegistrationService(
         userSvc as unknown as UserService,
         emailSvc as unknown as EmailVerificationService,
         userRepo as unknown as UserRepository,
         registrationTokenSvc as unknown as RegistrationTokenService,
+        auditSvc as never,
       ),
       userSvc,
       emailSvc,
       userRepo,
       registrationTokenSvc,
+      auditSvc,
     };
   };
 
   it('normalizes email, hashes the password, stores pending metadata, and returns its challenge DTO', async () => {
-    const { service, userSvc, emailSvc, userRepo } = setup();
+    const { service, userSvc, emailSvc, userRepo, auditSvc } = setup();
     await expect(service.register(dto)).resolves.toEqual({
       message: 'Registration pending. Please verify your email address.',
       email: 'person@example.test',
@@ -67,6 +72,15 @@ describe('RegistrationService', () => {
       'person@example.test',
       expect.objectContaining(metadata),
     );
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
+      outcome: 'pending',
+      actorType: 'anonymous',
+      source: 'http',
+      metadata: {
+        identifier_hash: hashAuditIdentifier('person@example.test'),
+      },
+    });
   });
 
   it('rejects duplicate users before hashing or sending email', async () => {
@@ -78,7 +92,7 @@ describe('RegistrationService', () => {
   });
 
   it('resends using the pending token metadata and normalized email', async () => {
-    const { service, emailSvc, registrationTokenSvc } = setup();
+    const { service, emailSvc, registrationTokenSvc, auditSvc } = setup();
     const pendingMetadata = { email: 'person@example.test', password: 'hash' };
     registrationTokenSvc.findPendingByEmail.mockResolvedValue({
       metadata: pendingMetadata,
@@ -98,6 +112,15 @@ describe('RegistrationService', () => {
       'person@example.test',
       pendingMetadata,
     );
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
+      outcome: 'pending',
+      actorType: 'anonymous',
+      source: 'http',
+      metadata: {
+        identifier_hash: hashAuditIdentifier('person@example.test'),
+      },
+    });
   });
 
   it('rejects resend when no pending registration token exists', async () => {

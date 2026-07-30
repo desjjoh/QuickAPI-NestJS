@@ -15,6 +15,7 @@ import {
 } from '@/config/cookie.config';
 import { UserSessionEntity } from '../entities/session.entity';
 import { RefreshService } from './refresh.service';
+import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 describe('RefreshService', () => {
   const user = { id: 'u1', identity: { email: 'user@test.dev' } };
@@ -42,6 +43,7 @@ describe('RefreshService', () => {
   const requestContext = { get: jest.fn() };
   const ipLocation = { resolve: jest.fn() };
   const res = { cookie: jest.fn(), clearCookie: jest.fn() };
+  const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
   let service: RefreshService;
 
   const expectIssuedFromSession = (sessionId: string, version: number) => {
@@ -96,6 +98,7 @@ describe('RefreshService', () => {
       userRepo as never,
       requestContext as never,
       ipLocation as never,
+      auditSvc as never,
     );
   });
 
@@ -126,6 +129,18 @@ describe('RefreshService', () => {
         }),
       }),
     );
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      sessionId: suppliedSession.id,
+      entityType: 'session',
+      entityId: suppliedSession.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('rotates the session obtained from RequestContext', async () => {

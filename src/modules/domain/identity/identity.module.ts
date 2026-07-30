@@ -23,6 +23,7 @@ import { RegistrationTokenService } from './services/registration-token.service'
 import { UserSessionEntity } from './entities/session.entity';
 import { UserMfaSettingsEntity } from './entities/mfa.entity';
 import { MfaService } from './services/mfa.service';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { MfaService } from './services/mfa.service';
     LibraryModule,
     MediaModule,
     EmailModule,
+    AuditModule,
   ],
   providers: [
     UserRepository,

@@ -34,16 +34,26 @@ service and captures a semantic, security-relevant action and its outcome. It
 describes intent at the service or use-case boundary rather than merely
 describing rows written by that action. Initial event keys include:
 
-| Stable event key                    | When it is emitted                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `identity.registration.requested`   | A registration request is accepted for processing                                           |
-| `identity.sign_in.succeeded`        | Authentication succeeds                                                                     |
-| `identity.sign_in.failed`           | Authentication fails, including an unknown account                                          |
-| `identity.password_reset.requested` | A password reset is requested, regardless of whether the public response reveals an account |
-| `identity.mfa.enabled`              | MFA enrollment is successfully completed                                                    |
-| `identity.session.revoked`          | A session is revoked by its owner, an administrator, or the system                          |
-| `identity.profile.updated`          | A user profile update succeeds                                                              |
-| `admin.user.deleted`                | An administrator deletes or soft-deletes a user                                             |
+| Stable event key                               | When it is emitted                                                                          |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `identity.registration.requested`              | A registration request is accepted for processing                                           |
+| `identity.registration.verification_succeeded` | A pending registration is verified and its user is created                                  |
+| `identity.registration.verification_failed`    | A registration verification is rejected after its outcome is known                          |
+| `identity.registration.verification_resent`    | A replacement registration verification challenge is issued                                 |
+| `identity.sign_in.succeeded`                   | Authentication succeeds                                                                     |
+| `identity.sign_in.failed`                      | Authentication fails, including an unknown account                                          |
+| `identity.mfa.sign_in.challenge_issued`        | A password-authenticated sign-in requires an MFA challenge                                  |
+| `identity.mfa.sign_in.verification_succeeded`  | A sign-in MFA challenge is successfully verified                                            |
+| `identity.mfa.sign_in.verification_failed`     | A sign-in MFA challenge is rejected after its outcome is known                              |
+| `identity.session.issued`                      | An access/refresh session is created or rotated                                             |
+| `identity.refresh.succeeded`                   | A refresh session is successfully validated and rotated                                     |
+| `identity.refresh.failed`                      | A refresh attempt is rejected after its outcome is known                                    |
+| `identity.sign_out.completed`                  | The active session is revoked and sign-out completes                                        |
+| `identity.password_reset.requested`            | A password reset is requested, regardless of whether the public response reveals an account |
+| `identity.mfa.enabled`                         | MFA enrollment is successfully completed                                                    |
+| `identity.session.revoked`                     | A session is revoked by its owner, an administrator, or the system                          |
+| `identity.profile.updated`                     | A user profile update succeeds                                                              |
+| `admin.user.deleted`                           | An administrator deletes or soft-deletes a user                                             |
 
 Emit attempts whose result matters to security, including failures. Where an
 operation has meaningful requested and completed phases, use separate keys

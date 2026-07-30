@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
 } from '@nestjs/common';
-import { Response } from 'express';
 import {
   RegisterDto,
   RegisterMapper,
@@ -16,6 +15,9 @@ import { UserRepository } from '@/modules/domain/identity/repositories/user.repo
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
+import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 @Injectable()
 export class RegistrationService {
@@ -24,6 +26,7 @@ export class RegistrationService {
     private readonly emailSvc: EmailVerificationService,
     private readonly userRepo: UserRepository,
     private readonly registrationTokenSvc: RegistrationTokenService,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async register(dto: RegisterDto): Promise<RegistrationPendingDto> {
@@ -43,6 +46,14 @@ export class RegistrationService {
         password,
       ),
     );
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
+      outcome: 'pending',
+      actorType: 'anonymous',
+      source: 'http',
+      metadata: { identifier_hash: hashAuditIdentifier(normalizedEmail) },
+    });
 
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',
@@ -75,6 +86,14 @@ export class RegistrationService {
       normalizedEmail,
       pendingToken.metadata,
     );
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
+      outcome: 'pending',
+      actorType: 'anonymous',
+      source: 'http',
+      metadata: { identifier_hash: hashAuditIdentifier(normalizedEmail) },
+    });
 
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',

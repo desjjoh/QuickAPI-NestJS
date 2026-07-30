@@ -19,6 +19,8 @@ import { IpLocationService } from '@/modules/system/geolocation/services/ip-loca
 import { MoreThan, Not, IsNull } from 'typeorm';
 import { day } from '@/common/constants/milliseconds.constants';
 import { env } from '@/config/environment.config';
+import { ActivityAuditService } from '../../audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 @Injectable()
 export class RefreshService {
@@ -27,6 +29,7 @@ export class RefreshService {
     private readonly userRepo: UserRepository,
     private readonly requestContext: RequestContext,
     private readonly ipLocation: IpLocationService,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async issueTokens(
@@ -68,6 +71,19 @@ export class RefreshService {
       tokens.refresh_token,
       getRefreshCookieOptions(),
     );
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      sessionId: updatedSession.id,
+      entityType: 'session',
+      entityId: updatedSession.id,
+      source: 'http',
+      metadata: {},
+    });
 
     return new JWTDto({
       refresh: refreshToken.exp,

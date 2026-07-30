@@ -26,6 +26,8 @@ import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/ema
 import { UserSessionEntity } from '../entities/session.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { RoleEntity } from '../../library/entities/role.entity';
+import { ActivityAuditService } from '../../audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -42,6 +44,7 @@ export class EmailVerificationService {
     private readonly userSvc: UserService,
     private readonly emailSvc: EmailService,
     private readonly dataSource: DataSource,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async sendVerificationEmail(
@@ -186,15 +189,46 @@ export class EmailVerificationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    const registrationToken =
-      await this.registrationTokenSvc.consumeVerificationCode(
-        challengeId,
-        code,
-      );
+    let user: UserEntity;
+    try {
+      const registrationToken =
+        await this.registrationTokenSvc.consumeVerificationCode(
+          challengeId,
+          code,
+        );
 
-    const user = await this.dataSource.transaction((manager) =>
-      this.verifyRegistration(registrationToken.metadata, manager),
-    );
+      user = await this.dataSource.transaction(async (manager) => {
+        const created = await this.verifyRegistration(
+          registrationToken.metadata,
+          manager,
+        );
+        await this.auditSvc.recordActivity(
+          {
+            event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
+            outcome: 'succeeded',
+            actorType: 'anonymous',
+            subjectUserId: created.id,
+            entityType: 'user',
+            entityId: created.id,
+            source: 'http',
+            metadata: {},
+          },
+          manager,
+        );
+        return created;
+      });
+    } catch (error) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        source: 'http',
+        metadata: {},
+        failureCode:
+          error instanceof Error ? error.constructor.name : 'UnknownError',
+      });
+      throw error;
+    }
 
     await this.sendRegistrationSuccess(user);
     return user;

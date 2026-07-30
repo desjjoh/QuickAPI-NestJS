@@ -16,6 +16,7 @@ import {
 } from '@/../test/helpers/identity.fixtures';
 
 import { AuthService } from './authentication.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 describe('AuthService', () => {
   const res = {
@@ -41,6 +42,7 @@ describe('AuthService', () => {
       issueTokens: jest.fn().mockResolvedValue(tokens),
       revokeTokens: jest.fn().mockResolvedValue(undefined),
     };
+    const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
     const mfaSvc = {
       createSignInChallenge: jest.fn().mockResolvedValue(null),
       verifyChallenge: jest.fn().mockResolvedValue(user),
@@ -50,22 +52,33 @@ describe('AuthService', () => {
         userSvc as unknown as UserService,
         refreshSvc as unknown as RefreshService,
         mfaSvc as unknown as MfaService,
+        auditSvc as never,
       ),
       userSvc,
       refreshSvc,
       mfaSvc,
+      auditSvc,
     };
   };
 
   it('completes an ordinary sign-in and returns the issued token DTO', async () => {
-    const { service, userSvc, refreshSvc } = setup();
+    const { service, userSvc, refreshSvc, auditSvc } = setup();
     await expect(service.signIn(user, res)).resolves.toBe(tokens);
     expect(userSvc.recordSignIn).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('returns an MFA challenge without recording sign-in or issuing tokens', async () => {
-    const { service, userSvc, refreshSvc, mfaSvc } = setup();
+    const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
     const expires = new Date('2026-02-01T00:00:00Z');
     mfaSvc.createSignInChallenge.mockResolvedValue({
       id: 'challenge-1',
@@ -79,10 +92,19 @@ describe('AuthService', () => {
     });
     expect(userSvc.recordSignIn).not.toHaveBeenCalled();
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
+      outcome: 'pending',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('verifies and completes the sign-in MFA challenge', async () => {
-    const { service, userSvc, refreshSvc, mfaSvc } = setup();
+    const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
     await expect(service.verifyMfa('challenge-1', '123456', res)).resolves.toBe(
       tokens,
     );
@@ -93,10 +115,19 @@ describe('AuthService', () => {
     );
     expect(userSvc.assertCanAuthenticate).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
+    expect(auditSvc.recordActivity).toHaveBeenNthCalledWith(1, {
+      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('propagates account-state failures and does not issue tokens', async () => {
-    const { service, userSvc, refreshSvc } = setup();
+    const { service, userSvc, refreshSvc, auditSvc } = setup();
     const error = new ForbiddenException('Account disabled.');
     userSvc.assertCanAuthenticate.mockImplementation(() => {
       throw error;
@@ -105,17 +136,64 @@ describe('AuthService', () => {
       error,
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
+      outcome: 'failed',
+      actorType: 'anonymous',
+      source: 'http',
+      metadata: {},
+      failureCode: 'ForbiddenException',
+    });
   });
 
   it('delegates refresh verification with the existing session', async () => {
-    const { service, refreshSvc } = setup();
+    const { service, refreshSvc, auditSvc } = setup();
     await expect(service.verify(user, res, session)).resolves.toBe(tokens);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      sessionId: session.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('revokes the session and clears response cookies on sign-out', async () => {
-    const { service, refreshSvc } = setup();
+    const { service, refreshSvc, auditSvc } = setup();
     await expect(service.signOut(session, res)).resolves.toBeUndefined();
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      sessionId: session.id,
+      entityType: 'session',
+      entityId: session.id,
+      source: 'http',
+      metadata: {},
+    });
+  });
+
+  it('records the exact failed refresh event after token issuance fails', async () => {
+    const { service, refreshSvc, auditSvc } = setup();
+    refreshSvc.issueTokens.mockRejectedValue(new Error('rotation failed'));
+    await expect(service.verify(user, res, session)).rejects.toThrow(
+      'rotation failed',
+    );
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+      event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+      outcome: 'failed',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      sessionId: session.id,
+      source: 'http',
+      metadata: {},
+      failureCode: 'Error',
+    });
   });
 });

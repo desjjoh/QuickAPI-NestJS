@@ -14,12 +14,15 @@ import { env } from '@/config/environment.config';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { getRefreshCookieName } from '@/config/cookie.config';
+import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(
     private readonly repo: UserRepository,
     private readonly svc: UserService,
+    private readonly auditSvc: ActivityAuditService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -31,6 +34,36 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   }
 
   async validate(
+    req: Request,
+    payload: RefreshPayload,
+  ): Promise<{
+    userEntity: UserEntity;
+    sessionEntity: UserSessionEntity;
+    refresh: string;
+    email: string;
+    sub: string;
+    sid: string;
+    version: number;
+  }> {
+    try {
+      return await this.validateRefresh(req, payload);
+    } catch (error) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        source: 'http',
+        metadata: {},
+        sessionId: payload.sid,
+        subjectUserId: payload.sub,
+        failureCode:
+          error instanceof Error ? error.constructor.name : 'UnknownError',
+      });
+      throw error;
+    }
+  }
+
+  private async validateRefresh(
     req: Request,
     payload: RefreshPayload,
   ): Promise<{

@@ -9,6 +9,8 @@ import { MfaService } from '@/modules/domain/identity/services/mfa.service';
 import { MfaChallengePurpose } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaChallengeResponseDto } from '../models/mfa.model';
+import { ActivityAuditService } from '@/modules/domain/audit/services/activity-audit.service';
+import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +18,7 @@ export class AuthService {
     private readonly userSvc: UserService,
     private readonly refreshSvc: RefreshService,
     private readonly mfaSvc: MfaService,
+    private readonly auditSvc: ActivityAuditService,
   ) {}
 
   public async signIn(
@@ -25,12 +28,23 @@ export class AuthService {
   ): Promise<JWTDto | MfaChallengeResponseDto> {
     const challenge = await this.mfaSvc.createSignInChallenge(user);
 
-    if (challenge)
+    if (challenge) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
+        outcome: 'pending',
+        actorType: 'user',
+        actorUserId: user.id,
+        subjectUserId: user.id,
+        source: 'http',
+        metadata: {},
+      });
+
       return new MfaChallengeResponseDto({
         challenge_id: challenge.id,
         method: MfaMethod.EMAIL_OTP,
         expires_at: challenge.expires_at,
       });
+    }
 
     return this.completeSignIn(user, res, req);
   }
@@ -41,10 +55,21 @@ export class AuthService {
     req?: Request,
   ): Promise<JWTDto> {
     const updated = await this.userSvc.recordSignIn(user);
-
-    return req
+    const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
-      : this.refreshSvc.issueTokens(updated, res);
+      : this.refreshSvc.issueTokens(updated, res));
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
+    return tokens;
   }
 
   public async verifyMfa(
@@ -53,13 +78,36 @@ export class AuthService {
     res: Response,
     req?: Request,
   ): Promise<JWTDto> {
-    const user = await this.mfaSvc.verifyChallenge(
-      challengeId,
-      code,
-      MfaChallengePurpose.SIGN_IN,
-    );
+    let user: UserEntity;
+    try {
+      user = await this.mfaSvc.verifyChallenge(
+        challengeId,
+        code,
+        MfaChallengePurpose.SIGN_IN,
+      );
+      this.userSvc.assertCanAuthenticate(user);
+    } catch (error) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        source: 'http',
+        metadata: {},
+        failureCode:
+          error instanceof Error ? error.constructor.name : 'UnknownError',
+      });
+      throw error;
+    }
 
-    this.userSvc.assertCanAuthenticate(user);
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorUserId: user.id,
+      subjectUserId: user.id,
+      source: 'http',
+      metadata: {},
+    });
 
     return this.completeSignIn(user, res, req);
   }
@@ -69,7 +117,37 @@ export class AuthService {
     res: Response,
     session: UserSessionEntity,
   ): Promise<JWTDto> {
-    return this.refreshSvc.issueTokens(user, res, session);
+    try {
+      const tokens = await this.refreshSvc.issueTokens(user, res, session);
+
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorUserId: user.id,
+        subjectUserId: user.id,
+        sessionId: session.id,
+        source: 'http',
+        metadata: {},
+      });
+
+      return tokens;
+    } catch (error) {
+      await this.auditSvc.recordActivity({
+        event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+        outcome: 'failed',
+        actorType: 'user',
+        actorUserId: user.id,
+        subjectUserId: user.id,
+        sessionId: session.id,
+        source: 'http',
+        metadata: {},
+        failureCode:
+          error instanceof Error ? error.constructor.name : 'UnknownError',
+      });
+
+      throw error;
+    }
   }
 
   public async signOut(
@@ -77,5 +155,16 @@ export class AuthService {
     res: Response,
   ): Promise<void> {
     await this.refreshSvc.revokeTokens(session, res);
+
+    await this.auditSvc.recordActivity({
+      event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      sessionId: session.id,
+      entityType: 'session',
+      entityId: session.id,
+      source: 'http',
+      metadata: {},
+    });
   }
 }

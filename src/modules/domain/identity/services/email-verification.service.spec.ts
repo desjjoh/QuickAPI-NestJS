@@ -9,6 +9,7 @@ import { AccountStatusEntity } from '../../library/entities/accountstatus.entity
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { UserEntity } from '../entities/user.entity';
 import { EmailVerificationService } from './email-verification.service';
+import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
 
 describe('EmailVerificationService', () => {
   const user = {
@@ -50,6 +51,7 @@ describe('EmailVerificationService', () => {
   };
   const manager = { getRepository: jest.fn(), createQueryBuilder: jest.fn() };
   const dataSource = { transaction: jest.fn() };
+  const auditSvc = { recordActivity: jest.fn().mockResolvedValue({}) };
   let service: EmailVerificationService;
 
   beforeEach(() => {
@@ -105,6 +107,7 @@ describe('EmailVerificationService', () => {
       userSvc as never,
       emailSvc as never,
       dataSource as never,
+      auditSvc as never,
     );
   });
 
@@ -253,6 +256,19 @@ describe('EmailVerificationService', () => {
       }),
     );
     expect(emailSvc.sendEmail).toHaveBeenCalled();
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+      {
+        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
+        outcome: 'succeeded',
+        actorType: 'anonymous',
+        subjectUserId: 'new-user',
+        entityType: 'user',
+        entityId: 'new-user',
+        source: 'http',
+        metadata: {},
+      },
+      manager,
+    );
   });
 
   it.each([
@@ -280,6 +296,15 @@ describe('EmailVerificationService', () => {
       );
       expect(users.save).not.toHaveBeenCalled();
       expect(emailSvc.sendEmail).not.toHaveBeenCalled();
+      expect(auditSvc.recordActivity).toHaveBeenCalledWith({
+        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
+        outcome: 'failed',
+        actorType: 'anonymous',
+        source: 'http',
+        metadata: {},
+        failureCode:
+          failure === 'duplicate' ? 'ConflictException' : 'BadRequestException',
+      });
     },
   );
 });
