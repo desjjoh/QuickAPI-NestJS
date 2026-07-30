@@ -20,12 +20,24 @@ capture() {
 }
 trap 'status=$?; if (( status != 0 )); then capture; fi; cleanup; exit "$status"' EXIT
 
+run_one_shot() {
+  local service=$1
+  echo "::group::Smoke: $service"
+  # Keep the stopped container until cleanup so its stdout/stderr is available
+  # to the failure artifact collector.
+  "${compose[@]}" up --no-deps --abort-on-container-exit --exit-code-from "$service" "$service"
+  echo "::endgroup::"
+}
+
 # Every run starts with new anonymous database state and a newly-created GeoLite volume.
 cleanup
+echo "::group::Smoke: ephemeral dependencies"
 "${compose[@]}" up -d --wait mysql redis
-"${compose[@]}" run --rm preflight
-"${compose[@]}" run --rm geoip-init
-"${compose[@]}" run --rm migration
+echo "::endgroup::"
+run_one_shot preflight
+run_one_shot geoip-init
+run_one_shot migration
+echo "::group::Smoke: API probes"
 "${compose[@]}" up -d --no-deps api
 
 poll_200() {
@@ -58,3 +70,4 @@ api_id="$("${compose[@]}" ps --quiet api)"
 docker kill --signal TERM "$api_id" >/dev/null
 timeout 25 sh -c 'while docker inspect --format="{{.State.Running}}" "$1" 2>/dev/null | grep -q true; do sleep 1; done' _ "$api_id"
 [[ "$(docker inspect --format '{{.State.ExitCode}}' "$api_id")" == 0 ]]
+echo "::endgroup::"

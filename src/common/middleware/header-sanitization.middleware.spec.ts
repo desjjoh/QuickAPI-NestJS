@@ -147,6 +147,7 @@ describe('sanitizeHeadersMiddleware', () => {
           'x-csrf-token': 'csrf-token',
           'x-request-id': 'request-id',
           'x-api-key': 'api-key',
+          'x-operations-key': 'operations-key',
         },
       });
       const res = createResponse();
@@ -176,6 +177,7 @@ describe('sanitizeHeadersMiddleware', () => {
         'x-csrf-token': 'csrf-token',
         'x-request-id': 'request-id',
         'x-api-key': 'api-key',
+        'x-operations-key': 'operations-key',
       });
       expect(next).toHaveBeenCalledTimes(1);
     });

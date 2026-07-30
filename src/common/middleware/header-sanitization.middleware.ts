@@ -42,6 +42,7 @@ const ALLOWLIST = new Set([
   'x-csrf-token',
   'x-request-id',
   'x-api-key',
+  'x-operations-key',
 ]);
 
 const VALID_NAME_RE: RegExp = /^[A-Za-z0-9-]+$/;
