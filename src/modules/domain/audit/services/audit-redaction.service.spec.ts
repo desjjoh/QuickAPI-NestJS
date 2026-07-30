@@ -55,10 +55,9 @@ describe(AuditRedactionService.name, () => {
     );
     const serialized = JSON.stringify(diff);
 
-    expect(diff.after).toMatchObject({
-      phone: '[CHANGED]',
-      address: '[CHANGED]',
-      date_of_birth: '[CHANGED]',
+    expect(diff.after).toEqual({ date_of_birth: '[CHANGED]' });
+    expect(diff.changes).toEqual({
+      date_of_birth: { before: null, after: '[CHANGED]' },
     });
     expect(serialized).not.toMatch(
       /1555|secret address|2000-01-01|diff-password/,
@@ -178,8 +177,7 @@ describe(AuditRedactionService.name, () => {
       { id: 'user-1', roles: [{ id: 'role-1' }, { id: 'role-2' }] },
     );
 
-    expect(diff.changed_fields).toEqual([]);
-    expect(diff.before).toEqual(diff.after);
+    expect(diff).toEqual({ before: {}, after: {}, changes: {} });
   });
 
   it('reports added and removed relationship IDs with useful snapshots', () => {
@@ -191,9 +189,95 @@ describe(AuditRedactionService.name, () => {
     );
 
     expect(diff).toEqual({
-      before: { id: 'user-1', roles: ['role-1', 'role-2'] },
-      after: { id: 'user-1', roles: ['role-2', 'role-3'] },
-      changed_fields: ['roles'],
+      before: { roles: ['role-1', 'role-2'] },
+      after: { roles: ['role-2', 'role-3'] },
+      changes: {
+        roles: {
+          before: ['role-1', 'role-2'],
+          after: ['role-2', 'role-3'],
+          added_ids: ['role-3'],
+          removed_ids: ['role-1'],
+        },
+      },
+    });
+  });
+
+  it('returns changed-only scalar values and a structured scalar change', () => {
+    const service = new AuditRedactionService();
+
+    expect(
+      service.redactDiff(
+        'role',
+        { id: 'role-1', name: 'Reader', active: true },
+        { id: 'role-1', name: 'Writer', active: true },
+      ),
+    ).toEqual({
+      before: { name: 'Reader' },
+      after: { name: 'Writer' },
+      changes: { name: { before: 'Reader', after: 'Writer' } },
+    });
+  });
+
+  it('retains only changed paths in a nested one-to-one object', () => {
+    const service = new AuditRedactionService();
+
+    expect(
+      service.redactDiff(
+        'user',
+        { profile: { id: 'p1', name: { first: 'Old', last: 'Same' } } },
+        { profile: { id: 'p1', name: { first: 'New', last: 'Same' } } },
+      ),
+    ).toEqual({
+      before: { profile: { name: { first: 'Old' } } },
+      after: { profile: { name: { first: 'New' } } },
+      changes: {
+        profile: { name: { first: { before: 'Old', after: 'New' } } },
+      },
+    });
+  });
+
+  it.each([
+    ['addition', ['role-1'], ['role-1', 'role-2'], ['role-2'], []],
+    ['removal', ['role-1', 'role-2'], ['role-1'], [], ['role-2']],
+    ['replacement', ['role-1'], ['role-2'], ['role-2'], ['role-1']],
+  ])('structures a relationship %s', (_case, before, after, added, removed) => {
+    const diff = new AuditRedactionService().redactDiff(
+      'user',
+      { roles: before },
+      { roles: after },
+    );
+
+    expect(diff.changes).toEqual({
+      roles: {
+        before,
+        after,
+        added_ids: added,
+        removed_ids: removed,
+      },
+    });
+  });
+
+  it('combines scalar and relationship changes without unchanged fields', () => {
+    const service = new AuditRedactionService();
+    const diff = service.redactDiff(
+      'user',
+      { id: 'user-1', active: true, roles: ['role-1'] },
+      { id: 'user-1', active: false, roles: ['role-1', 'role-2'] },
+    );
+
+    expect(diff.before).toEqual({ active: true, roles: ['role-1'] });
+    expect(diff.after).toEqual({
+      active: false,
+      roles: ['role-1', 'role-2'],
+    });
+    expect(diff.changes).toEqual({
+      active: { before: true, after: false },
+      roles: {
+        before: ['role-1'],
+        after: ['role-1', 'role-2'],
+        added_ids: ['role-2'],
+        removed_ids: [],
+      },
     });
   });
 

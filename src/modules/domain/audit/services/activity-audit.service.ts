@@ -126,7 +126,7 @@ export class ActivityAuditService {
   public recordEntityChange(
     input: RecordEntityChangeInput,
     manager?: EntityManager,
-  ): Promise<ActivityAuditEntity> {
+  ): Promise<ActivityAuditEntity | null> {
     this.validateBase(input);
     this.requiredString('entityType', input.entityType, 64);
     if (!ENTITY_TYPES.includes(input.entityType))
@@ -144,12 +144,8 @@ export class ActivityAuditService {
     );
     const left = this.asRecord(diff.before);
     const right = this.asRecord(diff.after);
-    const changes = Object.fromEntries(
-      diff.changed_fields.map((field) => [
-        field,
-        { before: left[field] ?? null, after: right[field] ?? null },
-      ]),
-    );
+    const changes = this.asRecord(diff.changes);
+    if (Object.keys(changes).length === 0) return Promise.resolve(null);
 
     return this.persist(
       input,

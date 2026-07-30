@@ -71,16 +71,30 @@ describe(ActivityAuditService.name, () => {
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'entity_change',
-        before: { name: { first: 'Old' }, phone: '[CHANGED]' },
-        after: { name: { first: 'New' }, phone: '[CHANGED]' },
+        before: { name: { first: 'Old' } },
+        after: { name: { first: 'New' } },
         changes: {
           name: {
-            before: { first: 'Old' },
-            after: { first: 'New' },
+            first: { before: 'Old', after: 'New' },
           },
         },
       }),
     );
+  });
+
+  it('does not persist an entity record without a meaningful safe change', async () => {
+    const result = await service.recordEntityChange({
+      ...activity,
+      event: 'entity.update',
+      entityType: 'user',
+      entityId: 'user-1',
+      before: { id: 'user-1', roles: ['role-2', 'role-1'] },
+      after: { id: 'user-1', roles: ['role-1', 'role-2'] },
+    });
+
+    expect(result).toBeNull();
+    expect(repository.create).not.toHaveBeenCalled();
+    expect(repository.insert).not.toHaveBeenCalled();
   });
 
   it.each([

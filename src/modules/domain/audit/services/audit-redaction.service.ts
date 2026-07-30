@@ -163,6 +163,12 @@ export interface AuditRedactionOptions {
   readonly maxBytes?: number;
 }
 
+export interface AuditDiff {
+  readonly before: AuditValue;
+  readonly after: AuditValue;
+  readonly changes: AuditValue;
+}
+
 @Injectable()
 export class AuditRedactionService {
   private readonly limits: Required<AuditRedactionOptions>;
@@ -189,15 +195,19 @@ export class AuditRedactionService {
     entityType: AuditEntityType,
     before: unknown,
     after: unknown,
-  ): { before: AuditValue; after: AuditValue; changed_fields: string[] } {
+  ): AuditDiff {
     const safeBefore = this.redactSnapshot(entityType, before);
     const safeAfter = this.redactSnapshot(entityType, after);
-    const left = this.asRecord(safeBefore);
-    const right = this.asRecord(safeAfter);
-    const changed = [...new Set([...Object.keys(left), ...Object.keys(right)])]
-      .filter((key) => JSON.stringify(left[key]) !== JSON.stringify(right[key]))
-      .sort();
-    return { before: safeBefore, after: safeAfter, changed_fields: changed };
+    const diff = this.diffTree(
+      this.asRecord(safeBefore),
+      this.asRecord(safeAfter),
+      ENTITY_FIELDS[entityType],
+    );
+    return {
+      before: this.fit(diff.before),
+      after: this.fit(diff.after),
+      changes: this.fit(diff.changes),
+    };
   }
 
   /** Metadata also uses a fixed allowlist; arbitrary keys are never retained. */
@@ -325,6 +335,71 @@ export class AuditRedactionService {
     return Buffer.byteLength(JSON.stringify(value)) <= this.limits.maxBytes
       ? value
       : { truncated: TRUNCATED };
+  }
+
+  private diffTree(
+    before: Record<string, AuditValue>,
+    after: Record<string, AuditValue>,
+    tree: FieldTree,
+  ): {
+    before: Record<string, AuditValue>;
+    after: Record<string, AuditValue>;
+    changes: Record<string, AuditValue>;
+  } {
+    const result = {
+      before: {} as Record<string, AuditValue>,
+      after: {} as Record<string, AuditValue>,
+      changes: {} as Record<string, AuditValue>,
+    };
+
+    for (const field of Object.keys(tree).sort()) {
+      const hasBefore = Object.prototype.hasOwnProperty.call(before, field);
+      const hasAfter = Object.prototype.hasOwnProperty.call(after, field);
+      const left = before[field];
+      const right = after[field];
+      const policy = tree[field];
+
+      if (policy.kind === 'nested-object' && hasBefore && hasAfter) {
+        const nested = this.diffTree(
+          this.asRecord(left),
+          this.asRecord(right),
+          policy.fields,
+        );
+        if (Object.keys(nested.changes).length > 0) {
+          result.before[field] = nested.before;
+          result.after[field] = nested.after;
+          result.changes[field] = nested.changes;
+        }
+        continue;
+      }
+
+      if (hasBefore === hasAfter && this.equal(left, right)) continue;
+
+      if (hasBefore) result.before[field] = left;
+      if (hasAfter) result.after[field] = right;
+      if (policy.kind === 'relationship-ids') {
+        const beforeIds = hasBefore && Array.isArray(left) ? left : [];
+        const afterIds = hasAfter && Array.isArray(right) ? right : [];
+        const beforeSet = new Set(beforeIds.map(String));
+        const afterSet = new Set(afterIds.map(String));
+        result.changes[field] = {
+          before: beforeIds,
+          after: afterIds,
+          added_ids: afterIds.filter((id) => !beforeSet.has(String(id))),
+          removed_ids: beforeIds.filter((id) => !afterSet.has(String(id))),
+        };
+      } else {
+        result.changes[field] = {
+          before: hasBefore ? left : null,
+          after: hasAfter ? right : null,
+        };
+      }
+    }
+    return result;
+  }
+
+  private equal(left: AuditValue | undefined, right: AuditValue | undefined) {
+    return JSON.stringify(left) === JSON.stringify(right);
   }
 
   private asRecord(value: AuditValue): Record<string, AuditValue> {
