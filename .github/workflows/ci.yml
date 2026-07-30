@@ -318,21 +318,28 @@ jobs:
           if-no-files-found: warn
 
   container-smoke:
-    name: Optional production container smoke test
-    if: github.event_name == 'workflow_dispatch' && inputs.container-smoke
+    name: Production topology smoke test
+    if: github.ref == 'refs/heads/staging' || github.base_ref == 'staging' || (github.event_name == 'workflow_dispatch' && inputs.container-smoke)
     needs: [type-checking, migration-validation, e2e-tests]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
       - run: docker build --tag quickapi-nestjs:ci .
-      - name: Verify the runtime image contains the built entry point
-        run: docker run --rm --entrypoint node quickapi-nestjs:ci -e "require.resolve('./dist/main.js')"
+      - name: Exercise the staging production topology
+        run: .github/scripts/ci-smoke.sh
+      - name: Upload topology logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: production-smoke-failure-logs
+          path: smoke-logs/
+          if-no-files-found: warn
 
   staging-deployment-gate:
     name: Staging deployment gate
     if: always() && (github.ref == 'refs/heads/staging' || github.base_ref == 'staging')
-    needs: [migration-validation, e2e-tests]
+    needs: [migration-validation, e2e-tests, container-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -340,4 +347,5 @@ jobs:
         env:
           MIGRATIONS: ${{ needs.migration-validation.result }}
           E2E: ${{ needs.e2e-tests.result }}
-        run: test "$MIGRATIONS" = success -a "$E2E" = success
+          SMOKE: ${{ needs.container-smoke.result }}
+        run: test "$MIGRATIONS" = success -a "$E2E" = success -a "$SMOKE" = success
