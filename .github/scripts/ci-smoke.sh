@@ -53,11 +53,12 @@ run_migration_cli() {
 
 # Every run starts with new anonymous database state and a newly-created GeoLite volume.
 cleanup
+run_one_shot preflight
+run_one_shot geoip-init
 echo "::group::Smoke: ephemeral dependencies"
 "${compose[@]}" up -d --wait mysql redis
 echo "::endgroup::"
-run_one_shot preflight
-run_one_shot geoip-init
+
 
 # Validate exactly what the production image can discover. This catches both a
 # missing compiled migrations directory and stale/extra files in that image.
