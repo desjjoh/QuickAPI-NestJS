@@ -26,7 +26,7 @@
     "test:infra:logs": "docker compose -f docker-compose.test.yml logs --tail=200",
     "test:db:prepare": "TEST_DB_ENABLED=true TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3308 TEST_DB_USER=quickapi_test_app TEST_DB_PASSWORD=quickapi_test_password TEST_DB_DATABASE=quickapi_test DB_HOST=127.0.0.1 DB_PORT=3308 DB_USER=quickapi_test_app DB_PASSWORD=quickapi_test_password DB_DATABASE=quickapi_test DB_SYNC=false npm run migration:run",
     "test:e2e:local": "TEST_DB_ENABLED=true TEST_DB_HOST=127.0.0.1 TEST_DB_PORT=3308 TEST_DB_USER=quickapi_test_app TEST_DB_PASSWORD=quickapi_test_password TEST_DB_DATABASE=quickapi_test REDIS_HOST=127.0.0.1 REDIS_PORT=6380 REDIS_PASSWORD=quickapi_test_redis_password npm run test:e2e",
-    "test:smoke": "docker build --tag quickapi-nestjs:ci . && .github/scripts/ci-smoke.sh",
+    "test:smoke": "docker build --tag quickapi-nestjs:ci . && bash .github/scripts/ci-smoke.sh",
     "test:smoke:config": "SMOKE_IMAGE=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa docker compose --file .github/compose.ci-smoke.yml config --quiet",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "check:e2e": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run test:e2e && npm run build",
