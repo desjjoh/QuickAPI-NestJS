@@ -1,70 +1,4 @@
-# Activity audit design
-
-## Purpose and principles
-
-The audit trail provides durable answers to **who did what, to which resource,
-when, from where, and with what result**. It is a security and accountability
-record, not an ordinary application log. Application logs remain the place for
-debug messages, stack traces, timings, and high-volume operational detail;
-those messages may be sampled, reformatted, or deleted independently of the
-audit trail.
-
-Audit records are append-only. Application code may insert them but must not
-update or delete them. Corrections are represented by a new record that refers
-to the erroneous record in metadata. Storage permissions, migrations, and
-operational tooling must enforce this rule. Access to audit data is itself
-restricted and should be audited.
-
-Records must remain understandable after an actor, subject, session, or entity
-has been deleted. IDs and the non-secret, point-in-time display context needed
-for an investigation may therefore be retained in metadata rather than relying
-on joins to mutable application tables. Audit rows must not use foreign-key
-cascades to users or domain entities.
-
-## Record categories
-
-Every record has exactly one of the following categories.
-
-### `activity_event`
-
-An activity event captures a semantic, security-relevant action and its
-outcome. It describes intent at the service or use-case boundary rather than
-merely describing rows written by that action. Initial event keys include:
-
-| Stable event key                    | When it is emitted                                                                          |
-| ----------------------------------- | ------------------------------------------------------------------------------------------- |
-| `identity.registration.requested`   | A registration request is accepted for processing                                           |
-| `identity.sign_in.succeeded`        | Authentication succeeds                                                                     |
-| `identity.sign_in.failed`           | Authentication fails, including an unknown account                                          |
-| `identity.password_reset.requested` | A password reset is requested, regardless of whether the public response reveals an account |
-| `identity.mfa.enabled`              | MFA enrollment is successfully completed                                                    |
-| `identity.session.revoked`          | A session is revoked by its owner, an administrator, or the system                          |
-| `identity.profile.updated`          | A user profile update succeeds                                                              |
-| `admin.user.deleted`                | An administrator deletes or soft-deletes a user                                             |
-
-Emit attempts whose result matters to security, including failures. Where an
-operation has meaningful requested and completed phases, use separate keys
-(for example, `identity.password_reset.requested` and
-`identity.password_reset.completed`) rather than changing the meaning of an
-existing key.
-
-### `entity_change`
-
-An entity change captures persistence-level mutations. Its stable action key
-is one of:
-
-- `entity.insert`
-- `entity.update`
-- `entity.soft_delete`
-- `entity.restore`
-- `entity.delete`
-
-One semantic activity can produce multiple entity changes. For example,
-enabling MFA can emit one `identity.mfa.enabled` event and changes for the user
-and recovery-code entities. These records are complementary and should share a
-request ID (and, where useful, an operation/correlation ID in metadata). An
-entity listener or subscriber is useful for coverage, but it must not replace
-semantic events and must receive request/job context explicitly.
+Create activity audit entity with TypeORM migration
 
 ## Shared envelope
 
@@ -143,13 +77,18 @@ secrets and recovery codes, access/refresh/session tokens, API keys, cookies,
 CSRF values, encryption keys, and raw file contents. Secret fields should be
 recorded only as a fact such as `password_changed: true`, not as old/new values.
 
+Relationship values use an explicit, bounded representation. A one-to-one
+relationship may use an explicitly allowlisted nested object. One-to-many and
+many-to-many relationships must be represented only as arrays of related
+entity IDs; relationship arrays must never contain full related objects.
+
 ## Capture and delivery
 
 1. Establish request context early and normalize the route from the framework's
    route template. Trust forwarded IP headers only from configured proxies.
-2. The application service emits activity events at the point where the
-   outcome is known. Persistence instrumentation emits entity changes with the
-   same context.
+2. The owning domain or application service manually emits both activity
+   events and entity changes at the point where the outcome and correct
+   representations are known, using the same context.
 3. Commit successful mutation audit records atomically with the business
    transaction, or write an outbox entry in that transaction for durable
    delivery. Never report a successful mutation that later rolls back.
