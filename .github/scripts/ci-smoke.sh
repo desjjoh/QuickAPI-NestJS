@@ -5,6 +5,7 @@ cd "$(dirname "$0")/../.."
 compose=(docker compose --project-name quickapi-smoke --file .github/compose.ci-smoke.yml)
 artifact_dir="${MIGRATION_ARTIFACT_DIR:-migration-artifacts}"
 mkdir -p "$artifact_dir"
+staging_env_created=false
 export SMOKE_IMAGE
 SMOKE_IMAGE="$(docker image inspect --format '{{.Id}}' quickapi-nestjs:ci)"
 runtime_user="$(docker image inspect --format '{{.Config.User}}' "$SMOKE_IMAGE")"
@@ -13,7 +14,12 @@ runtime_user="$(docker image inspect --format '{{.Config.User}}' "$SMOKE_IMAGE")
   exit 1
 }
 
-cleanup() { "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true; }
+cleanup() {
+  "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+  if [[ "$staging_env_created" == true ]]; then
+    rm -f .env.staging
+  fi
+}
 capture() {
   mkdir -p smoke-logs
   for service in api migration redis mysql geoip-init preflight; do
@@ -135,7 +141,15 @@ if "${compose[@]}" run --rm --no-deps -e DB_PASSWORD=deliberately-wrong migratio
   echo 'migration service unexpectedly succeeded with invalid credentials' >&2
   exit 1
 fi
-staging_api_condition="$(QUICKAPI_IMAGE="$SMOKE_IMAGE" docker compose -f docker-compose.staging.yml config --format json | node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>process.stdout.write(JSON.parse(s).services.api.depends_on.migration.condition))')"
+# Staging deliberately references an uncommitted .env.staging file. Supply the
+# inert smoke environment only for Compose model validation on clean CI checkouts.
+if [[ ! -e .env.staging ]]; then
+  cp .github/ci-smoke.env .env.staging
+  staging_env_created=true
+fi
+QUICKAPI_IMAGE="$SMOKE_IMAGE" docker compose -f docker-compose.staging.yml config --format json \
+  >"$artifact_dir/staging-compose.json"
+staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(model.services.api.depends_on.migration.condition)' "$artifact_dir/staging-compose.json")"
 [[ "$staging_api_condition" == service_completed_successfully ]] || {
   echo 'staging API is not blocked by migration failure' >&2
   exit 1
