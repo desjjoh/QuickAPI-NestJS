@@ -63,12 +63,14 @@ export class EmailVerificationService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_REQUESTED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -112,12 +114,14 @@ export class EmailVerificationService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_REQUESTED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -198,12 +202,14 @@ export class EmailVerificationService {
 
     await this.auditSvc.recordActivity({
       event,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -211,12 +217,14 @@ export class EmailVerificationService {
     if (previousEmail)
       await this.auditSvc.recordEntityChange({
         event,
+        domain: 'identity',
         outcome: 'succeeded',
         actorType: 'user',
-        actorUserId: user.id,
-        subjectUserId: user.id,
-        entityType: 'user',
-        entityId: user.id,
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        resourceType: 'user',
+        resourceId: user.id,
         source: 'http',
         metadata: {},
         before: { id: user.id, identity: { email: previousEmail } },
@@ -260,11 +268,13 @@ export class EmailVerificationService {
         await this.auditSvc.recordActivity(
           {
             event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
+            domain: 'identity',
             outcome: 'succeeded',
             actorType: 'anonymous',
-            subjectUserId: created.id,
-            entityType: 'user',
-            entityId: created.id,
+            subjectType: 'user',
+            subjectId: created.id,
+            resourceType: 'user',
+            resourceId: created.id,
             source: 'http',
             metadata: {},
           },
@@ -275,6 +285,7 @@ export class EmailVerificationService {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

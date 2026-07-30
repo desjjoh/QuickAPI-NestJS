@@ -17,10 +17,12 @@ describe(ActivityAuditService.name, () => {
 
   const activity = {
     event: 'identity.sign_in.succeeded',
+    domain: 'identity',
     outcome: 'succeeded' as const,
     actorType: 'user' as const,
-    actorUserId: 'user-1',
-    subjectUserId: 'user-1',
+    actorId: 'user-1',
+    subjectType: 'user',
+    subjectId: 'user-1',
     source: 'http' as const,
     metadata: { reason: 'interactive', ignored: 'not retained' },
   };
@@ -48,7 +50,11 @@ describe(ActivityAuditService.name, () => {
       expect.objectContaining({
         category: 'activity_event',
         event: activity.event,
-        actor_user_id: 'user-1',
+        domain: 'identity',
+        actor_type: 'user',
+        actor_id: 'user-1',
+        subject_type: 'user',
+        subject_id: 'user-1',
         metadata: { reason: 'interactive' },
         before: null,
         after: null,
@@ -62,8 +68,8 @@ describe(ActivityAuditService.name, () => {
     await service.recordEntityChange({
       ...activity,
       event: 'entity.update',
-      entityType: 'profile',
-      entityId: 'profile-1',
+      resourceType: 'profile',
+      resourceId: 'profile-1',
       before: { name: { first: 'Old' }, phone: '111', password: 'secret' },
       after: { name: { first: 'New' }, phone: '222', password: 'changed' },
     });
@@ -104,8 +110,8 @@ describe(ActivityAuditService.name, () => {
     await service.recordEntityChange({
       ...activity,
       event: 'identity.password.changed',
-      entityType: 'user',
-      entityId: 'user-1',
+      resourceType: 'user',
+      resourceId: 'user-1',
       before: {
         id: 'user-1',
         sessions: [{ id: 'session-1', refresh: secrets[4] }],
@@ -127,8 +133,8 @@ describe(ActivityAuditService.name, () => {
     const result = await service.recordEntityChange({
       ...activity,
       event: 'entity.update',
-      entityType: 'user',
-      entityId: 'user-1',
+      resourceType: 'user',
+      resourceId: 'user-1',
       before: { id: 'user-1', roles: ['role-2', 'role-1'] },
       after: { id: 'user-1', roles: ['role-1', 'role-2'] },
     });
@@ -140,7 +146,7 @@ describe(ActivityAuditService.name, () => {
 
   it.each([
     ['event', { event: '' }],
-    ['outcome', { outcome: undefined }],
+    ['domain', { domain: '' }],
     ['actorType', { actorType: undefined }],
     ['source', { source: undefined }],
     ['metadata', { metadata: undefined }],
@@ -168,7 +174,7 @@ describe(ActivityAuditService.name, () => {
         },
         () => {
           service
-            .recordActivity({ ...activity, actorUserId: undefined })
+            .recordActivity({ ...activity, actorId: undefined })
             .then(() => resolve())
             .catch(reject);
         },
@@ -178,7 +184,7 @@ describe(ActivityAuditService.name, () => {
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         actor_user_id: 'context-user',
-        request_id: 'request-1',
+        actor_id: 'context-user',
         session_id: 'session-1',
         ip_address: '127.0.0.1',
         user_agent: 'test-agent',
@@ -203,7 +209,7 @@ describe(ActivityAuditService.name, () => {
           ...activity,
           requestId: 'explicit-request',
           sessionId: 'explicit-session',
-          actorUserId: 'explicit-user',
+          actorId: 'explicit-user',
           actorType: 'admin',
           source: 'system',
           route: '/explicit/:id',
@@ -215,7 +221,7 @@ describe(ActivityAuditService.name, () => {
         request_id: 'explicit-request',
         session_id: 'explicit-session',
         actor_user_id: 'explicit-user',
-        actor_type: 'admin',
+        actor_id: 'explicit-user',
         source: 'system',
         route: '/explicit/:id',
       }),
@@ -226,8 +232,8 @@ describe(ActivityAuditService.name, () => {
     await service.recordEntityChange({
       ...activity,
       event: 'entity.update',
-      entityType: 'user',
-      entityId: 'user-1',
+      resourceType: 'user',
+      resourceId: 'user-1',
       before: { roles: [{ id: 'role-b' }, { id: 'role-a' }] },
       after: { roles: ['role-c', 'role-a', 'role-c'] },
     });

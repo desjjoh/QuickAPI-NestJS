@@ -35,13 +35,19 @@ export type AuditSource =
   | 'system';
 
 interface AuditInputBase {
+  /** Domain which owns and defines this event. */
+  readonly domain: string;
   readonly event: string;
   readonly outcome: AuditOutcome;
+  /** Party which initiated the action. The ID may be null for anonymous/system actors. */
   readonly actorType: AuditActorType;
-  readonly actorUserId?: string | null;
-  readonly subjectUserId?: string | null;
-  readonly entityType?: AuditEntityType | null;
-  readonly entityId?: string | null;
+  readonly actorId?: string | null;
+  /** Aggregate owner or party affected by the action. */
+  readonly subjectType?: string | null;
+  readonly subjectId?: string | null;
+  /** Specific object affected by the action. */
+  readonly resourceType?: AuditEntityType | null;
+  readonly resourceId?: string | null;
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
   readonly requestId?: string | null;
@@ -58,8 +64,8 @@ interface AuditInputBase {
 export type RecordActivityInput = AuditInputBase;
 
 export interface RecordEntityChangeInput extends AuditInputBase {
-  readonly entityType: AuditEntityType;
-  readonly entityId: string;
+  readonly resourceType: AuditEntityType;
+  readonly resourceId: string;
   readonly before: unknown;
   readonly after: unknown;
 }
@@ -128,17 +134,17 @@ export class ActivityAuditService {
     manager?: EntityManager,
   ): Promise<ActivityAuditEntity | null> {
     this.validateBase(input);
-    this.requiredString('entityType', input.entityType, 64);
-    if (!ENTITY_TYPES.includes(input.entityType))
-      throw new BadRequestException('entityType is invalid');
-    this.requiredString('entityId', input.entityId, 64);
+    this.requiredString('resourceType', input.resourceType, 64);
+    if (!ENTITY_TYPES.includes(input.resourceType))
+      throw new BadRequestException('resourceType is invalid');
+    this.requiredString('resourceId', input.resourceId, 255);
     if (!Object.prototype.hasOwnProperty.call(input, 'before'))
       throw new BadRequestException('before is required');
     if (!Object.prototype.hasOwnProperty.call(input, 'after'))
       throw new BadRequestException('after is required');
 
     const diff = this.redaction.redactDiff(
-      input.entityType,
+      input.resourceType,
       input.before,
       input.after,
     );
@@ -181,10 +187,12 @@ export class ActivityAuditService {
       event: input.event,
       outcome: input.outcome,
       actor_type: input.actorType ?? context?.actorType,
-      actor_user_id: input.actorUserId ?? context?.userId ?? null,
-      subject_user_id: input.subjectUserId ?? null,
-      entity_type: input.entityType ?? null,
-      entity_id: input.entityId ?? null,
+      actor_id: input.actorId ?? context?.userId ?? null,
+      subject_type: input.subjectType ?? null,
+      subject_id: input.subjectId ?? null,
+      resource_type: input.resourceType ?? null,
+      resource_id: input.resourceId ?? null,
+      domain: input.domain,
       request_id: input.requestId ?? context?.requestId ?? null,
       session_id: input.sessionId ?? context?.sessionId ?? null,
       ip_address: input.ipAddress ?? context?.ip ?? null,
@@ -207,6 +215,7 @@ export class ActivityAuditService {
     if (!input || typeof input !== 'object')
       throw new BadRequestException('audit input is required');
     this.requiredString('event', input.event, 128);
+    this.requiredString('domain', input.domain, 64);
     if (!EVENT_PATTERN.test(input.event))
       throw new BadRequestException('event must be a stable machine key');
     if (!OUTCOMES.includes(input.outcome))
@@ -224,9 +233,11 @@ export class ActivityAuditService {
     )
       throw new BadRequestException('metadata must be an object');
 
-    this.optionalString('actorUserId', input.actorUserId, 16);
-    this.optionalString('subjectUserId', input.subjectUserId, 16);
-    this.optionalString('entityId', input.entityId, 64);
+    this.optionalString('actorId', input.actorId, 255);
+    this.optionalString('subjectType', input.subjectType, 64);
+    this.optionalString('subjectId', input.subjectId, 255);
+    this.optionalString('resourceType', input.resourceType, 64);
+    this.optionalString('resourceId', input.resourceId, 255);
     this.optionalString('requestId', input.requestId, 64);
     this.optionalString('sessionId', input.sessionId, 16);
     this.optionalString('ipAddress', input.ipAddress, 45);

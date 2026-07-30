@@ -4,52 +4,62 @@ import { Column, Entity, Index } from 'typeorm';
 type RedactedAuditData = Record<string, unknown>;
 
 @Entity('activity_audits')
-@Index('IDX_activity_audits_actor_time', ['actor_user_id', 'occurred_at'])
-@Index('IDX_activity_audits_subject_time', ['subject_user_id', 'occurred_at'])
-@Index('IDX_activity_audits_entity_time', [
-  'entity_type',
-  'entity_id',
+@Index('IDX_activity_audits_actor_time', [
+  'actor_type',
+  'actor_id',
   'occurred_at',
 ])
-@Index('IDX_activity_audits_event_time', ['event', 'occurred_at'])
+@Index('IDX_activity_audits_subject_time', [
+  'subject_type',
+  'subject_id',
+  'occurred_at',
+])
+@Index('IDX_activity_audits_resource_time', [
+  'resource_type',
+  'resource_id',
+  'occurred_at',
+])
+@Index('IDX_activity_audits_domain_event_time', [
+  'domain',
+  'event',
+  'occurred_at',
+])
 export class ActivityAuditEntity extends BaseEntity {
-  @Index()
   @Column({ type: 'varchar', length: 32 })
   public readonly category!: string;
 
-  @Index()
   @Column({ type: 'varchar', length: 128 })
   public readonly event!: string;
 
-  @Index()
   @Column({ type: 'varchar', length: 32 })
   public readonly outcome!: string;
 
-  @Index()
   @Column({ type: 'varchar', length: 32 })
   public readonly actor_type!: string;
 
-  @Index()
-  @Column({ type: 'varchar', length: 16, nullable: true })
-  public readonly actor_user_id!: string | null;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly actor_id!: string | null;
 
-  @Index()
-  @Column({ type: 'varchar', length: 16, nullable: true })
-  public readonly subject_user_id!: string | null;
-
-  @Index()
   @Column({ type: 'varchar', length: 64, nullable: true })
-  public readonly entity_type!: string | null;
+  public readonly subject_type!: string | null;
 
-  @Index()
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly subject_id!: string | null;
+
   @Column({ type: 'varchar', length: 64, nullable: true })
-  public readonly entity_id!: string | null;
+  public readonly resource_type!: string | null;
 
-  @Index()
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  public readonly resource_id!: string | null;
+
+  @Column({ type: 'varchar', length: 64 })
+  public readonly domain!: string;
+
+  @Index('IDX_activity_audits_request_id')
   @Column({ type: 'varchar', length: 64, nullable: true })
   public readonly request_id!: string | null;
 
-  @Index()
+  @Index('IDX_activity_audits_session_id')
   @Column({ type: 'varchar', length: 16, nullable: true })
   public readonly session_id!: string | null;
 
@@ -71,7 +81,6 @@ export class ActivityAuditEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 64, nullable: true })
   public readonly failure_code!: string | null;
 
-  @Index()
   @Column({ type: 'varchar', length: 32 })
   public readonly source!: string;
 

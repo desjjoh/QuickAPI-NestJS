@@ -50,15 +50,18 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',
         metadata: {},
         sessionId: payload.sid,
-        subjectUserId: payload.sub,
+        subjectType: 'user',
+        subjectId: payload.sub,
         failureCode:
           error instanceof Error ? error.constructor.name : 'UnknownError',
       });
+
       throw error;
     }
   }

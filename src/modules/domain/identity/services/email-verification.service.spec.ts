@@ -262,11 +262,13 @@ describe('EmailVerificationService', () => {
     expect(auditSvc.recordActivity).toHaveBeenCalledWith(
       {
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
+        domain: 'identity',
         outcome: 'succeeded',
         actorType: 'anonymous',
-        subjectUserId: 'new-user',
-        entityType: 'user',
-        entityId: 'new-user',
+        subjectType: 'user',
+        subjectId: 'new-user',
+        resourceType: 'user',
+        resourceId: 'new-user',
         source: 'http',
         metadata: {},
       },
@@ -301,6 +303,7 @@ describe('EmailVerificationService', () => {
       expect(emailSvc.sendEmail).not.toHaveBeenCalled();
       expect(auditSvc.recordActivity).toHaveBeenCalledWith({
         event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

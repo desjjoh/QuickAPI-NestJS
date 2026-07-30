@@ -33,6 +33,7 @@ class LocalStrategy extends PassportStrategy(Strategy) {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.SIGN_IN_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

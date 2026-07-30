@@ -18,6 +18,7 @@ describe('authentication strategy audit events', () => {
     ).rejects.toBe(error);
     expect(audit.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SIGN_IN_FAILED,
+      domain: 'identity',
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',
@@ -50,12 +51,14 @@ describe('authentication strategy audit events', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(audit.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+      domain: 'identity',
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',
       metadata: {},
       sessionId: 'session-1',
-      subjectUserId: 'user-1',
+      subjectType: 'user',
+      subjectId: 'user-1',
       failureCode: 'UnauthorizedException',
     });
   });

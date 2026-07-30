@@ -74,6 +74,7 @@ describe('RegistrationService', () => {
     );
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
+      domain: 'identity',
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',
@@ -114,6 +115,7 @@ describe('RegistrationService', () => {
     );
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
+      domain: 'identity',
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',

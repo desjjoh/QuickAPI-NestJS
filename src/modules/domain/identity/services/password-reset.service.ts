@@ -66,11 +66,13 @@ export class PasswordResetService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_REQUESTED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -84,6 +86,7 @@ export class PasswordResetService {
     if (!user || !this.userSvc.canAuthenticate(user)) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',
@@ -105,11 +108,13 @@ export class PasswordResetService {
 
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_ACCEPTED,
+        domain: 'identity',
         outcome: 'succeeded',
         actorType: 'anonymous',
-        subjectUserId: user.id,
-        entityType: 'user',
-        entityId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        resourceType: 'user',
+        resourceId: user.id,
         source: 'http',
         metadata: {},
       });
@@ -118,11 +123,13 @@ export class PasswordResetService {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
-        subjectUserId: user.id,
-        entityType: 'user',
-        entityId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        resourceType: 'user',
+        resourceId: user.id,
         source: 'http',
         metadata: {},
         failureCode:
@@ -165,22 +172,26 @@ export class PasswordResetService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
 
     await this.auditSvc.recordEntityChange({
       event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
       before: { id: user.id },
@@ -189,11 +200,13 @@ export class PasswordResetService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectUserId: user.id,
-      entityType: 'user',
-      entityId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'user',
+      resourceId: user.id,
       source: 'http',
       metadata: { session_ids: sessionIds },
     });

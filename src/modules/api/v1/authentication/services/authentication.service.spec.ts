@@ -68,10 +68,12 @@ describe('AuthService', () => {
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -108,10 +110,12 @@ describe('AuthService', () => {
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
+      domain: 'identity',
       outcome: 'pending',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -131,10 +135,12 @@ describe('AuthService', () => {
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
     expect(auditSvc.recordActivity).toHaveBeenNthCalledWith(1, {
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -152,6 +158,7 @@ describe('AuthService', () => {
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
+      domain: 'identity',
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',
@@ -179,10 +186,12 @@ describe('AuthService', () => {
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       sessionId: session.id,
       source: 'http',
       metadata: {},
@@ -195,11 +204,12 @@ describe('AuthService', () => {
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
       sessionId: session.id,
-      entityType: 'session',
-      entityId: session.id,
+      resourceType: 'session',
+      resourceId: session.id,
       source: 'http',
       metadata: {},
     });
@@ -213,10 +223,12 @@ describe('AuthService', () => {
     );
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+      domain: 'identity',
       outcome: 'failed',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       sessionId: session.id,
       source: 'http',
       metadata: {},

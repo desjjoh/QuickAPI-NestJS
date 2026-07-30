@@ -49,6 +49,7 @@ export class RegistrationService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
+      domain: 'identity',
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',
@@ -89,6 +90,7 @@ export class RegistrationService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
+      domain: 'identity',
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',

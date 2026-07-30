@@ -131,13 +131,15 @@ describe('RefreshService', () => {
     );
     expect(auditSvc.recordActivity).toHaveBeenCalledWith({
       event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       sessionId: suppliedSession.id,
-      entityType: 'session',
-      entityId: suppliedSession.id,
+      resourceType: 'session',
+      resourceId: suppliedSession.id,
       source: 'http',
       metadata: {},
     });

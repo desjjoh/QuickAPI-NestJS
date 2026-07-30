@@ -127,10 +127,12 @@ conventions.
 | `event_action_key` | string                | yes         | Stable machine key from the controlled catalog, never a display message                     |
 | `outcome`          | enum                  | yes         | `succeeded`, `failed`, `denied`, `pending`, or `unknown`                                    |
 | `actor_type`       | enum                  | yes         | `user`, `anonymous`, `service`, `admin`, or `system`                                        |
-| `actor_user_id`    | string, nullable      | conditional | Authenticated actor's user ID when available; absent for anonymous/system actors            |
-| `subject_user_id`  | string, nullable      | no          | User affected when different from, or important in addition to, the actor                   |
-| `entity_type`      | string, nullable      | conditional | Stable logical entity name for entity changes or an applicable activity target              |
-| `entity_id`        | string, nullable      | conditional | Entity identifier represented as a string; required for entity changes when known           |
+| `actor_id`         | string, nullable      | conditional | Identifier of the party that initiated the action; absent for anonymous/system actors       |
+| `subject_type`     | string, nullable      | conditional | Type of aggregate owner or party affected                                                   |
+| `subject_id`       | string, nullable      | conditional | Identifier of the aggregate owner or party affected                                         |
+| `resource_type`    | string, nullable      | conditional | Type of the specific object affected                                                        |
+| `resource_id`      | string, nullable      | conditional | Identifier of the specific object affected                                                  |
+| `domain`           | string                | yes         | Domain that owns the event definition                                                       |
 | `request_id`       | string, nullable      | conditional | Request correlation ID; required for HTTP-sourced records and propagated to downstream work |
 | `session_id`       | string, nullable      | no          | Opaque session identifier when available; never a bearer or refresh token                   |
 | `ip_address`       | string, nullable      | no          | Canonical client IP after applying the trusted-proxy policy                                 |
@@ -148,13 +150,15 @@ An implementation may add `schema_version`, `ingested_at`, integrity/hash, and
 trace/correlation fields without changing this contract. Store timestamps with
 timezone awareness and serialize them in UTC ISO 8601 form.
 
-### Actor and subject rules
+### Actor, subject, resource, and domain rules
 
-The actor initiated the action; the subject is the user the action concerns.
-For self-service actions, `actor_user_id` and `subject_user_id` may be equal.
-For an administrator deleting another user, the administrator is the actor and
-the deleted user is the subject. For an unauthenticated sign-in failure,
-`actor_type` is `anonymous`, `actor_user_id` is null, and metadata may contain a
+The actor initiated the action. The subject is the aggregate owner or party the
+action concerns, while the resource is the specific object affected. The domain
+owns the event definition.
+For self-service actions, `actor_id` and `subject_id` may be equal.
+For an administrator deleting another user, the administrator is the actor, the
+deleted user is the subject, and that user's record is the resource. For an unauthenticated sign-in failure,
+`actor_type` is `anonymous`, `actor_id` is null, and metadata may contain a
 one-way keyed hash of the normalized login identifier; it must not contain the
 raw identifier. Automated work uses `service` or `system` plus a stable service
 name in metadata.
@@ -242,15 +246,15 @@ The store and indexes should support bounded time-range queries for:
 - authentication failures by time, keyed login hash, IP, or session, including
   detection of bursts and account attacks;
 - a request's complete semantic and entity-change history by `request_id`;
-- the history of an entity by `(entity_type, entity_id)`;
+- the history of an entity by `(resource_type, resource_id)`;
 - administrative actions by event key, actor, subject, outcome, and time;
 - session creation/revocation investigations by `session_id`;
 - changes to a named field using `changed_fields`;
 - retention, legal-hold, and compliance exports by time and category.
 
 Likely composite indexes begin with `occurred_at` and include
-`(actor_user_id, occurred_at)`, `(subject_user_id, occurred_at)`,
-`(event_action_key, outcome, occurred_at)`, `(entity_type, entity_id,
+`(actor_id, occurred_at)`, `(subject_id, occurred_at)`,
+`(event_action_key, outcome, occurred_at)`, `(resource_type, resource_id,
 occurred_at)`, `request_id`, and `session_id`. Partition primarily by time.
 Avoid unrestricted JSON scans on the primary store; promote frequently queried
 metadata to governed columns or a purpose-built secondary index.

@@ -31,10 +31,12 @@ export class AuthService {
     if (challenge) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
+        domain: 'identity',
         outcome: 'pending',
         actorType: 'user',
-        actorUserId: user.id,
-        subjectUserId: user.id,
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
         source: 'http',
         metadata: {},
       });
@@ -61,10 +63,12 @@ export class AuthService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -89,6 +93,7 @@ export class AuthService {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',
@@ -101,10 +106,12 @@ export class AuthService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
-      actorUserId: user.id,
-      subjectUserId: user.id,
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -122,10 +129,12 @@ export class AuthService {
 
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
+        domain: 'identity',
         outcome: 'succeeded',
         actorType: 'user',
-        actorUserId: user.id,
-        subjectUserId: user.id,
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
         sessionId: session.id,
         source: 'http',
         metadata: {},
@@ -135,10 +144,12 @@ export class AuthService {
     } catch (error) {
       await this.auditSvc.recordActivity({
         event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
+        domain: 'identity',
         outcome: 'failed',
         actorType: 'user',
-        actorUserId: user.id,
-        subjectUserId: user.id,
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
         sessionId: session.id,
         source: 'http',
         metadata: {},
@@ -158,11 +169,12 @@ export class AuthService {
 
     await this.auditSvc.recordActivity({
       event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
+      domain: 'identity',
       outcome: 'succeeded',
       actorType: 'user',
       sessionId: session.id,
-      entityType: 'session',
-      entityId: session.id,
+      resourceType: 'session',
+      resourceId: session.id,
       source: 'http',
       metadata: {},
     });
