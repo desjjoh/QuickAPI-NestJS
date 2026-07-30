@@ -156,6 +156,20 @@ describe(AuditRedactionService.name, () => {
     ).toEqual({ roles: ['role-1', 'role-2'] });
   });
 
+  it('rejects a nested object supplied to a collection relationship policy', () => {
+    const service = new AuditRedactionService();
+
+    const snapshot = service.redactSnapshot('user', {
+      roles: {
+        id: 'role-1',
+        arbitrary: { secret: 'must-not-be-serialized' },
+      },
+    });
+
+    expect(snapshot).toEqual({ roles: [] });
+    expect(JSON.stringify(snapshot)).not.toContain('must-not-be-serialized');
+  });
+
   it('does not report reordered unordered relationships as changed', () => {
     const service = new AuditRedactionService();
     const diff = service.redactDiff(

@@ -18,16 +18,44 @@ export type AuditEntityType =
   | 'image';
 
 type FieldPolicy =
-  | 'value'
-  | 'masked-email'
-  | 'hash'
-  | 'changed'
-  | 'relation-ids'
-  | 'ordered-relation-ids'
-  | FieldTree;
+  | ScalarFieldPolicy
+  | MaskedFieldPolicy
+  | ChangedFieldPolicy
+  | NestedObjectFieldPolicy
+  | RelationshipIdsFieldPolicy;
+interface ScalarFieldPolicy {
+  readonly kind: 'scalar';
+}
+interface MaskedFieldPolicy {
+  readonly kind: 'masked';
+  readonly mask: 'email' | 'sha256';
+}
+interface ChangedFieldPolicy {
+  readonly kind: 'changed-only';
+}
+interface NestedObjectFieldPolicy {
+  readonly kind: 'nested-object';
+  readonly fields: FieldTree;
+}
+interface RelationshipIdsFieldPolicy {
+  readonly kind: 'relationship-ids';
+  readonly preserveOrder?: boolean;
+}
 interface FieldTree {
   readonly [field: string]: FieldPolicy;
 }
+
+const scalar: ScalarFieldPolicy = { kind: 'scalar' };
+const maskedEmail: MaskedFieldPolicy = { kind: 'masked', mask: 'email' };
+const hashed: MaskedFieldPolicy = { kind: 'masked', mask: 'sha256' };
+const changedOnly: ChangedFieldPolicy = { kind: 'changed-only' };
+const nestedObject = (fields: FieldTree): NestedObjectFieldPolicy => ({
+  kind: 'nested-object',
+  fields,
+});
+const relationshipIds: RelationshipIdsFieldPolicy = {
+  kind: 'relationship-ids',
+};
 
 /**
  * Personal-data policy for the audit table:
@@ -40,68 +68,84 @@ interface FieldTree {
  * it auditable. It must also be added to the appropriate tree below.
  */
 const ENTITY_FIELDS: Readonly<Record<AuditEntityType, FieldTree>> = {
+  // Country is not initially audited; its one-to-many regions must be an ID
+  // array if a country policy is introduced.
   user: {
-    id: 'value',
-    identity: { email: 'masked-email' },
-    profile: { id: 'value', name: { first: 'value', last: 'value' } },
-    roles: 'relation-ids',
-    status: { id: 'value', name: 'value' },
-    active: 'value',
-    created_at: 'value',
-    updated_at: 'value',
-    deleted_at: 'value',
-    metadata: { mfa_enabled: 'value' },
+    id: scalar,
+    identity: nestedObject({ email: maskedEmail }),
+    // One-to-one: retain only this explicitly allowlisted profile summary.
+    profile: nestedObject({
+      id: scalar,
+      name: nestedObject({ first: scalar, last: scalar }),
+    }),
+    // Many-to-many: retain a bounded, unordered array of role IDs only.
+    roles: relationshipIds,
+    // Many-to-one: policy retains a small, explicitly allowlisted status object.
+    status: nestedObject({ id: scalar, name: scalar }),
+    // One-to-many sessions/account tokens are omitted; if added, use ID arrays.
+    active: scalar,
+    created_at: scalar,
+    updated_at: scalar,
+    deleted_at: scalar,
+    metadata: nestedObject({ mfa_enabled: scalar }),
   },
   profile: {
-    id: 'value',
-    name: { first: 'value', last: 'value', preferred: 'value' },
-    phone: 'changed',
-    address: 'changed',
-    date_of_birth: 'changed',
-    created_at: 'value',
-    updated_at: 'value',
+    id: scalar,
+    name: nestedObject({ first: scalar, last: scalar, preferred: scalar }),
+    phone: changedOnly,
+    address: changedOnly,
+    date_of_birth: changedOnly,
+    created_at: scalar,
+    updated_at: scalar,
   },
   session: {
-    id: 'value',
-    user_id: 'value',
-    active: 'value',
-    ip: 'hash',
-    user_agent: 'changed',
-    created_at: 'value',
-    expires_at: 'value',
-    revoked_at: 'value',
+    id: scalar,
+    // Many-to-one: retain the owning user as its scalar foreign-key ID.
+    user_id: scalar,
+    active: scalar,
+    ip: hashed,
+    user_agent: changedOnly,
+    created_at: scalar,
+    expires_at: scalar,
+    revoked_at: scalar,
   },
-  role: { id: 'value', name: 'value', active: 'value' },
-  account_status: { id: 'value', name: 'value', active: 'value' },
+  role: {
+    id: scalar,
+    name: scalar,
+    active: scalar,
+    // Many-to-many permissions are omitted; if added, use an ID array.
+  },
+  account_status: { id: scalar, name: scalar, active: scalar },
   image: {
-    id: 'value',
-    owner_id: 'value',
-    filename: 'value',
-    mime_type: 'value',
-    width: 'value',
-    height: 'value',
-    created_at: 'value',
+    id: scalar,
+    // Many-to-one: retain the owner as its scalar foreign-key ID.
+    owner_id: scalar,
+    filename: scalar,
+    mime_type: scalar,
+    width: scalar,
+    height: scalar,
+    created_at: scalar,
   },
 };
 
 const METADATA_FIELDS: FieldTree = {
-  request_id: 'value',
-  correlation_id: 'value',
-  operation_id: 'value',
-  actor_role: 'value',
-  actor_label: 'value',
-  subject_label: 'value',
-  reason: 'value',
-  reason_code: 'value',
-  client_application: 'value',
-  job_name: 'value',
-  route: 'value',
-  method: 'value',
-  status: 'value',
-  status_code: 'value',
-  ip: 'hash',
-  ip_address: 'hash',
-  user_agent: 'changed',
+  request_id: scalar,
+  correlation_id: scalar,
+  operation_id: scalar,
+  actor_role: scalar,
+  actor_label: scalar,
+  subject_label: scalar,
+  reason: scalar,
+  reason_code: scalar,
+  client_application: scalar,
+  job_name: scalar,
+  route: scalar,
+  method: scalar,
+  status: scalar,
+  status_code: scalar,
+  ip: hashed,
+  ip_address: hashed,
+  user_agent: changedOnly,
 };
 
 const SECRET_KEY =
@@ -205,27 +249,19 @@ export class AuditRedactionService {
     seen: WeakSet<object>,
     depth: number,
   ): AuditValue {
-    if (policy === 'changed') return CHANGED;
-    if (policy === 'masked-email') return this.maskEmail(value);
-    if (policy === 'hash') return this.hash(value);
-    if (policy === 'value') return this.scalar(value);
-    if (policy === 'relation-ids' || policy === 'ordered-relation-ids')
-      return this.relationIds(value, policy === 'ordered-relation-ids');
-    if (Array.isArray(value)) {
-      const selected = value.slice(0, this.limits.maxArrayLength);
-      const output = selected.map((item) =>
-        this.applyTree(item, policy, seen, depth),
-      );
-      if (value.length > selected.length) output.push(TRUNCATED);
-      return output;
-    }
-    return this.applyTree(value, policy, seen, depth);
+    if (policy.kind === 'changed-only') return CHANGED;
+    if (policy.kind === 'masked')
+      return policy.mask === 'email' ? this.maskEmail(value) : this.hash(value);
+    if (policy.kind === 'scalar') return this.scalar(value);
+    if (policy.kind === 'relationship-ids')
+      return this.relationIds(value, policy.preserveOrder === true);
+    return this.applyTree(value, policy.fields, seen, depth);
   }
 
   /**
    * Collection relations are deliberately reduced without traversing an item.
-   * `ordered-relation-ids` is available for relationships whose application
-   * order is meaningful; ordinary relation sets are sorted for stable diffs.
+   * Policies may preserve relationship order when application order is
+   * meaningful; ordinary relation sets are sorted for stable diffs.
    */
   private relationIds(value: unknown, preserveOrder: boolean): AuditValue[] {
     if (!Array.isArray(value)) return [];
