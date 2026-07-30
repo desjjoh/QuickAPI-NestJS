@@ -10,6 +10,7 @@ import { MediaModule } from '@/modules/domain/media/media.module';
 import { SessionsApiController } from './controllers/session.controller';
 import { SessionsApiService } from './services/sessions.service';
 import { EmailModule } from '@/modules/system/email/email.module';
+import { AuditModule } from '@/modules/domain/audit/audit.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     LibraryModule,
     MediaModule,
     EmailModule,
+    AuditModule,
   ],
   providers: [MeApiService, ProfileApiService, SessionsApiService],
   controllers: [MeApiController, ProfileApiController, SessionsApiController],
