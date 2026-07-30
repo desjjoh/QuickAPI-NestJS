@@ -5,10 +5,20 @@ import path from 'path';
 
 import { AppEnv, EnvSchema } from './environment.schema';
 
-const composeRequired = ['INGRESS_NETWORK', 'QUICKAPI_IMAGE'] as const;
+const composeRequired = [
+  'INGRESS_NETWORK',
+  'QUICKAPI_IMAGE',
+  'MYSQL_ROOT_PASSWORD',
+  'MYSQL_DATABASE',
+  'MYSQL_USER',
+  'MYSQL_PASSWORD',
+] as const;
 
 const secretRequired = [
   'DB_PASSWORD',
+  'MYSQL_ROOT_PASSWORD',
+  'MYSQL_USER',
+  'MYSQL_PASSWORD',
   'REDIS_PASSWORD',
   'OPERATIONS_TOKEN',
   'MAXMIND_ACCOUNT_ID',

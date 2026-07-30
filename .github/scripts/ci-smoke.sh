@@ -169,6 +169,21 @@ for (const name of ['preflight', 'migration', 'geoip-init', 'api']) {
     );
   }
 }
+
+for (const serviceName of ['migration', 'api']) {
+  const mysqlEnvironment = model.services.mysql?.environment;
+  const serviceEnvironment = model.services[serviceName]?.environment;
+  if (mysqlEnvironment?.MYSQL_DATABASE !== serviceEnvironment?.DB_DATABASE) {
+    throw new Error(
+      `MYSQL_DATABASE does not match DB_DATABASE for staging service ${serviceName}`,
+    );
+  }
+  if (mysqlEnvironment?.MYSQL_USER !== serviceEnvironment?.DB_USER) {
+    throw new Error(
+      `MYSQL_USER does not match DB_USER for staging service ${serviceName}`,
+    );
+  }
+}
 NODE
 staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(model.services.api.depends_on.migration.condition)' "$artifact_dir/staging-compose.json")"
 [[ "$staging_api_condition" == service_completed_successfully ]] || {
