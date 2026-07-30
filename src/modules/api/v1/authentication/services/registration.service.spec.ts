@@ -123,6 +123,17 @@ describe('RegistrationService', () => {
     });
   });
 
+  it('rejects resend for an email that already belongs to a user', async () => {
+    const { service, emailSvc, userRepo, registrationTokenSvc } = setup();
+    userRepo.findByEmail.mockResolvedValue(userFixture());
+
+    await expect(
+      service.resendRegistration(' Person@Example.TEST '),
+    ).rejects.toThrow(ConflictException);
+    expect(registrationTokenSvc.findPendingByEmail).not.toHaveBeenCalled();
+    expect(emailSvc.sendRegistrationVerificationEmail).not.toHaveBeenCalled();
+  });
+
   it('rejects resend when no pending registration token exists', async () => {
     const { service, emailSvc, registrationTokenSvc } = setup();
     registrationTokenSvc.findPendingByEmail.mockResolvedValue(null);

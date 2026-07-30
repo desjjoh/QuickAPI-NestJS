@@ -1,6 +1,6 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { ForbiddenException } from '@nestjs/common';
 
 import {
@@ -77,6 +77,20 @@ describe('AuthService', () => {
     });
   });
 
+  it('passes request context when issuing tokens for an ordinary sign-in', async () => {
+    const { service, refreshSvc } = setup();
+    const req = { ip: '127.0.0.1' } as Request;
+
+    await expect(service.signIn(user, res, req)).resolves.toBe(tokens);
+
+    expect(refreshSvc.issueTokens).toHaveBeenCalledWith(
+      user,
+      res,
+      undefined,
+      req,
+    );
+  });
+
   it('returns an MFA challenge without recording sign-in or issuing tokens', async () => {
     const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
     const expires = new Date('2026-02-01T00:00:00Z');
@@ -146,6 +160,19 @@ describe('AuthService', () => {
     });
   });
 
+  it('records a safe failure code when MFA verification rejects with a non-error value', async () => {
+    const { service, refreshSvc, mfaSvc, auditSvc } = setup();
+    mfaSvc.verifyChallenge.mockRejectedValue('verification failed');
+
+    await expect(service.verifyMfa('challenge-1', '123456', res)).rejects.toBe(
+      'verification failed',
+    );
+    expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ failureCode: 'UnknownError' }),
+    );
+  });
+
   it('delegates refresh verification with the existing session', async () => {
     const { service, refreshSvc, auditSvc } = setup();
     await expect(service.verify(user, res, session)).resolves.toBe(tokens);
@@ -195,5 +222,17 @@ describe('AuthService', () => {
       metadata: {},
       failureCode: 'Error',
     });
+  });
+
+  it('records a safe failure code when refresh rejects with a non-error value', async () => {
+    const { service, refreshSvc, auditSvc } = setup();
+    refreshSvc.issueTokens.mockRejectedValue('rotation failed');
+
+    await expect(service.verify(user, res, session)).rejects.toBe(
+      'rotation failed',
+    );
+    expect(auditSvc.recordActivity).toHaveBeenCalledWith(
+      expect.objectContaining({ failureCode: 'UnknownError' }),
+    );
   });
 });
