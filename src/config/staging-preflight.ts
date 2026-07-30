@@ -113,6 +113,12 @@ export function validateStagingEnv(input: NodeJS.ProcessEnv): AppEnv {
     throw new Error('QUICKAPI_IMAGE must use an immutable sha256 digest');
   if (env.DB_SYNC !== false)
     throw new Error('DB_SYNC must be false in staging');
+  if (input.MYSQL_DATABASE !== env.DB_DATABASE)
+    throw new Error('MYSQL_DATABASE must match DB_DATABASE');
+  if (input.MYSQL_USER !== env.DB_USER)
+    throw new Error('MYSQL_USER must match DB_USER');
+  if (input.MYSQL_PASSWORD !== env.DB_PASSWORD)
+    throw new Error('MYSQL_PASSWORD must match DB_PASSWORD');
   return env;
 }
 
