@@ -47,7 +47,10 @@ import {
   MfaChallengeResponseDto,
   VerifyMfaChallengeDto,
 } from '../../authentication/models/mfa.model';
-import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
+import {
+  EmailVerificationChallengeDto,
+  VerifyEmailDto,
+} from '../../authentication/models/verify-email.model';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
 
@@ -111,6 +114,37 @@ export class MeApiController {
     @Body() dto: UpdateEmailDto,
   ): Promise<EmailVerificationChallengeDto> {
     return this.svc.updateEmail(user, dto);
+  }
+
+  // PATCH /email/confirm
+  @Patch('email/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: throttlePolicies.otpConfirmation })
+  @ApiBody({
+    type: VerifyEmailDto,
+    description:
+      'The email verification challenge identifier and 6-digit code.',
+  })
+  @ApiOperation({
+    summary: 'Confirm account email change',
+    description:
+      'Consumes the email verification challenge, applies the pending email change, and rotates the current session tokens.',
+  })
+  @ApiOkResponse({
+    type: JWTDto,
+    description:
+      'The email address was changed and replacement authentication tokens were issued.',
+  })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
+  public async confirmEmail(
+    @CurrentUser() user: UserEntity,
+    @CurrentSession() currentSession: UserSessionEntity,
+    @Body() dto: VerifyEmailDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<JWTDto> {
+    return this.svc.confirmEmail(user, currentSession, dto, res);
   }
 
   // PATCH /password
