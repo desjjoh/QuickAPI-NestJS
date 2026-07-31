@@ -145,7 +145,7 @@ export class MeApiService {
       dto.email.trim().toLowerCase() !==
       user.identity.email.trim().toLowerCase();
 
-    if (emailChanged)
+    if (!emailChanged)
       throw new BadRequestException(
         'New email address must be different from the current email address.',
       );
@@ -177,10 +177,10 @@ export class MeApiService {
     );
 
     const emailChanged =
-      updated.identity.email.trim().toLowerCase() ===
+      updated.identity.email.trim().toLowerCase() !==
       previousEmail.trim().toLowerCase();
 
-    if (emailChanged)
+    if (!emailChanged)
       throw new BadRequestException(
         'New email address must be different from the current email address.',
       );
