@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { DataSource, EntityManager } from 'typeorm';
 
+import { RequestContext } from '@/common/store/request-context.store';
+import { IdentityAuditEvents } from '@/config/audit-events.config';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
   UserDto,
@@ -14,7 +19,12 @@ import { UpdateUserAdministrationDto } from '../models/update-user.model';
 
 @Injectable()
 export class UserAdminService {
-  public constructor(private readonly repo: UserRepository) {}
+  public constructor(
+    private readonly repo: UserRepository,
+    private readonly dataSource: DataSource,
+    private readonly audit: AuditService,
+    private readonly context: RequestContext,
+  ) {}
 
   public async paginateUsers(
     pageOptions: UserPaginationOptions,
@@ -28,19 +38,113 @@ export class UserAdminService {
   }
 
   public async findUser(id: string): Promise<UserDto> {
-    const user = await this.repo.findByIdOrFail(id);
-
-    return new UserDto(user);
+    return new UserDto(await this.repo.findByIdOrFail(id));
   }
 
   public async removeUser(id: string): Promise<void> {
-    return this.repo.removeUser(id);
+    const operationId = this.operationId();
+    if (
+      await this.wasCompleted(
+        IdentityAuditEvents.ADMIN_USER_DELETED,
+        operationId,
+      )
+    )
+      return;
+
+    await this.dataSource.transaction(async (manager) => {
+      const before = await this.lockUser(manager, id);
+      await this.repo.removeUser(id, manager);
+      await this.audit.record(
+        this.successInput(
+          IdentityAuditEvents.ADMIN_USER_DELETED,
+          id,
+          operationId,
+          before,
+          null,
+        ),
+        manager,
+      );
+    });
   }
 
   public async updateUser(
     id: string,
     dto: UpdateUserAdministrationDto,
   ): Promise<UserDto> {
-    return new UserDto(await this.repo.updateUserAdministration(id, dto));
+    const operationId = this.operationId();
+    if (
+      await this.wasCompleted(
+        IdentityAuditEvents.ADMIN_USER_UPDATED,
+        operationId,
+      )
+    )
+      return new UserDto(await this.repo.findByIdOrFail(id));
+
+    const user = await this.dataSource.transaction(async (manager) => {
+      const before = await this.lockUser(manager, id);
+      const after = await this.repo.updateUserAdministration(id, dto, manager);
+      await this.audit.record(
+        this.successInput(
+          IdentityAuditEvents.ADMIN_USER_UPDATED,
+          id,
+          operationId,
+          before,
+          after,
+        ),
+        manager,
+      );
+      return after;
+    });
+    return new UserDto(user);
+  }
+
+  private operationId(): string | null {
+    return this.context.get('requestId') ?? null;
+  }
+
+  private async wasCompleted(event: string, operationId: string | null) {
+    if (!operationId) return false;
+    return this.dataSource.getRepository(AuditEventEntity).existsBy({
+      event,
+      operation_id: operationId,
+      outcome: 'succeeded',
+    });
+  }
+
+  /** The pessimistic read makes the captured before value part of the mutation transaction. */
+  private async lockUser(
+    manager: EntityManager,
+    id: string,
+  ): Promise<UserEntity> {
+    return manager.findOneOrFail(UserEntity, {
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
+  private successInput(
+    event: IdentityAuditEvents,
+    id: string,
+    operationId: string | null,
+    before: UserEntity,
+    after: UserEntity | null,
+  ) {
+    return {
+      domain: 'identity',
+      event,
+      outcome: 'succeeded' as const,
+      actorType: 'admin' as const,
+      subjectType: 'identity.user',
+      subjectId: id,
+      resourceType: 'identity.user',
+      resourceId: id,
+      source: 'http' as const,
+      metadata: { operation_id: operationId },
+      operationId,
+      idempotencyId: operationId,
+      before,
+      after,
+      meaningfulWithoutChanges: true,
+    };
   }
 }

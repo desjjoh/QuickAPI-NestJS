@@ -15,6 +15,8 @@ export enum IdentityAuditEvents {
   SESSION_REVOKED = 'identity.session.revoked',
   ALL_SESSIONS_REVOKED = 'identity.session.all_revoked',
   ACCOUNT_DELETED = 'identity.account.deleted',
+  ADMIN_USER_UPDATED = 'identity.admin.user_updated',
+  ADMIN_USER_DELETED = 'identity.admin.user_deleted',
 }
 
 export type AuditEventKey = IdentityAuditEvents;

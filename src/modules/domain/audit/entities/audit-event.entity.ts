@@ -24,6 +24,9 @@ type RedactedAuditData = Record<string, unknown>;
   'event',
   'occurred_at',
 ])
+@Index('UQ_activity_audits_event_operation', ['event', 'operation_id'], {
+  unique: true,
+})
 export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128 })
   public readonly event!: string;

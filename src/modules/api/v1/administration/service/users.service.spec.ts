@@ -17,9 +17,30 @@ describe('UserAdminService', () => {
       updateUserAdministration: jest.fn(),
     };
 
+    const manager = {
+      findOneOrFail: jest.fn().mockResolvedValue(userFixture()),
+    };
+    const audit = { record: jest.fn().mockResolvedValue({}) };
+    const auditRepository = { existsBy: jest.fn().mockResolvedValue(false) };
+    const dataSource = {
+      transaction: jest.fn(async (callback) => callback(manager)),
+      getRepository: jest.fn(() => auditRepository),
+    };
+    const context = { get: jest.fn().mockReturnValue('operation-1') };
+
     return {
       repo,
-      service: new UserAdminService(repo as unknown as UserRepository),
+      manager,
+      audit,
+      auditRepository,
+      dataSource,
+      context,
+      service: new UserAdminService(
+        repo as unknown as UserRepository,
+        dataSource as never,
+        audit as never,
+        context as never,
+      ),
     };
   };
 
@@ -87,7 +108,7 @@ describe('UserAdminService', () => {
     await expect(service.removeUser('user-1')).resolves.toBeUndefined();
 
     expect(repo.removeUser).toHaveBeenCalledTimes(1);
-    expect(repo.removeUser).toHaveBeenCalledWith('user-1');
+    expect(repo.removeUser).toHaveBeenCalledWith('user-1', expect.any(Object));
   });
 
   it('delegates an administration update and converts the entity to a DTO', async () => {
@@ -104,18 +125,27 @@ describe('UserAdminService', () => {
     const result = await service.updateUser('user-1', dto);
 
     expect(repo.updateUserAdministration).toHaveBeenCalledTimes(1);
-    expect(repo.updateUserAdministration).toHaveBeenCalledWith('user-1', dto);
+    expect(repo.updateUserAdministration).toHaveBeenCalledWith(
+      'user-1',
+      dto,
+      expect.any(Object),
+    );
     expect(result).toBeInstanceOf(UserDto);
     expect(result.status.key).toBe('disabled');
   });
 
   it('propagates repository validation errors when updating a user', async () => {
-    const { repo, service } = setup();
+    const { repo, service, audit } = setup();
     const dto = { role_ids: ['missing-role-id'] };
     const error = new BadRequestException('One or more roles were not found.');
     repo.updateUserAdministration.mockRejectedValue(error);
 
     await expect(service.updateUser('user-1', dto)).rejects.toBe(error);
-    expect(repo.updateUserAdministration).toHaveBeenCalledWith('user-1', dto);
+    expect(repo.updateUserAdministration).toHaveBeenCalledWith(
+      'user-1',
+      dto,
+      expect.any(Object),
+    );
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });

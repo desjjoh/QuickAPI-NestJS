@@ -1,12 +1,18 @@
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
-
+import { jest } from '@jest/globals';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
+import { IdentityAuditEvents } from '@/config/audit-events.config';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { UserAdminService } from '@/modules/api/v1/administration/service/users.service';
+import { RequestContext } from '@/common/store/request-context.store';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import {
   acquireCsrf,
@@ -221,5 +227,129 @@ describe('user administration authorization and lifecycle', () => {
         .getRepository(UserEntity)
         .findOneBy({ id: target.id }),
     ).toBeNull();
+  });
+
+  it('commits an administrative write and its success audit together', async () => {
+    const updater = await register('audit-commit-admin@example.test');
+    const target = await register('audit-commit-target@example.test');
+    await grant(updater, 'e2e-audit-commit', ['update_users']);
+    await suite.dataSource.getRepository(UserSessionEntity).clear();
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .set(await signIn('audit-commit-admin@example.test'))
+      .send({ status_id: disabled.id })
+      .expect(200);
+
+    const event = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findOneByOrFail({
+        event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+        resource_id: target.id,
+      });
+    expect(event.outcome).toBe('succeeded');
+    expect(event.before).not.toEqual(event.after);
+  });
+
+  it('rolls back the domain write without recording a success event', async () => {
+    const updater = await register('audit-rollback-admin@example.test');
+    const target = await register('audit-rollback-target@example.test');
+    await grant(updater, 'e2e-audit-rollback', ['update_users']);
+    await suite.dataSource.getRepository(UserSessionEntity).clear();
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+    const originalStatus = target.status.id;
+    const repository = app.get(UserRepository);
+    const implementation = repository.updateUserAdministration.bind(repository);
+    const mutation = jest
+      .spyOn(repository, 'updateUserAdministration')
+      .mockImplementation(async (...args) => {
+        await implementation(...args);
+        throw new Error('failure after domain write');
+      });
+
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .set(await signIn('audit-rollback-admin@example.test'))
+      .send({ status_id: disabled.id })
+      .expect(500);
+    mutation.mockRestore();
+
+    const stored = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: target.id });
+    expect(stored.status.id).toBe(originalStatus);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).existsBy({
+        event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+        resource_id: target.id,
+      }),
+    ).toBe(false);
+  });
+
+  it('rolls back a security-sensitive mutation when its success audit insert fails', async () => {
+    const updater = await register('audit-failure-admin@example.test');
+    const target = await register('audit-failure-target@example.test');
+    await grant(updater, 'e2e-audit-failure', ['update_users']);
+    await suite.dataSource.getRepository(UserSessionEntity).clear();
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+    const originalStatus = target.status.id;
+    const audit = app.get(AuditService);
+    const implementation = audit.record.bind(audit);
+    const insertion = jest
+      .spyOn(audit, 'record')
+      .mockImplementation((input, manager) => {
+        if (manager && input.outcome === 'succeeded')
+          return Promise.reject(new Error('simulated audit insert failure'));
+        return implementation(input, manager);
+      });
+
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .set(await signIn('audit-failure-admin@example.test'))
+      .send({ status_id: disabled.id })
+      .expect(500);
+    insertion.mockRestore();
+
+    const stored = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: target.id });
+    expect(stored.status.id).toBe(originalStatus);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).existsBy({
+        event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+        resource_id: target.id,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses the operation ID to make a retried administrative mutation idempotent', async () => {
+    const target = await register('audit-retry-target@example.test');
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+    const service = app.get(UserAdminService);
+    const context = app.get(RequestContext);
+    const invoke = () =>
+      context.run(
+        { requestId: 'retry-operation', actorType: 'admin', source: 'service' },
+        () => service.updateUser(target.id, { status_id: disabled.id }),
+      );
+
+    await invoke();
+    await invoke();
+
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).countBy({
+        event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+        operation_id: 'retry-operation',
+      }),
+    ).toBe(1);
   });
 });

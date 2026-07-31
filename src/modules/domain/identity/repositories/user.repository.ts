@@ -113,16 +113,22 @@ export class UserRepository extends Repository<UserEntity> {
     return this.findByIdOrFail(created.id);
   }
 
-  public async removeUser(id: string): Promise<void> {
-    const user = await this.findByIdOrFail(id);
+  public async removeUser(id: string, manager?: EntityManager): Promise<void> {
+    const user = manager
+      ? await manager.findOne(UserEntity, { where: { id } })
+      : await this.findByIdOrFail(id);
+    if (!user) throw new NotFoundException('User not found.');
 
     const avatar = user.profile.media.avatar;
     const profileId = user.profile.id;
 
-    await this.manager.transaction(async (manager: EntityManager) => {
-      await manager.remove(UserEntity, user);
-      await manager.delete(UserProfileEntity, { id: profileId });
-    });
+    const remove = async (transactionManager: EntityManager) => {
+      await transactionManager.remove(UserEntity, user);
+      await transactionManager.delete(UserProfileEntity, { id: profileId });
+    };
+
+    if (manager) await remove(manager);
+    else await this.manager.transaction(remove);
 
     if (avatar) await this.imageSvc.remove(avatar);
   }
@@ -130,39 +136,54 @@ export class UserRepository extends Repository<UserEntity> {
   public async updateUserAdministration(
     id: string,
     input: { status_id?: string; role_ids?: string[] },
+    manager?: EntityManager,
   ): Promise<UserEntity> {
-    const user = await this.findByIdOrFail(id);
+    const user = manager
+      ? await manager.findOne(UserEntity, { where: { id } })
+      : await this.findByIdOrFail(id);
 
-    await this.manager.transaction(async (manager: EntityManager) => {
+    if (!user) throw new NotFoundException('User not found.');
+
+    const update = async (transactionManager: EntityManager) => {
       const status = input.status_id
-        ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
+        ? await transactionManager.findOneBy(AccountStatusEntity, {
+            id: input.status_id,
+          })
         : null;
 
       if (input.status_id && !status)
         throw new BadRequestException('Account status not found.');
 
       const roles = input.role_ids
-        ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })
+        ? await transactionManager.findBy(RoleEntity, {
+            id: In(input.role_ids),
+          })
         : null;
 
       if (roles && roles.length !== new Set(input.role_ids).size)
         throw new BadRequestException('One or more roles were not found.');
 
       if (status)
-        await manager
+        await transactionManager
           .createQueryBuilder()
           .relation(UserEntity, 'status')
           .of(user.id)
           .set(status.id);
 
       if (roles)
-        await manager
+        await transactionManager
           .createQueryBuilder()
           .relation(UserEntity, 'roles')
           .of(user.id)
           .addAndRemove(roles, user.roles ?? []);
-    });
+    };
 
+    if (manager) {
+      await update(manager);
+      return manager.findOneOrFail(UserEntity, { where: { id } });
+    }
+
+    await this.manager.transaction(update);
     return this.findByIdOrFail(id);
   }
 }

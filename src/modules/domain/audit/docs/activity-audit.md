@@ -33,10 +33,12 @@ stored.
 Generic persistence keys such as `entity.insert`, `entity.update`, and
 `entity.delete` are prohibited. Use an immutable semantic key instead, such as
 `identity.profile.updated`, `identity.user.roles_changed`, or
-`store.inventory.adjusted`. Attempts whose result matters to security,
-including failures, should have their own semantic keys. Where an operation has
-meaningful requested and completed phases, use separate keys rather than
-changing the meaning of an existing key.
+`store.inventory.adjusted`. Where an operation has meaningful requested and
+completed phases, use separate keys rather than changing the meaning of an
+existing key. Recording failed, rejected, or denied attempts is deliberately
+outside the current implementation scope; guards and failure handlers must not
+emit audit events until a separate failure-auditing policy is designed and
+approved.
 
 Event catalogs belong to the domain that owns their meaning. Domain-owned event
 catalogs are registered in `src/config/audit-events.config.ts`, using the same
@@ -122,11 +124,8 @@ action concerns, while the resource is the specific object affected. The domain
 owns the event definition.
 For self-service actions, `actor_id` and `subject_id` may be equal.
 For an administrator deleting another user, the administrator is the actor, the
-deleted user is the subject, and that user's record is the resource. For an unauthenticated sign-in failure,
-`actor_type` is `anonymous`, `actor_id` is null, and metadata may contain a
-one-way keyed hash of the normalized login identifier; it must not contain the
-raw identifier. Automated work uses `service` or `system` plus a stable service
-name in metadata.
+deleted user is the subject, and that user's record is the resource. Automated
+work uses `service` or `system` plus a stable service name in metadata.
 
 ### Stable keys and readable context
 
@@ -172,6 +171,32 @@ are rejected rather than stored without redaction.
 
 ## Capture and delivery
 
+### Transaction and retry invariants
+
+The following rules are mandatory for identity and other security-sensitive
+workflows:
+
+- A successful mutation event is inserted through the exact `EntityManager`
+  used for the domain mutation. Opening a second transaction, using the default
+  repository manager, or recording after the transaction callback returns is
+  not atomic and is prohibited.
+- The allowlisted before value is read (and locked when concurrent mutation is
+  possible), the mutation is applied, and the after value is read inside that
+  same transaction. The success event is the final logical write in the
+  transaction. It describes success only after all domain writes have
+  completed; it is never emitted optimistically before logical commit.
+- An audit insert error is a transaction error. Security-sensitive
+  administrative mutations fail closed and roll back every associated domain
+  write.
+- Operations which a client, worker, or database driver can retry carry a
+  stable operation/idempotency ID. The handler checks the completed event and
+  the database enforces uniqueness for an event and operation ID, so a retry
+  cannot repeat a completed mutation or create a second success record.
+
+Code review must treat passing no manager to `AuditService.record` on a success
+path, capturing snapshots before entering the transaction, or swallowing an
+audit error as a correctness and security defect.
+
 1. Establish request context early and normalize the route from the framework's
    route template. Trust forwarded IP headers only from configured proxies.
 2. The owning domain or application service manually emits both activity
@@ -180,11 +205,8 @@ are rejected rather than stored without redaction.
 3. Commit successful mutation audit records atomically with the business
    transaction, or write an outbox entry in that transaction for durable
    delivery. Never report a successful mutation that later rolls back.
-4. Record rejected/failed actions through a failure-safe path because their
-   business transaction will not commit. If audit persistence fails, security-
-   critical administrative operations should fail closed; other operations
-   must raise an operational alert and a metric rather than silently discard
-   the audit record.
+4. Do not emit failed, rejected, or denied attempt events from guards or failure
+   handlers; that behavior is outside the current scope.
 5. Consumers must be idempotent on `audit_record_id`. Queue retries must not
    create duplicate records.
 
