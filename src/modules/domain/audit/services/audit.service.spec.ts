@@ -107,7 +107,7 @@ describe(AuditService.name, () => {
     expect(result).not.toHaveProperty('category');
   });
 
-  it('recursively excludes known credentials, codes, and tokens from every stored payload', async () => {
+  it('recursively redacts unified input across every JSON output column', async () => {
     const secrets = [
       'KnownPassword!23',
       '$2b$12$known-password-hash',
@@ -115,37 +115,77 @@ describe(AuditService.name, () => {
       'known-verification-token',
       'known-refresh-token',
       'known-mfa-secret',
+      'known-cookie',
+      'known-authorization',
+      'known-request-body',
+      'known-exception-detail',
+      'known-postmark-key',
+      'known-r2-secret',
+      'known-crypto-key',
+      'known-api-key',
     ];
 
     await service.record({
       ...activity,
+      event: 'identity.user.updated',
+      resourceType: 'identity.user',
+      resourceId: 'user-1',
       metadata: {
         password: secrets[0],
         verification_code: secrets[2],
         refresh_token: secrets[4],
         mfa_secret: secrets[5],
+        cookie: secrets[6],
+        authorization: secrets[7],
+        request_body: secrets[8],
+        exception: secrets[9],
+        postmark_api_key: secrets[10],
+        r2_secret: secrets[11],
+        encryption_key: secrets[12],
+        api_credential: secrets[13],
+        ip: '203.0.113.42',
+        user_agent: 'private browser fingerprint',
       },
-    });
-    await service.record({
-      ...activity,
-      event: 'identity.password.changed',
-      resourceType: 'identity.user',
-      resourceId: 'user-1',
       before: {
         id: 'user-1',
-        sessions: [{ id: 'session-1', refresh: secrets[4] }],
+        identity: { email: 'old@example.test', password: secrets[0] },
+        metadata: { mfa_enabled: false, reset_code: secrets[2] },
+        token_hash: secrets[1],
       },
       after: {
         id: 'user-1',
-        identity: { password: secrets[0] },
-        sessions: [{ id: 'session-2', refresh: secrets[4] }],
+        identity: { email: 'new@example.test', password: secrets[1] },
+        metadata: { mfa_enabled: true, verification_code: secrets[2] },
+        access_token: secrets[3],
       },
+      error: Object.assign(new Error(secrets[9]), {
+        response: { body: secrets[8] },
+        authorization: secrets[7],
+      }),
     });
 
-    for (const [stored] of repository.insert.mock.calls) {
-      const serialized = JSON.stringify(stored);
+    const [stored] = repository.insert.mock.calls[0] as [AuditEventEntity];
+    for (const column of [
+      stored.before,
+      stored.after,
+      stored.changes,
+      stored.metadata,
+      stored.error,
+    ]) {
+      const serialized = JSON.stringify(column);
       for (const secret of secrets) expect(serialized).not.toContain(secret);
     }
+    expect(stored.before).toEqual({
+      identity: { email: 'o***@example.test' },
+    });
+    expect(stored.after).toEqual({
+      identity: { email: 'n***@example.test' },
+    });
+    expect(stored.metadata).toMatchObject({
+      ip: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
+      user_agent: '[CHANGED]',
+    });
+    expect(stored.error).toEqual({ type: 'Error', message: '[REDACTED]' });
   });
 
   it('does not persist an entity record without a meaningful safe change', async () => {

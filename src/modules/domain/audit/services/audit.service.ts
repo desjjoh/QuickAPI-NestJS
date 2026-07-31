@@ -46,6 +46,8 @@ export interface RecordAuditInput {
   readonly resourceId?: string | null;
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
+  /** An associated exception; only its redacted classification is stored. */
+  readonly error?: unknown;
   readonly requestId?: string | null;
   readonly sessionId?: string | null;
   readonly ipAddress?: string | null;
@@ -160,7 +162,18 @@ export class AuditService {
     const metadata = this.asRecord(
       this.redaction.redactMetadata(input.metadata),
     );
-    this.enforcePayloadBounds(data.before, data.after, data.changes, metadata);
+
+    const error = Object.prototype.hasOwnProperty.call(input, 'error')
+      ? this.asRecord(this.redaction.serializeError(input.error))
+      : null;
+
+    this.enforcePayloadBounds(
+      data.before,
+      data.after,
+      data.changes,
+      metadata,
+      error,
+    );
 
     const repository = manager
       ? manager.getRepository(AuditEventEntity)
@@ -189,6 +202,7 @@ export class AuditService {
       source: input.source ?? context?.source,
       occurred_at: input.occurredAt ?? new Date(),
       metadata,
+      error,
     });
 
     await repository.insert(entity as never);

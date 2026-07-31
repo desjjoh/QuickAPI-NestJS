@@ -104,4 +104,7 @@ export class AuditEventEntity extends BaseEntity {
 
   @Column({ type: 'json', nullable: true })
   public readonly metadata!: RedactedAuditData | null;
+
+  @Column({ type: 'json', nullable: true })
+  public readonly error!: RedactedAuditData | null;
 }

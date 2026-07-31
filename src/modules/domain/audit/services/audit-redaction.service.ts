@@ -46,6 +46,7 @@ const OMITTED = '[REDACTED]';
 const CHANGED = '[CHANGED]';
 const TRUNCATED = '[TRUNCATED]';
 const CIRCULAR = '[CIRCULAR]';
+const SAFE_ERROR_TYPE = /^(?:Error|[A-Za-z][A-Za-z0-9]*(?:Error|Exception))$/;
 
 export interface AuditRedactionOptions {
   readonly maxDepth?: number;
@@ -116,8 +117,13 @@ export class AuditRedactionService {
   /** Never serializes an exception object, its stack, cause, or arbitrary fields. */
   public serializeError(error: unknown): AuditValue {
     if (!(error instanceof Error)) return { type: 'UnknownError' };
+    const type = error.name || 'Error';
+
     return {
-      type: this.safeString(error.name || 'Error'),
+      type:
+        SAFE_ERROR_TYPE.test(type) && !SECRET_KEY.test(type)
+          ? this.safeString(type)
+          : 'UnknownError',
       message: OMITTED,
     };
   }
