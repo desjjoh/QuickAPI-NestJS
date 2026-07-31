@@ -4,7 +4,10 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 export interface ValidationPayload {
@@ -32,8 +35,8 @@ class LocalStrategy extends PassportStrategy(Strategy) {
       this.svc.assertCanAuthenticate(user);
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.SIGN_IN_FAILED,
-        domain: 'identity',
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

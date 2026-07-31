@@ -15,7 +15,10 @@ import {
 } from '@/config/cookie.config';
 import { UserSessionEntity } from '../entities/session.entity';
 import { RefreshService } from './refresh.service';
-import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 describe('RefreshService', () => {
   const user = { id: 'u1', identity: { email: 'user@test.dev' } };
@@ -130,8 +133,8 @@ describe('RefreshService', () => {
       }),
     );
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,

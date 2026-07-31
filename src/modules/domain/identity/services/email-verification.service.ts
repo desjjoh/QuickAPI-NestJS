@@ -27,7 +27,10 @@ import { UserSessionEntity } from '../entities/session.entity';
 import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
 import { RoleEntity } from '../../library/entities/role.entity';
 import { AuditService } from '../../audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -62,8 +65,10 @@ export class EmailVerificationService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .EMAIL_VERIFICATION_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -113,8 +118,9 @@ export class EmailVerificationService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -197,12 +203,13 @@ export class EmailVerificationService {
     if (previousEmail) await this.sendEmailChangeSuccess(user, previousEmail);
 
     const event = previousEmail
-      ? IDENTITY_AUDIT_EVENTS.EMAIL_CHANGE_COMPLETED
-      : IDENTITY_AUDIT_EVENTS.EMAIL_VERIFICATION_COMPLETED;
+      ? AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED
+      : AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .EMAIL_VERIFICATION_COMPLETED;
 
     await this.auditSvc.record({
       event,
-      domain: 'identity',
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -217,7 +224,7 @@ export class EmailVerificationService {
     if (previousEmail)
       await this.auditSvc.record({
         event,
-        domain: 'identity',
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
@@ -267,8 +274,10 @@ export class EmailVerificationService {
         );
         await this.auditSvc.record(
           {
-            event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
-            domain: 'identity',
+            event:
+              AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+                .REGISTRATION_VERIFICATION_SUCCEEDED,
+            domain: AuditEventDomain.IDENTITY,
             outcome: 'succeeded',
             actorType: 'anonymous',
             subjectType: 'user',
@@ -284,8 +293,10 @@ export class EmailVerificationService {
       });
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

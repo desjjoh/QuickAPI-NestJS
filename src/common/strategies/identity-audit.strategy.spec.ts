@@ -1,6 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common';
 
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 import { LocalStrategy } from './local.strategy';
@@ -17,8 +20,8 @@ describe('authentication strategy audit events', () => {
       strategy.validate(' Person@Example.TEST ', 'not-recorded'),
     ).rejects.toBe(error);
     expect(audit.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.SIGN_IN_FAILED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_FAILED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',
@@ -50,8 +53,8 @@ describe('authentication strategy audit events', () => {
       strategy.validate({ cookies: {} } as never, payload),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(audit.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',

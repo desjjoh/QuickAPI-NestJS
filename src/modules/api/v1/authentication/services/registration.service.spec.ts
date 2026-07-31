@@ -9,7 +9,10 @@ import type { UserService } from '@/modules/domain/identity/services/user.servic
 import { userFixture } from '@/../test/helpers/identity.fixtures';
 import type { RegisterDto } from '../models/register.model';
 import { RegistrationService } from './registration.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 describe('RegistrationService', () => {
@@ -73,8 +76,9 @@ describe('RegistrationService', () => {
       expect.objectContaining(metadata),
     );
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REGISTRATION_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',
@@ -114,8 +118,10 @@ describe('RegistrationService', () => {
       pendingMetadata,
     );
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .REGISTRATION_VERIFICATION_RESENT,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',

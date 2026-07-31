@@ -20,7 +20,10 @@ import { MoreThan, Not, IsNull } from 'typeorm';
 import { day } from '@/common/constants/milliseconds.constants';
 import { env } from '@/config/environment.config';
 import { AuditService } from '../../audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 @Injectable()
 export class RefreshService {
@@ -73,8 +76,8 @@ export class RefreshService {
     );
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.SESSION_ISSUED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -119,8 +122,8 @@ export class RefreshService {
     );
     await this.userRepo.revokeAllSessions(userId);
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: userId,
@@ -155,8 +158,9 @@ export class RefreshService {
 
     if (revokedIds.length > 0)
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'user',
         actorId: userId,
@@ -205,8 +209,8 @@ export class RefreshService {
     sessionId: string,
   ): Promise<void> {
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.SESSION_REVOKED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: userId,

@@ -14,7 +14,10 @@ import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates
 import { UserEntity } from '../entities/user.entity';
 import { UserSessionEntity } from '../entities/session.entity';
 import { AuditService } from '../../audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 const PASSWORD_RESET_CODE_EXPIRES_IN_MINUTES = 10;
 const PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES = 10;
@@ -65,8 +68,9 @@ export class PasswordResetService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
       subjectType: 'user',
@@ -85,8 +89,10 @@ export class PasswordResetService {
     const user = await this.userRepo.findByEmail(email);
     if (!user || !this.userSvc.canAuthenticate(user)) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .PASSWORD_RESET_CODE_REJECTED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',
@@ -107,8 +113,10 @@ export class PasswordResetService {
       });
 
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_ACCEPTED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .PASSWORD_RESET_CODE_ACCEPTED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'anonymous',
         subjectType: 'user',
@@ -122,8 +130,10 @@ export class PasswordResetService {
       return authorization;
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_CODE_REJECTED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .PASSWORD_RESET_CODE_REJECTED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         subjectType: 'user',
@@ -171,8 +181,9 @@ export class PasswordResetService {
     await this.userRepo.revokeAllSessions(user.id);
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_COMPLETED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
       subjectType: 'user',
@@ -184,8 +195,9 @@ export class PasswordResetService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.PASSWORD_RESET_COMPLETED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_COMPLETED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
       subjectType: 'user',
@@ -199,8 +211,8 @@ export class PasswordResetService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.ALL_SESSIONS_REVOKED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
       subjectType: 'user',

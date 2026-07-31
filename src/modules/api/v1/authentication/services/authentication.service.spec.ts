@@ -16,7 +16,10 @@ import {
 } from '@/../test/helpers/identity.fixtures';
 
 import { AuthService } from './authentication.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 describe('AuthService', () => {
   const res = {
@@ -67,8 +70,8 @@ describe('AuthService', () => {
     expect(userSvc.recordSignIn).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -109,8 +112,10 @@ describe('AuthService', () => {
     expect(userSvc.recordSignIn).not.toHaveBeenCalled();
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .MFA_SIGN_IN_CHALLENGE_ISSUED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'pending',
       actorType: 'user',
       actorId: user.id,
@@ -134,8 +139,10 @@ describe('AuthService', () => {
     expect(userSvc.assertCanAuthenticate).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
     expect(auditSvc.record).toHaveBeenNthCalledWith(1, {
-      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -157,8 +164,10 @@ describe('AuthService', () => {
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .MFA_SIGN_IN_VERIFICATION_FAILED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'failed',
       actorType: 'anonymous',
       source: 'http',
@@ -185,8 +194,8 @@ describe('AuthService', () => {
     await expect(service.verify(user, res, session)).resolves.toBe(tokens);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -203,8 +212,8 @@ describe('AuthService', () => {
     await expect(service.signOut(session, res)).resolves.toBeUndefined();
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       sessionId: session.id,
@@ -222,8 +231,8 @@ describe('AuthService', () => {
       'rotation failed',
     );
     expect(auditSvc.record).toHaveBeenCalledWith({
-      event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'failed',
       actorType: 'user',
       actorId: user.id,

@@ -68,6 +68,7 @@ export interface RecordAuditInput {
   readonly meaningfulWithoutChanges?: boolean;
 }
 
+const MACHINE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/;
 const EVENT_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$/;
 const OUTCOMES: readonly AuditOutcome[] = [
   'succeeded',
@@ -209,8 +210,14 @@ export class AuditService {
       throw new BadRequestException('audit input is required');
     this.requiredString('event', input.event, 128);
     this.requiredString('domain', input.domain, 64);
+    if (!MACHINE_KEY_PATTERN.test(input.domain))
+      throw new BadRequestException('domain must be a stable machine key');
     if (!EVENT_PATTERN.test(input.event))
       throw new BadRequestException('event must be a stable machine key');
+    if (!input.event.startsWith(`${input.domain}.`))
+      throw new BadRequestException(
+        'event must begin with the declared domain namespace',
+      );
     if (!OUTCOMES.includes(input.outcome))
       throw new BadRequestException('outcome is invalid');
     if (!ACTOR_TYPES.includes(input.actorType))

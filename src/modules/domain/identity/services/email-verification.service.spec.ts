@@ -9,7 +9,10 @@ import { AccountStatusEntity } from '../../library/entities/accountstatus.entity
 import { ROLE_KEYS } from '../../library/seeders/role.seeder';
 import { UserEntity } from '../entities/user.entity';
 import { EmailVerificationService } from './email-verification.service';
-import { IDENTITY_AUDIT_EVENTS } from '../../audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 describe('EmailVerificationService', () => {
   const user = {
@@ -260,8 +263,10 @@ describe('EmailVerificationService', () => {
     expect(emailSvc.sendEmail).toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith(
       {
-        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_SUCCEEDED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_SUCCEEDED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'anonymous',
         subjectType: 'user',
@@ -301,8 +306,10 @@ describe('EmailVerificationService', () => {
       expect(users.save).not.toHaveBeenCalled();
       expect(emailSvc.sendEmail).not.toHaveBeenCalled();
       expect(auditSvc.record).toHaveBeenCalledWith({
-        event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_FAILED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

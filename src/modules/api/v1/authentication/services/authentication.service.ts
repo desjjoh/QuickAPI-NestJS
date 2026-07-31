@@ -10,7 +10,10 @@ import { MfaChallengePurpose } from '@/modules/domain/identity/entities/mfa.enti
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaChallengeResponseDto } from '../models/mfa.model';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 @Injectable()
 export class AuthService {
@@ -30,8 +33,10 @@ export class AuthService {
 
     if (challenge) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_CHALLENGE_ISSUED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .MFA_SIGN_IN_CHALLENGE_ISSUED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'pending',
         actorType: 'user',
         actorId: user.id,
@@ -62,8 +67,8 @@ export class AuthService {
       : this.refreshSvc.issueTokens(updated, res));
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.SIGN_IN_SUCCEEDED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -92,8 +97,10 @@ export class AuthService {
       this.userSvc.assertCanAuthenticate(user);
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_FAILED,
-        domain: 'identity',
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .MFA_SIGN_IN_VERIFICATION_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',
@@ -105,8 +112,10 @@ export class AuthService {
     }
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -128,8 +137,8 @@ export class AuthService {
       const tokens = await this.refreshSvc.issueTokens(user, res, session);
 
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.REFRESH_SUCCEEDED,
-        domain: 'identity',
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_SUCCEEDED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
@@ -143,8 +152,8 @@ export class AuthService {
       return tokens;
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
-        domain: 'identity',
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'user',
         actorId: user.id,
@@ -168,8 +177,8 @@ export class AuthService {
     await this.refreshSvc.revokeTokens(session, res);
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.SIGN_OUT_COMPLETED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       sessionId: session.id,

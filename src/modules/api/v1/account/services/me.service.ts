@@ -27,7 +27,10 @@ import {
 import { UnauthorizedException } from '@nestjs/common';
 import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 @Injectable()
 export class MeApiService {
@@ -49,8 +52,8 @@ export class MeApiService {
 
     await this.userSvc.deleteUser(user, res);
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.ACCOUNT_DELETED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -73,8 +76,8 @@ export class MeApiService {
       await this.mfaSvc.disable(user);
       await this.userSvc.updateMetadata(user, { mfa_enabled: false });
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.MFA_DISABLED,
-        domain: 'identity',
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
@@ -91,8 +94,9 @@ export class MeApiService {
 
     const challenge = await this.mfaSvc.requestEnable(user);
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.MFA_ENROLLMENT_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENROLLMENT_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -103,6 +107,7 @@ export class MeApiService {
       source: 'http',
       metadata: {},
     });
+
     return new MfaChallengeResponseDto({
       challenge_id: challenge.id,
       method: MfaMethod.EMAIL_OTP,
@@ -128,8 +133,8 @@ export class MeApiService {
     await this.userSvc.updateMetadata(user, { mfa_enabled: true });
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.MFA_ENABLED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
@@ -177,8 +182,8 @@ export class MeApiService {
     const updated = await this.userSvc.recordPasswordChanged(user);
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: updated.id,
@@ -192,8 +197,8 @@ export class MeApiService {
     });
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.PASSWORD_CHANGED,
-      domain: 'identity',
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
       actorId: updated.id,

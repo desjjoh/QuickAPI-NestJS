@@ -2,6 +2,7 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
+import { AuditEventDomain } from '@/config/audit-events.config';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditService } from './audit.service';
 import { AuditRedactionService } from './audit-redaction.service';
@@ -17,7 +18,7 @@ describe(AuditService.name, () => {
 
   const activity = {
     event: 'identity.sign_in.succeeded',
-    domain: 'identity',
+    domain: AuditEventDomain.IDENTITY,
     outcome: 'succeeded' as const,
     actorType: 'user' as const,
     actorId: 'user-1',
@@ -49,7 +50,7 @@ describe(AuditService.name, () => {
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         event: activity.event,
-        domain: 'identity',
+        domain: AuditEventDomain.IDENTITY,
         actor_type: 'user',
         actor_id: 'user-1',
         subject_type: 'user',
@@ -64,10 +65,10 @@ describe(AuditService.name, () => {
     expect(repository.insert).toHaveBeenCalledWith(result);
   });
 
-  it('records safe snapshots and a field-level entity change', async () => {
+  it('records a semantic event with safe snapshots and field-level changes', async () => {
     const result = await service.record({
       ...activity,
-      event: 'entity.update',
+      event: 'identity.profile.updated',
       resourceType: 'profile',
       resourceId: 'profile-1',
       before: { name: { first: 'Old' }, phone: '111', password: 'secret' },
@@ -132,7 +133,7 @@ describe(AuditService.name, () => {
   it('does not persist an entity record without a meaningful safe change', async () => {
     const result = await service.record({
       ...activity,
-      event: 'entity.update',
+      event: 'identity.user.roles_changed',
       resourceType: 'user',
       resourceId: 'user-1',
       before: { id: 'user-1', roles: ['role-2', 'role-1'] },
@@ -147,7 +148,7 @@ describe(AuditService.name, () => {
   it('persists an explicitly meaningful event even when snapshots do not change', async () => {
     await service.record({
       ...activity,
-      event: 'profile.reviewed',
+      event: 'identity.profile.reviewed',
       resourceType: 'profile',
       resourceId: 'profile-1',
       before: { name: { first: 'Same' } },
@@ -190,6 +191,20 @@ describe(AuditService.name, () => {
     ['source', { source: undefined }],
     ['metadata', { metadata: undefined }],
   ])('rejects a missing %s', (_name, override) => {
+    expect(() => service.record({ ...activity, ...override } as never)).toThrow(
+      BadRequestException,
+    );
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['invalid domain format', { domain: 'Identity' }],
+    ['invalid event format', { event: 'identity.profile-UPDATED' }],
+    [
+      'event outside the declared domain namespace',
+      { event: 'store.product.updated' },
+    ],
+  ])('rejects %s', (_name, override) => {
     expect(() => service.record({ ...activity, ...override } as never)).toThrow(
       BadRequestException,
     );
@@ -268,7 +283,7 @@ describe(AuditService.name, () => {
   it('normalizes relation objects to a stable, unique ID list', async () => {
     await service.record({
       ...activity,
-      event: 'entity.update',
+      event: 'identity.user.roles_changed',
       resourceType: 'user',
       resourceId: 'user-1',
       before: { roles: [{ id: 'role-b' }, { id: 'role-a' }] },

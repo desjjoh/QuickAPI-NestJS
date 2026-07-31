@@ -16,7 +16,10 @@ import { RegistrationTokenService } from '@/modules/domain/identity/services/reg
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 
 @Injectable()
@@ -48,8 +51,9 @@ export class RegistrationService {
     );
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_REQUESTED,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REGISTRATION_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',
@@ -89,8 +93,10 @@ export class RegistrationService {
     );
 
     await this.auditSvc.record({
-      event: IDENTITY_AUDIT_EVENTS.REGISTRATION_VERIFICATION_RESENT,
-      domain: 'identity',
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .REGISTRATION_VERIFICATION_RESENT,
+      domain: AuditEventDomain.IDENTITY,
       outcome: 'pending',
       actorType: 'anonymous',
       source: 'http',

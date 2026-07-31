@@ -15,7 +15,10 @@ import { UserRepository } from '@/modules/domain/identity/repositories/user.repo
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { getRefreshCookieName } from '@/config/cookie.config';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IDENTITY_AUDIT_EVENTS } from '@/modules/domain/audit/constants/identity-audit.constants';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -49,8 +52,8 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
       return await this.validateRefresh(req, payload);
     } catch (error) {
       await this.auditSvc.record({
-        event: IDENTITY_AUDIT_EVENTS.REFRESH_FAILED,
-        domain: 'identity',
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
+        domain: AuditEventDomain.IDENTITY,
         outcome: 'failed',
         actorType: 'anonymous',
         source: 'http',

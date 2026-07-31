@@ -21,75 +21,39 @@ for an investigation may therefore be retained in metadata rather than relying
 on joins to mutable application tables. Audit rows must not use foreign-key
 cascades to users or domain entities.
 
-## Record forms
+## Record form
 
-Every record is emitted through `AuditService.record(input, manager?)`. A
-record is either a semantic event without snapshots or an event carrying a
-redacted, changed-only snapshot diff; no category discriminator is stored.
+Every row is a semantic global audit event emitted through
+`AuditService.record(input, manager?)`. An event describes a meaningful domain
+action and its outcome, rather than a generic database operation. It may
+optionally contain safe, allowlisted `before`, `after`, and `changes` data when
+that context is useful to explain the action. No category discriminator is
+stored.
 
-### Semantic events
+Generic persistence keys such as `entity.insert`, `entity.update`, and
+`entity.delete` are prohibited. Use an immutable semantic key instead, such as
+`identity.profile.updated`, `identity.user.roles_changed`, or
+`store.inventory.adjusted`. Attempts whose result matters to security,
+including failures, should have their own semantic keys. Where an operation has
+meaningful requested and completed phases, use separate keys rather than
+changing the meaning of an existing key.
 
-An activity event is explicitly recorded by the owning domain or application
-service and captures a semantic, security-relevant action and its outcome. It
-describes intent at the service or use-case boundary rather than merely
-describing rows written by that action. Initial event keys include:
+Event catalogs belong to the domain that owns their meaning. Domain-owned event
+catalogs are registered in `src/config/audit-events.config.ts`, using the same
+domain-and-matrix structure as the permission configuration. Future store and
+audit-access events receive their own domain entries rather than being added to
+the identity catalog. The audit service validates the shared event structure,
+but does not maintain a catalog of every domain's events.
 
-| Stable event key                               | When it is emitted                                                                          |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `identity.registration.requested`              | A registration request is accepted for processing                                           |
-| `identity.registration.verification_succeeded` | A pending registration is verified and its user is created                                  |
-| `identity.registration.verification_failed`    | A registration verification is rejected after its outcome is known                          |
-| `identity.registration.verification_resent`    | A replacement registration verification challenge is issued                                 |
-| `identity.sign_in.succeeded`                   | Authentication succeeds                                                                     |
-| `identity.sign_in.failed`                      | Authentication fails, including an unknown account                                          |
-| `identity.mfa.sign_in.challenge_issued`        | A password-authenticated sign-in requires an MFA challenge                                  |
-| `identity.mfa.sign_in.verification_succeeded`  | A sign-in MFA challenge is successfully verified                                            |
-| `identity.mfa.sign_in.verification_failed`     | A sign-in MFA challenge is rejected after its outcome is known                              |
-| `identity.session.issued`                      | An access/refresh session is created or rotated                                             |
-| `identity.refresh.succeeded`                   | A refresh session is successfully validated and rotated                                     |
-| `identity.refresh.failed`                      | A refresh attempt is rejected after its outcome is known                                    |
-| `identity.sign_out.completed`                  | The active session is revoked and sign-out completes                                        |
-| `identity.password_reset.requested`            | A password reset is requested, regardless of whether the public response reveals an account |
-| `identity.password_reset.code_accepted`        | A password-reset code is accepted                                                           |
-| `identity.password_reset.code_rejected`        | A password-reset code is rejected without retaining the submitted code                      |
-| `identity.password_reset.completed`            | A verified password reset changes the password                                              |
-| `identity.password.changed`                    | An authenticated user changes their password                                                |
-| `identity.email_verification.requested`        | Initial email verification is requested                                                     |
-| `identity.email_verification.completed`        | Initial email verification completes                                                        |
-| `identity.email_change.requested`              | Verification of a new email address is requested                                            |
-| `identity.email_change.completed`              | A verified email change completes                                                           |
-| `identity.mfa.enrollment_requested`            | MFA enrollment is requested                                                                 |
-| `identity.mfa.enabled`                         | MFA enrollment is successfully completed                                                    |
-| `identity.mfa.disabled`                        | MFA is disabled                                                                             |
-| `identity.session.revoked`                     | A session is revoked by its owner, an administrator, or the system                          |
-| `identity.session.all_revoked`                 | All applicable sessions are revoked; metadata contains session IDs only                     |
-| `identity.account.deleted`                     | A user deletes their own account                                                            |
-| `identity.profile.updated`                     | A user profile update succeeds                                                              |
-| `admin.user.deleted`                           | An administrator deletes or soft-deletes a user                                             |
+Keys use the stable lowercase machine-key format and begin with their declared
+domain namespace followed by a dot. For example, an event declared with domain
+`identity` must begin with `identity.`. This makes every key globally scoped
+without coupling the audit module to each owning domain's catalog.
 
-Emit attempts whose result matters to security, including failures. Where an
-operation has meaningful requested and completed phases, use separate keys
-(for example, `identity.password_reset.requested` and
-`identity.password_reset.completed`) rather than changing the meaning of an
-existing key.
-
-### Events with snapshots
-
-An entity change is also explicitly recorded by the owning domain or
-application service and captures the persistence-level mutations that the
-operation is designed to audit. Its stable action key is one of:
-
-- `entity.insert`
-- `entity.update`
-- `entity.soft_delete`
-- `entity.restore`
-- `entity.delete`
-
-One semantic activity can produce multiple entity changes. For example,
-enabling MFA can emit one `identity.mfa.enabled` event and changes for the user
-and recovery-code entities. These records are complementary and should share a
-request ID (and, where useful, an operation/correlation ID in metadata). The
-owning service emits each record directly with the shared context.
+Snapshots do not turn an event into a generic entity-change record. One
+semantic activity may produce multiple semantic events with safe change data;
+they should share a request ID and, where useful, an operation ID. The owning
+service emits each event directly with the shared context.
 
 ## Explicit recording ownership
 
@@ -115,7 +79,7 @@ explicitly emits their records.
 
 ## Shared envelope
 
-Use a single logical envelope for both categories. Fields that do not apply are
+Use a single logical envelope for every semantic event. Fields that do not apply are
 `null`; do not invent placeholder IDs. JSON examples use snake case to match a
 storage/API representation, while implementation names may follow TypeScript
 conventions.
@@ -205,7 +169,7 @@ entity IDs; relationship arrays must never contain full related objects.
 1. Establish request context early and normalize the route from the framework's
    route template. Trust forwarded IP headers only from configured proxies.
 2. The owning domain or application service manually emits both activity
-   events and entity changes at the point where the outcome and correct
+   events, including events with safe change data, at the point where the outcome and correct
    representations are known, using the same context.
 3. Commit successful mutation audit records atomically with the business
    transaction, or write an outbox entry in that transaction for durable
