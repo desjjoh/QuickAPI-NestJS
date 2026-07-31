@@ -1,6 +1,6 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
 import {
   MfaChallengePurpose,
@@ -149,28 +149,45 @@ describe('MeApiService', () => {
 
   it('validates an email change and returns its verification DTO', async () => {
     const { service, userSvc, evSvc, auditSvc } = setup();
+    const currentUser = userFixture({
+      identity: { ...user.identity, email: 'current@example.test' },
+    });
     await expect(
-      service.updateEmail(user, { password: 'old', email: 'new@example.test' }),
+      service.updateEmail(currentUser, {
+        password: 'old',
+        email: 'replacement@example.test',
+      }),
     ).resolves.toEqual({
       challenge_id: 'email-challenge',
       method: MfaMethod.EMAIL_OTP,
       expires_at: new Date('2026-02-01'),
     });
     expect(userSvc.validateUser).toHaveBeenCalledWith(
-      user.identity.email,
+      'current@example.test',
       'old',
     );
     expect(evSvc.sendEmailChangeVerification).toHaveBeenCalledWith(
-      user,
-      'new@example.test',
+      currentUser,
+      'replacement@example.test',
     );
-    expect(auditSvc.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
-        actorId: user.id,
+    expect(auditSvc.record).not.toHaveBeenCalled();
+  });
+
+  it('rejects requesting the current email without validating or sending', async () => {
+    const { service, userSvc, evSvc } = setup();
+    const currentUser = userFixture({
+      identity: { ...user.identity, email: 'current@example.test' },
+    });
+
+    await expect(
+      service.updateEmail(currentUser, {
+        password: 'old',
+        email: ' CURRENT@EXAMPLE.TEST ',
       }),
-    );
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(userSvc.validateUser).not.toHaveBeenCalled();
+    expect(evSvc.sendEmailChangeVerification).not.toHaveBeenCalled();
   });
 
   it('audits a completed email change before issuing replacement tokens', async () => {
@@ -198,6 +215,27 @@ describe('MeApiService', () => {
       }),
     );
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(updated, res, session);
+  });
+
+  it('rejects a confirmation that did not change the email', async () => {
+    const { service, evSvc, refreshSvc, auditSvc } = setup();
+
+    await expect(
+      service.confirmEmail(
+        user,
+        session,
+        { challenge_id: 'email-challenge', code: '123456' },
+        res,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(evSvc.verifyEmail).toHaveBeenCalledWith(
+      'email-challenge',
+      '123456',
+      user,
+    );
+    expect(auditSvc.record).not.toHaveBeenCalled();
+    expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
   });
 
   it('changes password, revokes other sessions, emails the user, and reissues tokens', async () => {

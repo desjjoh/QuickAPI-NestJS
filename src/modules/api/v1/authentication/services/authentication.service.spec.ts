@@ -77,6 +77,8 @@ describe('AuthService', () => {
       actorId: user.id,
       subjectType: 'user',
       subjectId: user.id,
+      resourceType: 'identity.user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -111,19 +113,7 @@ describe('AuthService', () => {
     });
     expect(userSvc.recordSignIn).not.toHaveBeenCalled();
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .MFA_SIGN_IN_CHALLENGE_ISSUED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'pending',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('verifies and completes the sign-in MFA challenge', async () => {
@@ -138,19 +128,14 @@ describe('AuthService', () => {
     );
     expect(userSvc.assertCanAuthenticate).toHaveBeenCalledWith(user);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
-    expect(auditSvc.record).toHaveBeenNthCalledWith(1, {
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).toHaveBeenCalledTimes(1);
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        resourceType: 'identity.user',
+        resourceId: user.id,
+      }),
+    );
   });
 
   it('propagates account-state failures and does not issue tokens', async () => {
@@ -163,20 +148,10 @@ describe('AuthService', () => {
       error,
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .MFA_SIGN_IN_VERIFICATION_FAILED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'failed',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: {},
-      failureCode: 'ForbiddenException',
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
-  it('records a safe failure code when MFA verification rejects with a non-error value', async () => {
+  it('does not audit when MFA verification rejects with a non-error value', async () => {
     const { service, refreshSvc, mfaSvc, auditSvc } = setup();
     mfaSvc.verifyChallenge.mockRejectedValue('verification failed');
 
@@ -184,9 +159,7 @@ describe('AuthService', () => {
       'verification failed',
     );
     expect(refreshSvc.issueTokens).not.toHaveBeenCalled();
-    expect(auditSvc.record).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCode: 'UnknownError' }),
-    );
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('delegates refresh verification with the existing session', async () => {
@@ -200,17 +173,12 @@ describe('AuthService', () => {
     const { service, refreshSvc, auditSvc } = setup();
     await expect(service.signOut(session, res)).resolves.toBeUndefined();
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      sessionId: session.id,
-      resourceType: 'identity.session',
-      resourceId: session.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
+        resourceId: session.id,
+      }),
+    );
   });
 
   it('does not audit an ordinary refresh failure after token issuance fails', async () => {

@@ -12,7 +12,6 @@ import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
 } from '@/config/audit-events.config';
-import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 describe('RegistrationService', () => {
@@ -75,17 +74,7 @@ describe('RegistrationService', () => {
       'person@example.test',
       expect.objectContaining(metadata),
     );
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REGISTRATION_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'pending',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: {
-        identifier_hash: hashAuditIdentifier('person@example.test'),
-      },
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('rejects duplicate users before hashing or sending email', async () => {
@@ -117,18 +106,7 @@ describe('RegistrationService', () => {
       'person@example.test',
       pendingMetadata,
     );
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .REGISTRATION_VERIFICATION_RESENT,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'pending',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: {
-        identifier_hash: hashAuditIdentifier('person@example.test'),
-      },
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('rejects resend for an email that already belongs to a user', async () => {

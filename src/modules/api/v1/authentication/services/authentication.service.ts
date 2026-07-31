@@ -31,27 +31,12 @@ export class AuthService {
   ): Promise<JWTDto | MfaChallengeResponseDto> {
     const challenge = await this.mfaSvc.createSignInChallenge(user);
 
-    if (challenge) {
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .MFA_SIGN_IN_CHALLENGE_ISSUED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'pending',
-        actorType: 'user',
-        actorId: user.id,
-        subjectType: 'user',
-        subjectId: user.id,
-        source: 'http',
-        metadata: {},
-      });
-
+    if (challenge)
       return new MfaChallengeResponseDto({
         challenge_id: challenge.id,
         method: MfaMethod.EMAIL_OTP,
         expires_at: challenge.expires_at,
       });
-    }
 
     return this.completeSignIn(user, res, req);
   }
@@ -74,6 +59,8 @@ export class AuthService {
       actorId: user.id,
       subjectType: 'user',
       subjectId: user.id,
+      resourceType: 'identity.user',
+      resourceId: user.id,
       source: 'http',
       metadata: {},
     });
@@ -87,43 +74,13 @@ export class AuthService {
     res: Response,
     req?: Request,
   ): Promise<JWTDto> {
-    let user: UserEntity;
-    try {
-      user = await this.mfaSvc.verifyChallenge(
-        challengeId,
-        code,
-        MfaChallengePurpose.SIGN_IN,
-      );
-      this.userSvc.assertCanAuthenticate(user);
-    } catch (error) {
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .MFA_SIGN_IN_VERIFICATION_FAILED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'anonymous',
-        source: 'http',
-        metadata: {},
-        failureCode:
-          error instanceof Error ? error.constructor.name : 'UnknownError',
-      });
-      throw error;
-    }
+    const user = await this.mfaSvc.verifyChallenge(
+      challengeId,
+      code,
+      MfaChallengePurpose.SIGN_IN,
+    );
 
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .MFA_SIGN_IN_VERIFICATION_SUCCEEDED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      source: 'http',
-      metadata: {},
-    });
+    this.userSvc.assertCanAuthenticate(user);
 
     return this.completeSignIn(user, res, req);
   }
@@ -147,6 +104,9 @@ export class AuthService {
       domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
+      actorId: session.user?.id ?? null,
+      subjectType: 'user',
+      subjectId: session.user?.id ?? null,
       sessionId: session.id,
       resourceType: 'identity.session',
       resourceId: session.id,

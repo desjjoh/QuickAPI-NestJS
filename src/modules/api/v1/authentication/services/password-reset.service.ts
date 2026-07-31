@@ -15,7 +15,6 @@ import {
 import { AccountTokenType } from '@/config/token.config';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
@@ -90,67 +89,18 @@ export class PasswordResetService {
     code: string,
   ): Promise<CreatedAccountToken> {
     const user = await this.userRepo.findByEmail(email);
-    if (!user || !this.userSvc.canAuthenticate(user)) {
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .PASSWORD_RESET_CODE_REJECTED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'anonymous',
-        source: 'http',
-        metadata: {},
-        failureCode: 'InvalidChallenge',
-      });
+
+    if (!user || !this.userSvc.canAuthenticate(user))
       throw new UnauthorizedException('Invalid or expired challenge.');
-    }
 
-    try {
-      const authorization = await this.accountTokenSvc.authorizeMfaCode({
-        userId: user.id,
-        type: AccountTokenType.PASSWORD_RESET,
-        code,
-        pendingMetadata: { state: PasswordResetChallengeState.PENDING },
-        verifiedMetadata: { state: PasswordResetChallengeState.VERIFIED },
-        expiresInMs: PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES * minute,
-      });
-
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .PASSWORD_RESET_CODE_ACCEPTED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'anonymous',
-        subjectType: 'user',
-        subjectId: user.id,
-        resourceType: 'identity.user',
-        resourceId: user.id,
-        source: 'http',
-        metadata: {},
-      });
-
-      return authorization;
-    } catch (error) {
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .PASSWORD_RESET_CODE_REJECTED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'anonymous',
-        subjectType: 'user',
-        subjectId: user.id,
-        resourceType: 'identity.user',
-        resourceId: user.id,
-        source: 'http',
-        metadata: {},
-        failureCode:
-          error instanceof Error ? error.constructor.name : 'UnknownError',
-      });
-
-      throw error;
-    }
+    return this.accountTokenSvc.authorizeMfaCode({
+      userId: user.id,
+      type: AccountTokenType.PASSWORD_RESET,
+      code,
+      pendingMetadata: { state: PasswordResetChallengeState.PENDING },
+      verifiedMetadata: { state: PasswordResetChallengeState.VERIFIED },
+      expiresInMs: PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES * minute,
+    });
   }
 
   public async confirmPasswordReset(
@@ -175,12 +125,6 @@ export class PasswordResetService {
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
     await this.userSvc.recordPasswordChanged(user);
 
-    const sessionIds = (
-      await this.userRepo.manager.find(UserSessionEntity, {
-        where: { user: { id: user.id }, active: true },
-      })
-    ).map(({ id }) => id);
-
     await this.userRepo.revokeAllSessions(user.id);
 
     await this.auditSvc.record({
@@ -189,20 +133,7 @@ export class PasswordResetService {
       domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
-    });
-
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_COMPLETED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
+      actorId: null,
       subjectType: 'user',
       subjectId: user.id,
       resourceType: 'identity.user',
@@ -211,19 +142,6 @@ export class PasswordResetService {
       metadata: {},
       before: { id: user.id },
       after: { id: user.id, identity: { password: true } },
-    });
-
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: { session_ids: sessionIds },
     });
 
     await this.emailSvc.sendEmail({

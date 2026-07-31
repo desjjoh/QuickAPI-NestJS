@@ -19,7 +19,6 @@ import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
 } from '@/config/audit-events.config';
-import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @Injectable()
@@ -49,16 +48,6 @@ export class RegistrationService {
         password,
       ),
     );
-
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REGISTRATION_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'pending',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: { identifier_hash: hashAuditIdentifier(normalizedEmail) },
-    });
 
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',
@@ -92,17 +81,6 @@ export class RegistrationService {
       pendingToken.metadata,
     );
 
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .REGISTRATION_VERIFICATION_RESENT,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'pending',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: { identifier_hash: hashAuditIdentifier(normalizedEmail) },
-    });
-
     return new RegistrationPendingDto({
       message: 'Registration pending. Please verify your email address.',
       email: normalizedEmail,
@@ -125,6 +103,7 @@ export class RegistrationService {
       domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
+      actorId: null,
       subjectType: 'user',
       subjectId: user.id,
       resourceType: 'identity.user',

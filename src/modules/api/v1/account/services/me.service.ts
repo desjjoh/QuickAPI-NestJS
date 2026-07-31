@@ -1,6 +1,6 @@
 import { Response } from 'express';
 
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -96,20 +96,6 @@ export class MeApiService {
     }
 
     const challenge = await this.mfaSvc.requestEnable(user);
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENROLLMENT_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
-    });
 
     return new MfaChallengeResponseDto({
       challenge_id: challenge.id,
@@ -155,26 +141,20 @@ export class MeApiService {
     user: UserEntity,
     dto: UpdateEmailDto,
   ): Promise<EmailVerificationChallengeDto> {
+    const emailChanged =
+      dto.email.trim().toLowerCase() !==
+      user.identity.email.trim().toLowerCase();
+
+    if (emailChanged)
+      throw new BadRequestException(
+        'New email address must be different from the current email address.',
+      );
+
     await this.userSvc.validateUser(user.identity.email, dto.password);
     const challenge = await this.evSvc.sendEmailChangeVerification(
       user,
       dto.email,
     );
-
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
-    });
 
     return new EmailVerificationChallengeDto({
       challenge_id: challenge.id,
@@ -196,12 +176,18 @@ export class MeApiService {
       user,
     );
 
-    const emailChanged = updated.identity.email !== previousEmail;
+    const emailChanged =
+      updated.identity.email.trim().toLowerCase() ===
+      previousEmail.trim().toLowerCase();
+
+    if (emailChanged)
+      throw new BadRequestException(
+        'New email address must be different from the current email address.',
+      );
+
     await this.auditSvc.record({
-      event: emailChanged
-        ? AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED
-        : AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .EMAIL_VERIFICATION_COMPLETED,
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'user',
@@ -213,10 +199,8 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: 'http',
       metadata: {},
-      ...(emailChanged && {
-        before: { id: updated.id, identity: { email: previousEmail } },
-        after: { id: updated.id, identity: { email: updated.identity.email } },
-      }),
+      before: { id: updated.id, identity: { email: previousEmail } },
+      after: { id: updated.id, identity: { email: updated.identity.email } },
     });
 
     return this.refreshSvc.issueTokens(updated, res, currentSession);
@@ -237,21 +221,6 @@ export class MeApiService {
     });
 
     const updated = await this.userSvc.recordPasswordChanged(user);
-
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: updated.id,
-      subjectType: 'user',
-      subjectId: updated.id,
-      resourceType: 'identity.user',
-      resourceId: updated.id,
-      sessionId: currentSession.id,
-      source: 'http',
-      metadata: {},
-    });
 
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,

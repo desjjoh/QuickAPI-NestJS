@@ -1,36 +1,17 @@
 import { UnauthorizedException } from '@nestjs/common';
 
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
-import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
-
 import { LocalStrategy } from './local.strategy';
 import { RefreshTokenStrategy } from './refresh.strategy';
 
 describe('authentication strategy audit events', () => {
-  it('records the exact anonymous sign-in failure after credentials are rejected', async () => {
+  it('does not audit rejected credentials', async () => {
     const error = new UnauthorizedException('Invalid credentials');
     const users = { validateUser: jest.fn().mockRejectedValue(error) };
-    const audit = { record: jest.fn().mockResolvedValue({}) };
-    const strategy = new LocalStrategy(users as never, audit as never);
+    const strategy = new LocalStrategy(users as never);
 
     await expect(
       strategy.validate(' Person@Example.TEST ', 'not-recorded'),
     ).rejects.toBe(error);
-    expect(audit.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_FAILED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'failed',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: {
-        identifier_hash: hashAuditIdentifier('person@example.test'),
-      },
-      failureCode: 'UnauthorizedException',
-    });
-    expect(audit.record.mock.calls[0][0]).not.toHaveProperty('email');
   });
 
   it('does not audit an ordinary refresh validation failure', async () => {
