@@ -1,4 +1,6 @@
 import { AuditRedactionService } from './audit-redaction.service';
+import { AuditPolicyRegistry } from './audit-policy.registry';
+import { scalar } from '../types/audit-policy.types';
 
 describe(AuditRedactionService.name, () => {
   const secrets = {
@@ -16,9 +18,39 @@ describe(AuditRedactionService.name, () => {
     r2_secret_access_key: 'r2-value',
   };
 
+  it('supports independently registered domain policies', () => {
+    const registry = new AuditPolicyRegistry(false);
+    registry.register('store.product', { id: scalar, sku: scalar });
+    registry.register('support.ticket', { id: scalar, state: scalar });
+    const service = new AuditRedactionService({}, registry);
+
+    expect(
+      service.redactSnapshot('store.product', {
+        id: 'product-1',
+        sku: 'SKU-1',
+        state: 'must-not-cross-domains',
+      }),
+    ).toEqual({ id: 'product-1', sku: 'SKU-1' });
+    expect(
+      service.redactSnapshot('support.ticket', {
+        id: 'ticket-1',
+        state: 'open',
+        sku: 'must-not-cross-domains',
+      }),
+    ).toEqual({ id: 'ticket-1', state: 'open' });
+  });
+
+  it('rejects snapshots without a registered policy', () => {
+    expect(() =>
+      new AuditRedactionService().redactSnapshot('store.product', {
+        secret: 'unsafe',
+      }),
+    ).toThrow('No audit redaction policy registered for store.product');
+  });
+
   it('uses explicit entity allowlists and applies the documented personal-data policy', () => {
     const service = new AuditRedactionService();
-    const snapshot = service.redactSnapshot('user', {
+    const snapshot = service.redactSnapshot('identity.user', {
       id: 'user-1',
       identity: { email: 'person@example.test', ...secrets },
       metadata: {
@@ -43,7 +75,7 @@ describe(AuditRedactionService.name, () => {
   it('prevents sensitive values from entering diffs', () => {
     const service = new AuditRedactionService();
     const diff = service.redactDiff(
-      'profile',
+      'identity.profile',
       { id: 'p1', phone: '+15550000001', address: 'old secret address' },
       {
         id: 'p1',
@@ -125,8 +157,8 @@ describe(AuditRedactionService.name, () => {
     };
     role['users' as keyof typeof role] = entity as never;
 
-    const first = service.redactSnapshot('user', entity);
-    const second = service.redactSnapshot('user', entity);
+    const first = service.redactSnapshot('identity.user', entity);
+    const second = service.redactSnapshot('identity.user', entity);
 
     expect(JSON.stringify(first)).toBe(JSON.stringify(second));
     expect(first).toMatchObject({
@@ -141,7 +173,7 @@ describe(AuditRedactionService.name, () => {
     const service = new AuditRedactionService();
 
     expect(
-      service.redactSnapshot('user', {
+      service.redactSnapshot('identity.user', {
         roles: [
           'role-2',
           { id: 'role-1', label: 'User' },
@@ -158,7 +190,7 @@ describe(AuditRedactionService.name, () => {
   it('rejects a nested object supplied to a collection relationship policy', () => {
     const service = new AuditRedactionService();
 
-    const snapshot = service.redactSnapshot('user', {
+    const snapshot = service.redactSnapshot('identity.user', {
       roles: {
         id: 'role-1',
         arbitrary: { secret: 'must-not-be-serialized' },
@@ -172,7 +204,7 @@ describe(AuditRedactionService.name, () => {
   it('does not report reordered unordered relationships as changed', () => {
     const service = new AuditRedactionService();
     const diff = service.redactDiff(
-      'user',
+      'identity.user',
       { id: 'user-1', roles: ['role-2', 'role-1'] },
       { id: 'user-1', roles: [{ id: 'role-1' }, { id: 'role-2' }] },
     );
@@ -183,7 +215,7 @@ describe(AuditRedactionService.name, () => {
   it('reports added and removed relationship IDs with useful snapshots', () => {
     const service = new AuditRedactionService();
     const diff = service.redactDiff(
-      'user',
+      'identity.user',
       { id: 'user-1', roles: ['role-1', 'role-2'] },
       { id: 'user-1', roles: ['role-2', 'role-3'] },
     );
@@ -207,7 +239,7 @@ describe(AuditRedactionService.name, () => {
 
     expect(
       service.redactDiff(
-        'role',
+        'identity.role',
         { id: 'role-1', name: 'Reader', active: true },
         { id: 'role-1', name: 'Writer', active: true },
       ),
@@ -223,7 +255,7 @@ describe(AuditRedactionService.name, () => {
 
     expect(
       service.redactDiff(
-        'user',
+        'identity.user',
         { profile: { id: 'p1', name: { first: 'Old', last: 'Same' } } },
         { profile: { id: 'p1', name: { first: 'New', last: 'Same' } } },
       ),
@@ -242,7 +274,7 @@ describe(AuditRedactionService.name, () => {
     ['replacement', ['role-1'], ['role-2'], ['role-2'], ['role-1']],
   ])('structures a relationship %s', (_case, before, after, added, removed) => {
     const diff = new AuditRedactionService().redactDiff(
-      'user',
+      'identity.user',
       { roles: before },
       { roles: after },
     );
@@ -260,7 +292,7 @@ describe(AuditRedactionService.name, () => {
   it('combines scalar and relationship changes without unchanged fields', () => {
     const service = new AuditRedactionService();
     const diff = service.redactDiff(
-      'user',
+      'identity.user',
       { id: 'user-1', active: true, roles: ['role-1'] },
       { id: 'user-1', active: false, roles: ['role-1', 'role-2'] },
     );
@@ -285,7 +317,7 @@ describe(AuditRedactionService.name, () => {
     const service = new AuditRedactionService({ maxArrayLength: 2 });
 
     expect(
-      service.redactSnapshot('user', {
+      service.redactSnapshot('identity.user', {
         roles: ['role-3', 'role-1', 'role-2', 'role-2'],
       }),
     ).toEqual({ roles: ['role-1', 'role-2', '[TRUNCATED]'] });
@@ -298,7 +330,7 @@ describe(AuditRedactionService.name, () => {
     user.roles = [role];
     role.users.push(role);
 
-    const snapshot = service.redactSnapshot('user', user);
+    const snapshot = service.redactSnapshot('identity.user', user);
 
     expect(snapshot).toEqual({ id: 'user-1', roles: ['role-1'] });
     expect(JSON.stringify(snapshot)).not.toMatch(/Admin|users|CIRCULAR/);
@@ -307,7 +339,7 @@ describe(AuditRedactionService.name, () => {
   it('replaces oversized output with a deterministic marker', () => {
     const service = new AuditRedactionService({ maxBytes: 20 });
     expect(
-      service.redactSnapshot('image', {
+      service.redactSnapshot('media.image', {
         id: 'image-1',
         filename: 'a'.repeat(100),
       }),

@@ -65,11 +65,29 @@ describe(AuditService.name, () => {
     expect(repository.insert).toHaveBeenCalledWith(result);
   });
 
+  it('allows an unregistered resource type on events without snapshots', async () => {
+    await service.record({
+      ...activity,
+      event: 'identity.external_resource.observed',
+      resourceType: 'future.external_resource',
+      resourceId: 'external-1',
+    });
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resource_type: 'future.external_resource',
+        resource_id: 'external-1',
+        before: null,
+        after: null,
+      }),
+    );
+  });
+
   it('records a semantic event with safe snapshots and field-level changes', async () => {
     const result = await service.record({
       ...activity,
       event: 'identity.profile.updated',
-      resourceType: 'profile',
+      resourceType: 'identity.profile',
       resourceId: 'profile-1',
       before: { name: { first: 'Old' }, phone: '111', password: 'secret' },
       after: { name: { first: 'New' }, phone: '222', password: 'changed' },
@@ -111,7 +129,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.password.changed',
-      resourceType: 'user',
+      resourceType: 'identity.user',
       resourceId: 'user-1',
       before: {
         id: 'user-1',
@@ -134,7 +152,7 @@ describe(AuditService.name, () => {
     const result = await service.record({
       ...activity,
       event: 'identity.user.roles_changed',
-      resourceType: 'user',
+      resourceType: 'identity.user',
       resourceId: 'user-1',
       before: { id: 'user-1', roles: ['role-2', 'role-1'] },
       after: { id: 'user-1', roles: ['role-1', 'role-2'] },
@@ -149,7 +167,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.profile.reviewed',
-      resourceType: 'profile',
+      resourceType: 'identity.profile',
       resourceId: 'profile-1',
       before: { name: { first: 'Same' } },
       after: { name: { first: 'Same' } },
@@ -181,7 +199,7 @@ describe(AuditService.name, () => {
         before: {},
         after: {},
       }),
-    ).toThrow('resourceType is invalid');
+    ).toThrow('resourceType has no registered snapshot policy');
   });
 
   it.each([
@@ -284,7 +302,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.user.roles_changed',
-      resourceType: 'user',
+      resourceType: 'identity.user',
       resourceId: 'user-1',
       before: { roles: [{ id: 'role-b' }, { id: 'role-a' }] },
       after: { roles: ['role-c', 'role-a', 'role-c'] },

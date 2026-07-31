@@ -271,7 +271,7 @@ describe('EmailVerificationService', () => {
         actorType: 'anonymous',
         subjectType: 'user',
         subjectId: 'new-user',
-        resourceType: 'user',
+        resourceType: 'identity.user',
         resourceId: 'new-user',
         source: 'http',
         metadata: {},

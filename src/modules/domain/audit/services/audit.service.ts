@@ -8,11 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
-import {
-  AuditEntityType,
-  AuditRedactionService,
-  AuditValue,
-} from './audit-redaction.service';
+import { AuditRedactionService, AuditValue } from './audit-redaction.service';
 
 export type AuditOutcome =
   | 'succeeded'
@@ -46,7 +42,7 @@ export interface RecordAuditInput {
   readonly subjectType?: string | null;
   readonly subjectId?: string | null;
   /** Specific object affected by the action. */
-  readonly resourceType?: AuditEntityType | null;
+  readonly resourceType?: string | null;
   readonly resourceId?: string | null;
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
@@ -92,14 +88,6 @@ const SOURCES: readonly AuditSource[] = [
   'migration',
   'system',
 ];
-const ENTITY_TYPES: readonly AuditEntityType[] = [
-  'user',
-  'profile',
-  'session',
-  'role',
-  'account_status',
-  'image',
-];
 const MAX_JSON_BYTES = 64 * 1024;
 
 @Injectable()
@@ -132,11 +120,14 @@ export class AuditService {
     }
 
     this.requiredString('resourceType', input.resourceType, 64);
-    if (!ENTITY_TYPES.includes(input.resourceType as AuditEntityType))
-      throw new BadRequestException('resourceType is invalid');
+    if (!this.redaction.hasPolicy(input.resourceType as string))
+      throw new BadRequestException(
+        'resourceType has no registered snapshot policy',
+      );
+
     this.requiredString('resourceId', input.resourceId, 255);
     const diff = this.redaction.redactDiff(
-      input.resourceType as AuditEntityType,
+      input.resourceType as string,
       input.before,
       input.after,
     );

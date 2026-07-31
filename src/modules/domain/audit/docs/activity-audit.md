@@ -164,6 +164,12 @@ relationship may use an explicitly allowlisted nested object. One-to-many and
 many-to-many relationships must be represented only as arrays of related
 entity IDs; relationship arrays must never contain full related objects.
 
+Resource types are fully qualified domain keys such as `identity.user` and
+`media.image`. Semantic events without snapshots may name a resource for which
+no snapshot policy exists. Supplying `before` and `after`, however, requires an
+explicit policy registration for that resource type; unregistered snapshots
+are rejected rather than stored without redaction.
+
 ## Capture and delivery
 
 1. Establish request context early and normalize the route from the framework's

@@ -1,5 +1,14 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { createHash } from 'node:crypto';
+import {
+  AuditFieldPolicy as FieldPolicy,
+  AuditPolicy as FieldTree,
+  changedOnly,
+  hashed,
+  relationshipIds,
+  scalar,
+} from '../types/audit-policy.types';
+import { AuditPolicyRegistry } from './audit-policy.registry';
 
 export type AuditValue =
   | null
@@ -8,125 +17,6 @@ export type AuditValue =
   | string
   | AuditValue[]
   | { [key: string]: AuditValue };
-
-export type AuditEntityType =
-  | 'user'
-  | 'profile'
-  | 'session'
-  | 'role'
-  | 'account_status'
-  | 'image';
-
-type FieldPolicy =
-  | ScalarFieldPolicy
-  | MaskedFieldPolicy
-  | ChangedFieldPolicy
-  | NestedObjectFieldPolicy
-  | RelationshipIdsFieldPolicy;
-interface ScalarFieldPolicy {
-  readonly kind: 'scalar';
-}
-interface MaskedFieldPolicy {
-  readonly kind: 'masked';
-  readonly mask: 'email' | 'sha256';
-}
-interface ChangedFieldPolicy {
-  readonly kind: 'changed-only';
-}
-interface NestedObjectFieldPolicy {
-  readonly kind: 'nested-object';
-  readonly fields: FieldTree;
-}
-interface RelationshipIdsFieldPolicy {
-  readonly kind: 'relationship-ids';
-  readonly preserveOrder?: boolean;
-}
-interface FieldTree {
-  readonly [field: string]: FieldPolicy;
-}
-
-const scalar: ScalarFieldPolicy = { kind: 'scalar' };
-const maskedEmail: MaskedFieldPolicy = { kind: 'masked', mask: 'email' };
-const hashed: MaskedFieldPolicy = { kind: 'masked', mask: 'sha256' };
-const changedOnly: ChangedFieldPolicy = { kind: 'changed-only' };
-const nestedObject = (fields: FieldTree): NestedObjectFieldPolicy => ({
-  kind: 'nested-object',
-  fields,
-});
-const relationshipIds: RelationshipIdsFieldPolicy = {
-  kind: 'relationship-ids',
-};
-
-/**
- * Personal-data policy for the audit table:
- *
- * - email is masked (the domain and at most the first local-part character remain);
- * - IP addresses are stored only as a one-way SHA-256 hash;
- * - phone, address, date of birth, and user agent are only `"[CHANGED]"` markers.
- *
- * Entity snapshots are deny-by-default: adding an entity property does not make
- * it auditable. It must also be added to the appropriate tree below.
- */
-const ENTITY_FIELDS: Readonly<Record<AuditEntityType, FieldTree>> = {
-  // Country is not initially audited; its one-to-many regions must be an ID
-  // array if a country policy is introduced.
-  user: {
-    id: scalar,
-    identity: nestedObject({ email: maskedEmail, password: changedOnly }),
-    // One-to-one: retain only this explicitly allowlisted profile summary.
-    profile: nestedObject({
-      id: scalar,
-      name: nestedObject({ first: scalar, last: scalar }),
-    }),
-    // Many-to-many: retain a bounded, unordered array of role IDs only.
-    roles: relationshipIds,
-    // Many-to-one: policy retains a small, explicitly allowlisted status object.
-    status: nestedObject({ id: scalar, name: scalar }),
-    // One-to-many sessions/account tokens are omitted; if added, use ID arrays.
-    active: scalar,
-    created_at: scalar,
-    updated_at: scalar,
-    deleted_at: scalar,
-    metadata: nestedObject({ mfa_enabled: changedOnly }),
-  },
-  profile: {
-    id: scalar,
-    name: nestedObject({ first: scalar, last: scalar, preferred: scalar }),
-    phone: changedOnly,
-    address: changedOnly,
-    date_of_birth: changedOnly,
-    created_at: scalar,
-    updated_at: scalar,
-  },
-  session: {
-    id: scalar,
-    // Many-to-one: retain the owning user as its scalar foreign-key ID.
-    user_id: scalar,
-    active: scalar,
-    ip: hashed,
-    user_agent: changedOnly,
-    created_at: scalar,
-    expires_at: scalar,
-    revoked_at: scalar,
-  },
-  role: {
-    id: scalar,
-    name: scalar,
-    active: scalar,
-    // Many-to-many permissions are omitted; if added, use an ID array.
-  },
-  account_status: { id: scalar, name: scalar, active: scalar },
-  image: {
-    id: scalar,
-    // Many-to-one: retain the owner as its scalar foreign-key ID.
-    owner_id: scalar,
-    filename: scalar,
-    mime_type: scalar,
-    width: scalar,
-    height: scalar,
-    created_at: scalar,
-  },
-};
 
 const METADATA_FIELDS: FieldTree = {
   request_id: scalar,
@@ -174,7 +64,11 @@ export interface AuditDiff {
 export class AuditRedactionService {
   private readonly limits: Required<AuditRedactionOptions>;
 
-  public constructor(@Optional() options: AuditRedactionOptions = {}) {
+  public constructor(
+    @Optional() options: AuditRedactionOptions = {},
+    @Optional()
+    private readonly registry: AuditPolicyRegistry = new AuditPolicyRegistry(),
+  ) {
     this.limits = {
       maxDepth: options.maxDepth ?? 8,
       maxArrayLength: options.maxArrayLength ?? 50,
@@ -183,26 +77,27 @@ export class AuditRedactionService {
     };
   }
 
-  public redactSnapshot(
-    entityType: AuditEntityType,
-    entity: unknown,
-  ): AuditValue {
+  public hasPolicy(resourceType: string): boolean {
+    return this.registry.has(resourceType);
+  }
+
+  public redactSnapshot(resourceType: string, entity: unknown): AuditValue {
     return this.fit(
-      this.applyTree(entity, ENTITY_FIELDS[entityType], new WeakSet(), 0),
+      this.applyTree(entity, this.policy(resourceType), new WeakSet(), 0),
     );
   }
 
   public redactDiff(
-    entityType: AuditEntityType,
+    resourceType: string,
     before: unknown,
     after: unknown,
   ): AuditDiff {
-    const safeBefore = this.redactSnapshot(entityType, before);
-    const safeAfter = this.redactSnapshot(entityType, after);
+    const safeBefore = this.redactSnapshot(resourceType, before);
+    const safeAfter = this.redactSnapshot(resourceType, after);
     const diff = this.diffTree(
       this.asRecord(safeBefore),
       this.asRecord(safeAfter),
-      ENTITY_FIELDS[entityType],
+      this.policy(resourceType),
     );
     return {
       before: this.fit(diff.before),
@@ -225,6 +120,15 @@ export class AuditRedactionService {
       type: this.safeString(error.name || 'Error'),
       message: OMITTED,
     };
+  }
+
+  private policy(resourceType: string): FieldTree {
+    const policy = this.registry.get(resourceType);
+    if (!policy)
+      throw new Error(
+        `No audit redaction policy registered for ${resourceType}`,
+      );
+    return policy;
   }
 
   private applyTree(

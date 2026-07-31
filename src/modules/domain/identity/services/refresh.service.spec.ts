@@ -141,7 +141,7 @@ describe('RefreshService', () => {
       subjectType: 'user',
       subjectId: user.id,
       sessionId: suppliedSession.id,
-      resourceType: 'session',
+      resourceType: 'identity.session',
       resourceId: suppliedSession.id,
       source: 'http',
       metadata: {},

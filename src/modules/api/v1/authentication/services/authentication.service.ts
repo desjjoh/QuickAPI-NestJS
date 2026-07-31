@@ -182,7 +182,7 @@ export class AuthService {
       outcome: 'succeeded',
       actorType: 'user',
       sessionId: session.id,
-      resourceType: 'session',
+      resourceType: 'identity.session',
       resourceId: session.id,
       source: 'http',
       metadata: {},
