@@ -152,7 +152,7 @@ describe('RegistrationService', () => {
   });
 
   it('delegates registration verification and returns the created user', async () => {
-    const { service, emailSvc } = setup();
+    const { service, emailSvc, auditSvc } = setup();
     const created = userFixture({ id: 'created-user' });
     emailSvc.verifyRegistrationToken.mockResolvedValue(created);
     await expect(
@@ -161,6 +161,14 @@ describe('RegistrationService', () => {
     expect(emailSvc.verifyRegistrationToken).toHaveBeenCalledWith(
       'challenge-1',
       '123456',
+    );
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_SUCCEEDED,
+        subjectId: 'created-user',
+      }),
     );
   });
 });

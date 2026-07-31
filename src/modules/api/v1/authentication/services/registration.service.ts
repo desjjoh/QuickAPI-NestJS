@@ -116,6 +116,23 @@ export class RegistrationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    return this.emailSvc.verifyRegistrationToken(challengeId, code);
+    const user = await this.emailSvc.verifyRegistrationToken(challengeId, code);
+
+    await this.auditSvc.record({
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+          .REGISTRATION_VERIFICATION_SUCCEEDED,
+      domain: AuditEventDomain.IDENTITY,
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'identity.user',
+      resourceId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
+    return user;
   }
 }

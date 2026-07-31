@@ -16,6 +16,10 @@ import {
 } from '@/../test/helpers/identity.fixtures';
 import { MeApiService } from './me.service';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 
 describe('MeApiService', () => {
   const user = userFixture();
@@ -42,6 +46,7 @@ describe('MeApiService', () => {
         id: 'email-challenge',
         expires_at: new Date('2026-02-01'),
       }),
+      verifyEmail: jest.fn().mockResolvedValue(user),
     };
     const emailSvc = { sendEmail: jest.fn() };
     const mfaSvc = {
@@ -143,7 +148,7 @@ describe('MeApiService', () => {
   });
 
   it('validates an email change and returns its verification DTO', async () => {
-    const { service, userSvc, evSvc } = setup();
+    const { service, userSvc, evSvc, auditSvc } = setup();
     await expect(
       service.updateEmail(user, { password: 'old', email: 'new@example.test' }),
     ).resolves.toEqual({
@@ -159,6 +164,40 @@ describe('MeApiService', () => {
       user,
       'new@example.test',
     );
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
+        actorId: user.id,
+      }),
+    );
+  });
+
+  it('audits a completed email change before issuing replacement tokens', async () => {
+    const { service, evSvc, refreshSvc, auditSvc } = setup();
+    const updated = userFixture({
+      id: user.id,
+      identity: { ...user.identity, email: 'new@example.test' },
+    });
+    evSvc.verifyEmail.mockResolvedValue(updated);
+
+    await service.confirmEmail(
+      user,
+      session,
+      { challenge_id: 'email-challenge', code: '123456' },
+      res,
+    );
+
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
+        sessionId: session.id,
+        before: { id: user.id, identity: { email: user.identity.email } },
+        after: { id: user.id, identity: { email: 'new@example.test' } },
+      }),
+    );
+    expect(refreshSvc.issueTokens).toHaveBeenCalledWith(updated, res, session);
   });
 
   it('changes password, revokes other sessions, emails the user, and reissues tokens', async () => {

@@ -32,11 +32,6 @@ import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/ema
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
-import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 const EMAIL_VERIFICATION_EXPIRES_IN_MINUTES = 30;
 
@@ -53,7 +48,6 @@ export class EmailVerificationService {
     private readonly userSvc: UserService,
     private readonly emailSvc: EmailService,
     private readonly dataSource: DataSource,
-    private readonly auditSvc: AuditService,
   ) {}
 
   public async sendVerificationEmail(
@@ -68,22 +62,6 @@ export class EmailVerificationService {
       to: user.identity.email,
       tokenId: verification.id,
       mfaCode,
-    });
-
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .EMAIL_VERIFICATION_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
     });
 
     return verification;
@@ -121,21 +99,6 @@ export class EmailVerificationService {
       to: normalizedEmail,
       tokenId: verification.id,
       mfaCode,
-    });
-
-    await this.auditSvc.record({
-      event:
-        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
     });
 
     return verification;
@@ -208,42 +171,6 @@ export class EmailVerificationService {
 
     if (previousEmail) await this.sendEmailChangeSuccess(user, previousEmail);
 
-    const event = previousEmail
-      ? AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED
-      : AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-          .EMAIL_VERIFICATION_COMPLETED;
-
-    await this.auditSvc.record({
-      event,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
-    });
-
-    if (previousEmail)
-      await this.auditSvc.record({
-        event,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
-        actorId: user.id,
-        subjectType: 'user',
-        subjectId: user.id,
-        resourceType: 'identity.user',
-        resourceId: user.id,
-        source: 'http',
-        metadata: {},
-        before: { id: user.id, identity: { email: previousEmail } },
-        after: { id: user.id, identity: { email: user.identity.email } },
-      });
-
     return user;
   }
 
@@ -265,53 +192,15 @@ export class EmailVerificationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    let user: UserEntity;
-    try {
-      const registrationToken =
-        await this.registrationTokenSvc.consumeVerificationCode(
-          challengeId,
-          code,
-        );
+    const registrationToken =
+      await this.registrationTokenSvc.consumeVerificationCode(
+        challengeId,
+        code,
+      );
 
-      user = await this.dataSource.transaction(async (manager) => {
-        const created = await this.verifyRegistration(
-          registrationToken.metadata,
-          manager,
-        );
-        await this.auditSvc.record(
-          {
-            event:
-              AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-                .REGISTRATION_VERIFICATION_SUCCEEDED,
-            domain: AuditEventDomain.IDENTITY,
-            outcome: 'succeeded',
-            actorType: 'anonymous',
-            subjectType: 'user',
-            subjectId: created.id,
-            resourceType: 'identity.user',
-            resourceId: created.id,
-            source: 'http',
-            metadata: {},
-          },
-          manager,
-        );
-        return created;
-      });
-    } catch (error) {
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .REGISTRATION_VERIFICATION_FAILED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'anonymous',
-        source: 'http',
-        metadata: {},
-        failureCode:
-          error instanceof Error ? error.constructor.name : 'UnknownError',
-      });
-      throw error;
-    }
+    const user = await this.dataSource.transaction((manager) =>
+      this.verifyRegistration(registrationToken.metadata, manager),
+    );
 
     await this.sendRegistrationSuccess(user);
     return user;

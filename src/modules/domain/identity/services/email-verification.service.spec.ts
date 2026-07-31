@@ -9,10 +9,6 @@ import { AccountStatusEntity } from '@/modules/domain/library/entities/accountst
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { EmailVerificationService } from './email-verification.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 describe('EmailVerificationService', () => {
   const user = {
@@ -54,9 +50,7 @@ describe('EmailVerificationService', () => {
   };
   const manager = { getRepository: jest.fn(), createQueryBuilder: jest.fn() };
   const dataSource = { transaction: jest.fn() };
-  const auditSvc = {
-    record: jest.fn().mockResolvedValue({}),
-  };
+
   let service: EmailVerificationService;
 
   beforeEach(() => {
@@ -112,7 +106,6 @@ describe('EmailVerificationService', () => {
       userSvc as never,
       emailSvc as never,
       dataSource as never,
-      auditSvc as never,
     );
   });
 
@@ -261,23 +254,6 @@ describe('EmailVerificationService', () => {
       }),
     );
     expect(emailSvc.sendEmail).toHaveBeenCalled();
-    expect(auditSvc.record).toHaveBeenCalledWith(
-      {
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .REGISTRATION_VERIFICATION_SUCCEEDED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'anonymous',
-        subjectType: 'user',
-        subjectId: 'new-user',
-        resourceType: 'identity.user',
-        resourceId: 'new-user',
-        source: 'http',
-        metadata: {},
-      },
-      manager,
-    );
   });
 
   it.each([
@@ -305,18 +281,6 @@ describe('EmailVerificationService', () => {
       );
       expect(users.save).not.toHaveBeenCalled();
       expect(emailSvc.sendEmail).not.toHaveBeenCalled();
-      expect(auditSvc.record).toHaveBeenCalledWith({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
-            .REGISTRATION_VERIFICATION_FAILED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'anonymous',
-        source: 'http',
-        metadata: {},
-        failureCode:
-          failure === 'duplicate' ? 'ConflictException' : 'BadRequestException',
-      });
     },
   );
 });

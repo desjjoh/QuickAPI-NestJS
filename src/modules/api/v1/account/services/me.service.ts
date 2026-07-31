@@ -161,6 +161,21 @@ export class MeApiService {
       dto.email,
     );
 
+    await this.auditSvc.record({
+      event:
+        AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_REQUESTED,
+      domain: AuditEventDomain.IDENTITY,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'identity.user',
+      resourceId: user.id,
+      source: 'http',
+      metadata: {},
+    });
+
     return new EmailVerificationChallengeDto({
       challenge_id: challenge.id,
       method: MfaMethod.EMAIL_OTP,
@@ -174,11 +189,35 @@ export class MeApiService {
     dto: VerifyEmailDto,
     res: Response,
   ): Promise<JWTDto> {
+    const previousEmail = user.identity.email;
     const updated = await this.evSvc.verifyEmail(
       dto.challenge_id,
       dto.code,
       user,
     );
+
+    const emailChanged = updated.identity.email !== previousEmail;
+    await this.auditSvc.record({
+      event: emailChanged
+        ? AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED
+        : AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .EMAIL_VERIFICATION_COMPLETED,
+      domain: AuditEventDomain.IDENTITY,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: updated.id,
+      subjectType: 'user',
+      subjectId: updated.id,
+      resourceType: 'identity.user',
+      resourceId: updated.id,
+      sessionId: currentSession.id,
+      source: 'http',
+      metadata: {},
+      ...(emailChanged && {
+        before: { id: updated.id, identity: { email: previousEmail } },
+        after: { id: updated.id, identity: { email: updated.identity.email } },
+      }),
+    });
 
     return this.refreshSvc.issueTokens(updated, res, currentSession);
   }

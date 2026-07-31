@@ -21,6 +21,7 @@ import { UserSessionEntity } from './entities/session.entity';
 import { UserMfaSettingsEntity } from './entities/mfa.entity';
 import { MfaService } from './services/mfa.service';
 import { EmailModule } from '@/modules/system/email/email.module';
+import { EmailVerificationService } from './services/email-verification.service';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     AccountTokenService,
     RegistrationTokenService,
     MfaService,
+    EmailVerificationService,
   ],
   exports: [
     UserRepository,
@@ -54,6 +56,7 @@ import { EmailModule } from '@/modules/system/email/email.module';
     AccountTokenService,
     RegistrationTokenService,
     MfaService,
+    EmailVerificationService,
   ],
 })
 export class IdentityModule {}
