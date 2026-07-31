@@ -12,10 +12,12 @@ describe('GeoLite2 updater', () => {
   let directory: string;
 
   beforeEach(async () => {
+    jest.spyOn(console, 'log').mockImplementation(() => undefined);
     directory = await mkdtemp(join(tmpdir(), 'geolite-test-'));
   });
 
   afterEach(async () => {
+    jest.restoreAllMocks();
     await rm(directory, { recursive: true, force: true });
   });
 

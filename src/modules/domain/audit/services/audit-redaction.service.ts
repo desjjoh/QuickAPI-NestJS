@@ -285,13 +285,24 @@ export class AuditRedactionService {
       if (policy.kind === 'relationship-ids') {
         const beforeIds = hasBefore && Array.isArray(left) ? left : [];
         const afterIds = hasAfter && Array.isArray(right) ? right : [];
-        const beforeSet = new Set(beforeIds.map(String));
-        const afterSet = new Set(afterIds.map(String));
+
+        const beforeSet = new Set(
+          beforeIds.filter((id) => id !== TRUNCATED).map(String),
+        );
+
+        const afterSet = new Set(
+          afterIds.filter((id) => id !== TRUNCATED).map(String),
+        );
+
         result.changes[field] = {
           before: beforeIds,
           after: afterIds,
-          added_ids: afterIds.filter((id) => !beforeSet.has(String(id))),
-          removed_ids: beforeIds.filter((id) => !afterSet.has(String(id))),
+          added_ids: afterIds.filter(
+            (id) => id !== TRUNCATED && !beforeSet.has(String(id)),
+          ),
+          removed_ids: beforeIds.filter(
+            (id) => id !== TRUNCATED && !afterSet.has(String(id)),
+          ),
         };
       } else {
         result.changes[field] = {

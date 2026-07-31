@@ -199,8 +199,10 @@ export class AuditService {
   private validateBase(input: RecordAuditInput): void {
     if (!input || typeof input !== 'object')
       throw new BadRequestException('audit input is required');
+
     this.requiredString('event', input.event, 128);
     this.requiredString('domain', input.domain, 64);
+
     if (!MACHINE_KEY_PATTERN.test(input.domain))
       throw new BadRequestException('domain must be a stable machine key');
     if (!EVENT_PATTERN.test(input.event))
@@ -239,6 +241,7 @@ export class AuditService {
     this.optionalString('failureCode', input.failureCode, 64);
     this.optionalString('operationId', input.operationId, 128);
     this.optionalString('idempotencyId', input.idempotencyId, 128);
+
     if (
       input.occurredAt !== undefined &&
       (!(input.occurredAt instanceof Date) ||

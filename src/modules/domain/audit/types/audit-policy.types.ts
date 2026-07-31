@@ -25,3 +25,8 @@ export const nestedObject = (fields: AuditPolicy): AuditFieldPolicy => ({
 export const relationshipIds: AuditFieldPolicy = {
   kind: 'relationship-ids',
 };
+
+export const orderedRelationshipIds: AuditFieldPolicy = {
+  kind: 'relationship-ids',
+  preserveOrder: true,
+};

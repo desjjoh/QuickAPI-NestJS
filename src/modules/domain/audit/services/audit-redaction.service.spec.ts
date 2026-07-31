@@ -1,6 +1,10 @@
 import { AuditRedactionService } from './audit-redaction.service';
 import { AuditPolicyRegistry } from './audit-policy.registry';
-import { scalar } from '../types/audit-policy.types';
+import {
+  orderedRelationshipIds,
+  relationshipIds,
+  scalar,
+} from '../types/audit-policy.types';
 
 describe(AuditRedactionService.name, () => {
   const secrets = {
@@ -38,6 +42,53 @@ describe(AuditRedactionService.name, () => {
         sku: 'must-not-cross-domains',
       }),
     ).toEqual({ id: 'ticket-1', state: 'open' });
+  });
+
+  it('applies relationship ID policy across identity and store domains', () => {
+    const registry = new AuditPolicyRegistry();
+    registry.register('store.product', {
+      id: scalar,
+      stores: relationshipIds,
+    });
+    const service = new AuditRedactionService({}, registry);
+
+    expect(
+      service.redactSnapshot('identity.user', {
+        roles: [
+          { id: 'role-2', label: 'Editor', permissions: ['write'] },
+          'role-1',
+        ],
+      }),
+    ).toEqual({ roles: ['role-1', 'role-2'] });
+    expect(
+      service.redactSnapshot('store.product', {
+        stores: [
+          { id: 'store-2', description: 'private' },
+          'store-1',
+          { id: 'store-2', owner: { id: 'owner-1' } },
+          { label: 'invalid' },
+        ],
+      }),
+    ).toEqual({ stores: ['store-1', 'store-2'] });
+  });
+
+  it('preserves relationship order only when explicitly requested', () => {
+    const registry = new AuditPolicyRegistry(false);
+    registry.register('store.product', {
+      featured_in: orderedRelationshipIds,
+      stores: relationshipIds,
+    });
+    const service = new AuditRedactionService({}, registry);
+
+    expect(
+      service.redactSnapshot('store.product', {
+        featured_in: ['store-2', { id: 'store-1' }, 'store-2'],
+        stores: ['store-2', { id: 'store-1' }],
+      }),
+    ).toEqual({
+      featured_in: ['store-2', 'store-1'],
+      stores: ['store-1', 'store-2'],
+    });
   });
 
   it('rejects snapshots without a registered policy', () => {
@@ -321,6 +372,25 @@ describe(AuditRedactionService.name, () => {
         roles: ['role-3', 'role-1', 'role-2', 'role-2'],
       }),
     ).toEqual({ roles: ['role-1', 'role-2', '[TRUNCATED]'] });
+  });
+
+  it('does not report the relationship truncation marker as an ID', () => {
+    const service = new AuditRedactionService({ maxArrayLength: 1 });
+
+    expect(
+      service.redactDiff(
+        'identity.user',
+        { roles: ['role-1', 'role-2'] },
+        { roles: ['role-2', 'role-3'] },
+      ).changes,
+    ).toEqual({
+      roles: {
+        before: ['role-1', '[TRUNCATED]'],
+        after: ['role-2', '[TRUNCATED]'],
+        added_ids: ['role-2'],
+        removed_ids: ['role-1'],
+      },
+    });
   });
 
   it('cannot leak cyclic relation graphs through an ID-only policy', () => {
