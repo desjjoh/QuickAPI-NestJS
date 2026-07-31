@@ -132,20 +132,7 @@ describe('RefreshService', () => {
         }),
       }),
     );
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: suppliedSession.id,
-      resourceType: 'identity.session',
-      resourceId: suppliedSession.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('rotates the session obtained from RequestContext', async () => {
@@ -156,6 +143,7 @@ describe('RefreshService', () => {
 
     expect(manager.create).not.toHaveBeenCalled();
     expectIssuedFromSession('s1', 1);
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('creates a session when neither an explicit nor contextual session exists', async () => {
@@ -170,6 +158,20 @@ describe('RefreshService', () => {
     expect(ipLocation.resolve).not.toHaveBeenCalled();
     expectIssuedFromSession('new-session', 1);
     expect(result.access_token).toBe('access');
+    expect(auditSvc.record).toHaveBeenCalledWith({
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
+      domain: AuditEventDomain.IDENTITY,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      sessionId: 'new-session',
+      resourceType: 'identity.session',
+      resourceId: 'new-session',
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('creates a session without request metadata or a location lookup when the request is missing', async () => {

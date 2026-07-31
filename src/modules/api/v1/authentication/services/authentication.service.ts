@@ -133,41 +133,7 @@ export class AuthService {
     res: Response,
     session: UserSessionEntity,
   ): Promise<JWTDto> {
-    try {
-      const tokens = await this.refreshSvc.issueTokens(user, res, session);
-
-      await this.auditSvc.record({
-        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_SUCCEEDED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
-        actorId: user.id,
-        subjectType: 'user',
-        subjectId: user.id,
-        sessionId: session.id,
-        source: 'http',
-        metadata: {},
-      });
-
-      return tokens;
-    } catch (error) {
-      await this.auditSvc.record({
-        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'failed',
-        actorType: 'user',
-        actorId: user.id,
-        subjectType: 'user',
-        subjectId: user.id,
-        sessionId: session.id,
-        source: 'http',
-        metadata: {},
-        failureCode:
-          error instanceof Error ? error.constructor.name : 'UnknownError',
-      });
-
-      throw error;
-    }
+    return this.refreshSvc.issueTokens(user, res, session);
   }
 
   public async signOut(

@@ -48,6 +48,7 @@ export class RefreshService {
         })
       : null;
 
+    const isNewSession = !existingSession && !currentSession;
     const session =
       existingSession ??
       currentSession ??
@@ -75,20 +76,21 @@ export class RefreshService {
       getRefreshCookieOptions(),
     );
 
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: updatedSession.id,
-      resourceType: 'identity.session',
-      resourceId: updatedSession.id,
-      source: 'http',
-      metadata: {},
-    });
+    if (isNewSession)
+      await this.auditSvc.record({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
+        domain: AuditEventDomain.IDENTITY,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        sessionId: updatedSession.id,
+        resourceType: 'identity.session',
+        resourceId: updatedSession.id,
+        source: 'http',
+        metadata: {},
+      });
 
     return new JWTDto({
       refresh: refreshToken.exp,

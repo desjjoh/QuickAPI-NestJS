@@ -193,18 +193,7 @@ describe('AuthService', () => {
     const { service, refreshSvc, auditSvc } = setup();
     await expect(service.verify(user, res, session)).resolves.toBe(tokens);
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_SUCCEEDED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: session.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('revokes the session and clears response cookies on sign-out', async () => {
@@ -224,36 +213,22 @@ describe('AuthService', () => {
     });
   });
 
-  it('records the exact failed refresh event after token issuance fails', async () => {
+  it('does not audit an ordinary refresh failure after token issuance fails', async () => {
     const { service, refreshSvc, auditSvc } = setup();
     refreshSvc.issueTokens.mockRejectedValue(new Error('rotation failed'));
     await expect(service.verify(user, res, session)).rejects.toThrow(
       'rotation failed',
     );
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'failed',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: session.id,
-      source: 'http',
-      metadata: {},
-      failureCode: 'Error',
-    });
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
-  it('records a safe failure code when refresh rejects with a non-error value', async () => {
+  it('does not audit a non-error rejection during ordinary refresh', async () => {
     const { service, refreshSvc, auditSvc } = setup();
     refreshSvc.issueTokens.mockRejectedValue('rotation failed');
 
     await expect(service.verify(user, res, session)).rejects.toBe(
       'rotation failed',
     );
-    expect(auditSvc.record).toHaveBeenCalledWith(
-      expect.objectContaining({ failureCode: 'UnknownError' }),
-    );
+    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 });

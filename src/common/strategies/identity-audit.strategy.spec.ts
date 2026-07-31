@@ -33,14 +33,13 @@ describe('authentication strategy audit events', () => {
     expect(audit.record.mock.calls[0][0]).not.toHaveProperty('email');
   });
 
-  it('records the exact refresh failure after session validation is rejected', async () => {
+  it('does not audit an ordinary refresh validation failure', async () => {
     const repository = { findByIdOrFail: jest.fn(), manager: {} };
     const users = { assertCanAuthenticate: jest.fn() };
     const audit = { record: jest.fn().mockResolvedValue({}) };
     const strategy = new RefreshTokenStrategy(
       repository as never,
       users as never,
-      audit as never,
     );
     const payload = {
       sub: 'user-1',
@@ -52,17 +51,6 @@ describe('authentication strategy audit events', () => {
     await expect(
       strategy.validate({ cookies: {} } as never, payload),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(audit.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].REFRESH_FAILED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'failed',
-      actorType: 'anonymous',
-      source: 'http',
-      metadata: {},
-      sessionId: 'session-1',
-      subjectType: 'user',
-      subjectId: 'user-1',
-      failureCode: 'UnauthorizedException',
-    });
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });
