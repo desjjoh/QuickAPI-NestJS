@@ -72,6 +72,18 @@ describe('PasswordResetService', () => {
       createHash('sha256').update(code).digest('hex'),
     );
     expect(creation.mfaCodeHash).not.toBe(code);
+    expect(auditSvc.record).toHaveBeenCalledWith({
+      event: 'identity.password_reset.requested',
+      domain: 'identity',
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      subjectType: 'user',
+      subjectId: 'u1',
+      resourceType: 'identity.user',
+      resourceId: 'u1',
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it.each([
@@ -132,6 +144,21 @@ describe('PasswordResetService', () => {
     expect(userSvc.recordPasswordChanged).toHaveBeenCalledWith(user);
     expect(userRepo.revokeAllSessions).toHaveBeenCalledWith('u1');
     expect(emailSvc.sendEmail).toHaveBeenCalled();
+    expect(auditSvc.record).toHaveBeenCalledWith({
+      event: 'identity.password_reset.completed',
+      domain: 'identity',
+      outcome: 'succeeded',
+      actorType: 'anonymous',
+      actorId: null,
+      subjectType: 'user',
+      subjectId: 'u1',
+      resourceType: 'identity.user',
+      resourceId: 'u1',
+      source: 'http',
+      metadata: {},
+      before: { id: 'u1' },
+      after: { id: 'u1', identity: { password: true } },
+    });
   });
 
   it('rejects an inactive account without changing a password or revoking sessions', async () => {

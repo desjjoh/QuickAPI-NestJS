@@ -102,17 +102,29 @@ describe('UserAdminService', () => {
   });
 
   it('delegates user removal exactly once with the requested id', async () => {
-    const { repo, service } = setup();
+    const { repo, service, audit, manager } = setup();
     repo.removeUser.mockResolvedValue(undefined);
 
     await expect(service.removeUser('user-1')).resolves.toBeUndefined();
 
     expect(repo.removeUser).toHaveBeenCalledTimes(1);
     expect(repo.removeUser).toHaveBeenCalledWith('user-1', expect.any(Object));
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.admin.user_deleted',
+        actorType: 'admin',
+        subjectId: 'user-1',
+        resourceId: 'user-1',
+        operationId: 'operation-1',
+        idempotencyId: 'operation-1',
+        after: null,
+      }),
+      manager,
+    );
   });
 
   it('delegates an administration update and converts the entity to a DTO', async () => {
-    const { repo, service } = setup();
+    const { repo, service, audit, manager } = setup();
     const dto = {
       status_id: 'status-id-000001',
       role_ids: ['role-id-0000001'],
@@ -132,6 +144,18 @@ describe('UserAdminService', () => {
     );
     expect(result).toBeInstanceOf(UserDto);
     expect(result.status.key).toBe('disabled');
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.admin.user_updated',
+        actorType: 'admin',
+        subjectId: 'user-1',
+        resourceId: 'user-1',
+        operationId: 'operation-1',
+        idempotencyId: 'operation-1',
+        after: user,
+      }),
+      manager,
+    );
   });
 
   it('propagates repository validation errors when updating a user', async () => {

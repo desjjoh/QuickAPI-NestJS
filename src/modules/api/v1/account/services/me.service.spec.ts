@@ -80,17 +80,26 @@ describe('MeApiService', () => {
   };
 
   it('validates the password and deletes the account with cookie response', async () => {
-    const { service, userSvc } = setup();
+    const { service, userSvc, auditSvc } = setup();
     await service.deleteMe(user, { password: 'old' }, res);
     expect(userSvc.validateUser).toHaveBeenCalledWith(
       user.identity.email,
       'old',
     );
     expect(userSvc.deleteUser).toHaveBeenCalledWith(user, res);
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.account.deleted',
+        actorId: user.id,
+        subjectId: user.id,
+        resourceType: 'identity.user',
+        resourceId: user.id,
+      }),
+    );
   });
 
   it('disables MFA and synchronizes user metadata', async () => {
-    const { service, userSvc, mfaSvc } = setup();
+    const { service, userSvc, mfaSvc, auditSvc } = setup();
     await expect(
       service.updateMfa(user, { password: 'old', enabled: false }),
     ).resolves.toBeUndefined();
@@ -98,6 +107,14 @@ describe('MeApiService', () => {
     expect(userSvc.updateMetadata).toHaveBeenCalledWith(user, {
       mfa_enabled: false,
     });
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.mfa.disabled',
+        actorId: user.id,
+        subjectId: user.id,
+        resourceId: user.id,
+      }),
+    );
   });
 
   it('requests MFA enablement and returns the challenge DTO', async () => {
@@ -114,7 +131,7 @@ describe('MeApiService', () => {
   });
 
   it('confirms MFA and protects the current session while revoking others', async () => {
-    const { service, userSvc, refreshSvc, mfaSvc } = setup();
+    const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
     await service.confirmMfa(user, session, {
       challenge_id: 'mfa-challenge',
       code: '123456',
@@ -132,6 +149,15 @@ describe('MeApiService', () => {
     expect(refreshSvc.revokeOtherSessions).toHaveBeenCalledWith(
       user.id,
       session.id,
+    );
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.mfa.enabled',
+        actorId: user.id,
+        subjectId: user.id,
+        resourceId: user.id,
+        sessionId: session.id,
+      }),
     );
   });
 
@@ -239,7 +265,7 @@ describe('MeApiService', () => {
   });
 
   it('changes password, revokes other sessions, emails the user, and reissues tokens', async () => {
-    const { service, userSvc, refreshSvc, emailSvc } = setup();
+    const { service, userSvc, refreshSvc, emailSvc, auditSvc } = setup();
     const tokenDto = await service.updatePassword(
       user,
       session,
@@ -268,5 +294,16 @@ describe('MeApiService', () => {
       }),
     );
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res, session);
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.password.changed',
+        actorId: user.id,
+        subjectId: user.id,
+        resourceId: user.id,
+        sessionId: session.id,
+        before: { id: user.id },
+        after: { id: user.id, identity: { password: true } },
+      }),
+    );
   });
 });

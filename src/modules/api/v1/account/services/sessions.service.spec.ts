@@ -47,25 +47,59 @@ describe('SessionsApiService', () => {
   });
 
   it('protects current-session semantics by revoking its tokens and cookies', async () => {
-    const { service, refreshSvc } = setup();
+    const { service, refreshSvc, auditSvc } = setup();
     await service.revoke(user, current, current.id, res);
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(current, res);
     expect(refreshSvc.revokeSessionById).not.toHaveBeenCalled();
+    expect(auditSvc.record).toHaveBeenCalledWith({
+      event: 'identity.session.revoked',
+      domain: 'identity',
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'identity.session',
+      resourceId: current.id,
+      sessionId: current.id,
+      source: 'http',
+      metadata: {},
+    });
   });
 
   it('revokes an individual non-current session for the owning user', async () => {
-    const { service, refreshSvc } = setup();
+    const { service, refreshSvc, auditSvc } = setup();
     await service.revoke(user, current, 'other-session', res);
     expect(refreshSvc.revokeSessionById).toHaveBeenCalledWith(
       user.id,
       'other-session',
     );
     expect(refreshSvc.revokeTokens).not.toHaveBeenCalled();
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.session.revoked',
+        resourceId: 'other-session',
+        sessionId: 'other-session',
+      }),
+    );
   });
 
   it('revokes all sessions and delegates cookie cleanup', async () => {
-    const { service, refreshSvc } = setup();
+    const { service, refreshSvc, auditSvc } = setup();
     await service.revokeAll(user, res);
     expect(refreshSvc.revokeAllSessions).toHaveBeenCalledWith(user.id, res);
+    expect(auditSvc.record).toHaveBeenCalledWith({
+      event: 'identity.session.all_revoked',
+      domain: 'identity',
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      resourceType: 'identity.user',
+      resourceId: user.id,
+      source: 'http',
+      metadata: { session_ids: [current.id] },
+    });
   });
 });
