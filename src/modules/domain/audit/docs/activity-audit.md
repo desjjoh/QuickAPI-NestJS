@@ -104,7 +104,7 @@ conventions.
 | `user_agent`       | string, nullable      | no          | Bounded, sanitized HTTP user-agent value                                                    |
 | `http_method`      | string, nullable      | conditional | Uppercase method for HTTP records                                                           |
 | `normalized_route` | string, nullable      | conditional | Route template such as `/api/v1/users/:id`, never the raw URL or query string               |
-| `source`           | enum                  | yes         | `http`, `queue`, `scheduled_job`, `seed`, `migration`, or `system`                          |
+| `source`           | enum                  | yes         | `http`, `queue`, `scheduled_job`, `seed`, `service`, `migration`, or `system`               |
 | `occurred_at`      | timestamp             | yes         | UTC time the audited action occurred, distinct from storage ingestion time                  |
 | `metadata`         | JSON object           | yes         | Versioned, structured, allowlisted context; `{}` when none                                  |
 | `before`           | JSON object, nullable | no          | Allowlisted pre-change values where applicable                                              |

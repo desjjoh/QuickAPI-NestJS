@@ -27,6 +27,7 @@ export type AuditSource =
   | 'queue'
   | 'scheduled_job'
   | 'seed'
+  | 'service'
   | 'migration'
   | 'system';
 
@@ -87,6 +88,7 @@ const SOURCES: readonly AuditSource[] = [
   'queue',
   'scheduled_job',
   'seed',
+  'service',
   'migration',
   'system',
 ];
@@ -183,7 +185,7 @@ export class AuditService {
       event: input.event,
       outcome: input.outcome,
       actor_type: input.actorType ?? context?.actorType,
-      actor_id: input.actorId ?? context?.userId ?? null,
+      actor_id: this.explicitOrContext(input, 'actorId', context?.actorId),
       subject_type: input.subjectType ?? null,
       subject_id: input.subjectId ?? null,
       resource_type: input.resourceType ?? null,
@@ -191,12 +193,32 @@ export class AuditService {
       domain: input.domain,
       operation_id: input.operationId ?? null,
       idempotency_id: input.idempotencyId ?? null,
-      request_id: input.requestId ?? context?.requestId ?? null,
-      session_id: input.sessionId ?? context?.sessionId ?? null,
-      ip_address: input.ipAddress ?? context?.ip ?? null,
-      user_agent: input.userAgent ?? context?.userAgent ?? null,
-      http_method: (input.httpMethod ?? context?.method ?? null)?.toUpperCase(),
-      route: input.route ?? context?.route ?? null,
+      request_id: this.explicitOrContext(
+        input,
+        'requestId',
+        context?.requestId,
+      ),
+      session_id: this.explicitOrContext(
+        input,
+        'sessionId',
+        context?.sessionId,
+      ),
+      ip_address: this.explicitOrContext(
+        input,
+        'ipAddress',
+        context?.ipAddress,
+      ),
+      user_agent: this.explicitOrContext(
+        input,
+        'userAgent',
+        context?.userAgent,
+      ),
+      http_method: this.explicitOrContext(
+        input,
+        'httpMethod',
+        context?.method,
+      )?.toUpperCase(),
+      route: this.explicitOrContext(input, 'route', context?.normalizedRoute),
       failure_reason: input.failureReason ?? null,
       failure_code: input.failureCode ?? null,
       source: input.source ?? context?.source,
@@ -208,6 +230,19 @@ export class AuditService {
     await repository.insert(entity as never);
 
     return entity;
+  }
+
+  /** Explicit audit values, including null, take precedence over ambient context. */
+  private explicitOrContext<K extends keyof RecordAuditInput>(
+    input: RecordAuditInput,
+    key: K,
+    contextValue: string | undefined,
+  ): string | null {
+    const value = input[key] as string | null | undefined;
+    return Object.prototype.hasOwnProperty.call(input, key) &&
+      value !== undefined
+      ? value
+      : (contextValue ?? null);
   }
 
   private validateBase(input: RecordAuditInput): void {

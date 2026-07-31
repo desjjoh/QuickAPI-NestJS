@@ -82,9 +82,14 @@ export const logger: Logger = pino(
 
       return {
         requestId: ctx.requestId,
+        actorType: ctx.actorType,
+        actorId: ctx.actorId,
+        sessionId: ctx.sessionId,
+        source: ctx.source,
         method: ctx.method,
-        path: ctx.path,
-        ip: ctx.ip,
+        normalizedRoute: ctx.normalizedRoute,
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
       };
     },
     serializers: {

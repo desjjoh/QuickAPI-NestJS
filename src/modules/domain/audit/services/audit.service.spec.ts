@@ -275,14 +275,13 @@ describe(AuditService.name, () => {
         {
           requestId: 'request-1',
           method: 'post',
-          path: '/api/users/:id',
-          ip: '127.0.0.1',
-          userId: 'context-user',
+          ipAddress: '127.0.0.1',
+          actorId: 'context-user',
           sessionId: 'session-1',
           userAgent: 'test-agent',
           actorType: 'user',
           source: 'http',
-          route: '/api/users/:id',
+          normalizedRoute: '/api/users/:id',
         },
         () => {
           service
@@ -310,10 +309,10 @@ describe(AuditService.name, () => {
       {
         requestId: 'context-request',
         sessionId: 'context-session',
-        userId: 'context-user',
+        actorId: 'context-user',
         actorType: 'anonymous',
         source: 'queue',
-        route: '/context/:id',
+        normalizedRoute: '/context/:id',
       },
       () =>
         service.record({
@@ -334,6 +333,36 @@ describe(AuditService.name, () => {
         actor_id: 'explicit-user',
         source: 'system',
         route: '/explicit/:id',
+      }),
+    );
+  });
+
+  it('allows an explicit null actor ID to override authenticated context', async () => {
+    await context.run(
+      {
+        requestId: 'context-request',
+        actorId: 'authenticated-user',
+        actorType: 'user',
+        source: 'http',
+      },
+      () =>
+        service.record({
+          ...activity,
+          actorType: 'service',
+          actorId: null,
+          subjectType: 'user',
+          subjectId: 'represented-user',
+          source: 'service',
+        }),
+    );
+
+    expect(repository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actor_type: 'service',
+        actor_id: null,
+        subject_type: 'user',
+        subject_id: 'represented-user',
+        source: 'service',
       }),
     );
   });

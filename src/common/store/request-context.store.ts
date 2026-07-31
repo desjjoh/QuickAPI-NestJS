@@ -12,18 +12,18 @@ export type ContextSource =
   | 'queue'
   | 'scheduled_job'
   | 'seed'
+  | 'service'
   | 'migration'
   | 'system';
-export type NonHttpContextSource = Exclude<ContextSource, 'http' | 'migration'>;
+export type NonHttpContextSource = Exclude<ContextSource, 'http'>;
 
 /** Deliberately contains only allowlisted correlation and audit attributes. */
 export type RequestContextStore = {
   requestId: string;
   method?: string;
-  path?: string;
-  route?: string;
-  ip?: string;
-  userId?: string;
+  normalizedRoute?: string;
+  ipAddress?: string;
+  actorId?: string;
   sessionId?: string;
   actorType?: ContextActorType;
   userAgent?: string;
@@ -32,7 +32,7 @@ export type RequestContextStore = {
 
 export type NonHttpContext = Omit<
   RequestContextStore,
-  'method' | 'path' | 'route' | 'ip' | 'userAgent' | 'source'
+  'method' | 'normalizedRoute' | 'ipAddress' | 'userAgent' | 'source'
 > & {
   source: NonHttpContextSource;
 };

@@ -15,16 +15,20 @@ class JwtAuthGuard extends AuthGuard('jwt-access') {
     const request = context.switchToHttp().getRequest();
     const { user } = request;
 
-    this.requestContext.set('userId', user.sub);
+    this.requestContext.set('actorId', user.sub);
     this.requestContext.set('actorType', 'user');
     this.requestContext.set('source', 'http');
+
     const sessionId = user.sessionEntity?.id ?? user.sid ?? user.sessionId;
+
     if (typeof sessionId === 'string')
       this.requestContext.set('sessionId', sessionId);
+
     const normalizedRoute = request.route?.path;
+
     if (typeof normalizedRoute === 'string')
       this.requestContext.set(
-        'route',
+        'normalizedRoute',
         `${request.baseUrl ?? ''}${normalizedRoute}`,
       );
 

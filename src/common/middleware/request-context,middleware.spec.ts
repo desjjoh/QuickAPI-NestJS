@@ -29,14 +29,14 @@ describe(requestContextMiddleware.name, () => {
         expect(context.getStore()).toEqual(
           expect.objectContaining({
             method: 'GET',
-            path: '/users/123',
-            route: '/users/123',
+            ipAddress: '127.0.0.1',
             actorType: 'anonymous',
             userAgent: 'test-agent',
             source: 'http',
           }),
         );
         expect(context.getStore()).not.toHaveProperty('request');
+        expect(context.getStore()).not.toHaveProperty('normalizedRoute');
       }) as NextFunction,
     );
   });

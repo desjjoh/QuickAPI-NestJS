@@ -10,13 +10,10 @@ export function requestContextMiddleware(): RequestHandler {
     next: NextFunction,
   ): void {
     const userAgent = req.get('user-agent');
-    const route = req.path;
     const ctx = {
       requestId: generateRequestId(),
       method: req.method,
-      path: route,
-      route,
-      ip: req.ip,
+      ipAddress: req.ip,
       ...(userAgent ? { userAgent } : {}),
       actorType: 'anonymous' as const,
       source: 'http' as const,
