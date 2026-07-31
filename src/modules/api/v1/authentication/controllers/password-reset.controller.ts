@@ -22,7 +22,7 @@ import {
   RequestPasswordResetResponseDto,
   VerifyPasswordResetCodeResponseDto,
 } from '@/modules/domain/identity/models/password-reset.model';
-import { PasswordResetService } from '@/modules/domain/identity/services/password-reset.service';
+import { PasswordResetService } from '@/modules/api/v1/authentication/services/password-reset.service';
 import {
   ConfirmPasswordResetDto,
   RequestPasswordResetDto,

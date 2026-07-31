@@ -1,7 +1,6 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { BadRequestException, ConflictException } from '@nestjs/common';
-import type { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import type { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import type { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
@@ -14,6 +13,7 @@ import {
   AuditEventDomain,
 } from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 describe('RegistrationService', () => {
   const dto = {

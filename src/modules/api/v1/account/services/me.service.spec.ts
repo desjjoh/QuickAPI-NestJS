@@ -2,7 +2,6 @@ jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { UnauthorizedException } from '@nestjs/common';
 import type { Response } from 'express';
-import type { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import {
   MfaChallengePurpose,
   MfaMethod,
@@ -16,6 +15,7 @@ import {
   userFixture,
 } from '@/../test/helpers/identity.fixtures';
 import { MeApiService } from './me.service';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 describe('MeApiService', () => {
   const user = userFixture();

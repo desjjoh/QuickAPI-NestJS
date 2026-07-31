@@ -12,7 +12,6 @@ export enum IdentityAuditEvents {
   MFA_SIGN_IN_CHALLENGE_ISSUED = 'identity.mfa.sign_in.challenge_issued',
   MFA_SIGN_IN_VERIFICATION_SUCCEEDED = 'identity.mfa.sign_in.verification_succeeded',
   MFA_SIGN_IN_VERIFICATION_FAILED = 'identity.mfa.sign_in.verification_failed',
-  SESSION_ISSUED = 'identity.session.issued',
   SIGN_OUT_COMPLETED = 'identity.sign_out.completed',
   PASSWORD_RESET_REQUESTED = 'identity.password_reset.requested',
   PASSWORD_RESET_CODE_ACCEPTED = 'identity.password_reset.code_accepted',

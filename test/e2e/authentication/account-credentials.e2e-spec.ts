@@ -17,7 +17,7 @@ import {
 import { teardownTestSuite, type TestSuite } from '../../helpers/test-app';
 
 const ACCOUNT_ROOT = '/api/v1/account';
-const VERIFY_ROOT = '/api/v1/authentication/email-verification';
+const VERIFY_ROOT = '/api/v1/account/email';
 const AUTH_ROOT = '/api/v1/authentication';
 const PASSWORD = 'Valid!Pass1';
 describe('Authenticated credential and email changes', () => {

@@ -10,7 +10,6 @@ import {
 } from '../models/register.model';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
@@ -21,6 +20,7 @@ import {
   AuditEventDomain,
 } from '@/config/audit-events.config';
 import { hashAuditIdentifier } from '@/modules/domain/audit/helpers/audit-privacy.helper';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @Injectable()
 export class RegistrationService {

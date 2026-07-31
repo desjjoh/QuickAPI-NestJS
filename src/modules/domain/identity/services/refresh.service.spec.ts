@@ -15,10 +15,6 @@ import {
 } from '@/config/cookie.config';
 import { UserSessionEntity } from '../entities/session.entity';
 import { RefreshService } from './refresh.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 describe('RefreshService', () => {
   const user = { id: 'u1', identity: { email: 'user@test.dev' } };
@@ -46,7 +42,7 @@ describe('RefreshService', () => {
   const requestContext = { get: jest.fn() };
   const ipLocation = { resolve: jest.fn() };
   const res = { cookie: jest.fn(), clearCookie: jest.fn() };
-  const auditSvc = { record: jest.fn().mockResolvedValue({}) };
+
   let service: RefreshService;
 
   const expectIssuedFromSession = (sessionId: string, version: number) => {
@@ -101,7 +97,6 @@ describe('RefreshService', () => {
       userRepo as never,
       requestContext as never,
       ipLocation as never,
-      auditSvc as never,
     );
   });
 
@@ -132,7 +127,6 @@ describe('RefreshService', () => {
         }),
       }),
     );
-    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('rotates the session obtained from RequestContext', async () => {
@@ -143,7 +137,6 @@ describe('RefreshService', () => {
 
     expect(manager.create).not.toHaveBeenCalled();
     expectIssuedFromSession('s1', 1);
-    expect(auditSvc.record).not.toHaveBeenCalled();
   });
 
   it('creates a session when neither an explicit nor contextual session exists', async () => {
@@ -158,20 +151,6 @@ describe('RefreshService', () => {
     expect(ipLocation.resolve).not.toHaveBeenCalled();
     expectIssuedFromSession('new-session', 1);
     expect(result.access_token).toBe('access');
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: 'new-session',
-      resourceType: 'identity.session',
-      resourceId: 'new-session',
-      source: 'http',
-      metadata: {},
-    });
   });
 
   it('creates a session without request metadata or a location lookup when the request is missing', async () => {

@@ -14,16 +14,13 @@ import { RegistrationTokenEntity } from './entities/registration-token.entity';
 
 import { LibraryModule } from '../library/library.module';
 import { RefreshService } from './services/refresh.service';
-import { EmailVerificationService } from './services/email-verification.service';
-import { EmailModule } from '@/modules/system/email/email.module';
-import { PasswordResetService } from './services/password-reset.service';
 import { MediaModule } from '../media/media.module';
 import { UserPhoneEntity } from './entities/phone.entity';
 import { RegistrationTokenService } from './services/registration-token.service';
 import { UserSessionEntity } from './entities/session.entity';
 import { UserMfaSettingsEntity } from './entities/mfa.entity';
 import { MfaService } from './services/mfa.service';
-import { AuditModule } from '../audit/audit.module';
+import { EmailModule } from '@/modules/system/email/email.module';
 
 @Module({
   imports: [
@@ -41,16 +38,13 @@ import { AuditModule } from '../audit/audit.module';
     LibraryModule,
     MediaModule,
     EmailModule,
-    AuditModule,
   ],
   providers: [
     UserRepository,
     UserService,
     RefreshService,
     AccountTokenService,
-    EmailVerificationService,
     RegistrationTokenService,
-    PasswordResetService,
     MfaService,
   ],
   exports: [
@@ -59,8 +53,6 @@ import { AuditModule } from '../audit/audit.module';
     RefreshService,
     AccountTokenService,
     RegistrationTokenService,
-    EmailVerificationService,
-    PasswordResetService,
     MfaService,
   ],
 })

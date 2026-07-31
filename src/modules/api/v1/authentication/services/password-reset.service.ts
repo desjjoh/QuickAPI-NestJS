@@ -5,15 +5,18 @@ import { createHash, randomInt } from 'crypto';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { PasswordResetTemplate } from '@/modules/system/email/templates/password-reset.template';
 
-import { UserRepository } from '../repositories/user.repository';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 
-import { UserService } from './user.service';
-import { AccountTokenService, CreatedAccountToken } from './token.service';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import {
+  AccountTokenService,
+  CreatedAccountToken,
+} from '@/modules/domain/identity/services/token.service';
 import { AccountTokenType } from '@/config/token.config';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
-import { UserEntity } from '../entities/user.entity';
-import { UserSessionEntity } from '../entities/session.entity';
-import { AuditService } from '../../audit/services/audit.service';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,

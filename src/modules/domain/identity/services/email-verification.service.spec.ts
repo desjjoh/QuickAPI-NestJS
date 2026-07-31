@@ -5,9 +5,9 @@ import { createHash } from 'crypto';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { AccountTokenType } from '@/config/token.config';
-import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
-import { ROLE_KEYS } from '../../library/seeders/role.seeder';
-import { UserEntity } from '../entities/user.entity';
+import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
+import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { EmailVerificationService } from './email-verification.service';
 import {
   AUDIT_EVENT_MATRIX,

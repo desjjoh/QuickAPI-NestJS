@@ -20,9 +20,14 @@ describe('SessionsApiService', () => {
       revokeSessionById: jest.fn(),
       revokeAllSessions: jest.fn(),
     };
+    const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     return {
-      service: new SessionsApiService(refreshSvc as unknown as RefreshService),
+      service: new SessionsApiService(
+        refreshSvc as unknown as RefreshService,
+        auditSvc as never,
+      ),
       refreshSvc,
+      auditSvc,
     };
   };
 

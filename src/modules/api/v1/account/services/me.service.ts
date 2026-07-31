@@ -11,7 +11,6 @@ import { UpdateEmailDto } from '../models/updateEmail.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
 import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
-import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { MfaService } from '@/modules/domain/identity/services/mfa.service';
@@ -25,12 +24,16 @@ import {
   MfaMethod,
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { UnauthorizedException } from '@nestjs/common';
-import { EmailVerificationChallengeDto } from '../../authentication/models/verify-email.model';
+import {
+  EmailVerificationChallengeDto,
+  VerifyEmailDto,
+} from '../../authentication/models/verify-email.model';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
 } from '@/config/audit-events.config';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 @Injectable()
 export class MeApiService {
@@ -163,6 +166,21 @@ export class MeApiService {
       method: MfaMethod.EMAIL_OTP,
       expires_at: challenge.expires_at,
     });
+  }
+
+  public async confirmEmail(
+    user: UserEntity,
+    currentSession: UserSessionEntity,
+    dto: VerifyEmailDto,
+    res: Response,
+  ): Promise<JWTDto> {
+    const updated = await this.evSvc.verifyEmail(
+      dto.challenge_id,
+      dto.code,
+      user,
+    );
+
+    return this.refreshSvc.issueTokens(updated, res, currentSession);
   }
 
   public async updatePassword(

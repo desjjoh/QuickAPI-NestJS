@@ -19,11 +19,6 @@ import { IpLocationService } from '@/modules/system/geolocation/services/ip-loca
 import { MoreThan, Not, IsNull } from 'typeorm';
 import { day } from '@/common/constants/milliseconds.constants';
 import { env } from '@/config/environment.config';
-import { AuditService } from '../../audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 @Injectable()
 export class RefreshService {
@@ -32,7 +27,6 @@ export class RefreshService {
     private readonly userRepo: UserRepository,
     private readonly requestContext: RequestContext,
     private readonly ipLocation: IpLocationService,
-    private readonly auditSvc: AuditService,
   ) {}
 
   public async issueTokens(
@@ -48,7 +42,6 @@ export class RefreshService {
         })
       : null;
 
-    const isNewSession = !existingSession && !currentSession;
     const session =
       existingSession ??
       currentSession ??
@@ -76,22 +69,6 @@ export class RefreshService {
       getRefreshCookieOptions(),
     );
 
-    if (isNewSession)
-      await this.auditSvc.record({
-        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_ISSUED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
-        actorId: user.id,
-        subjectType: 'user',
-        subjectId: user.id,
-        sessionId: updatedSession.id,
-        resourceType: 'identity.session',
-        resourceId: updatedSession.id,
-        source: 'http',
-        metadata: {},
-      });
-
     return new JWTDto({
       refresh: refreshToken.exp,
       access_token: tokens.access_token,
@@ -107,7 +84,6 @@ export class RefreshService {
     res: Response,
   ): Promise<void> {
     await this.revokeSession(session);
-    await this.recordSessionRevoked(session.user?.id, session.id);
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
@@ -119,23 +95,7 @@ export class RefreshService {
   }
 
   public async revokeAllSessions(userId: string, res: Response): Promise<void> {
-    const sessionIds = ((await this.findSessions(userId)) ?? []).map(
-      ({ id }) => id,
-    );
     await this.userRepo.revokeAllSessions(userId);
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: userId,
-      subjectType: 'user',
-      subjectId: userId,
-      resourceType: 'identity.user',
-      resourceId: userId,
-      source: 'http',
-      metadata: { session_ids: sessionIds },
-    });
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
@@ -143,11 +103,6 @@ export class RefreshService {
     userId: string,
     currentSessionId: string,
   ): Promise<void> {
-    const sessions = (await this.findSessions(userId)) ?? [];
-    const revokedIds = sessions
-      .filter(({ id }) => id !== currentSessionId)
-      .map(({ id }) => id);
-
     await this.userRepo.manager
       .createQueryBuilder()
       .update(UserSessionEntity)
@@ -157,23 +112,6 @@ export class RefreshService {
         currentSessionId,
       })
       .execute();
-
-    if (revokedIds.length > 0)
-      await this.auditSvc.record({
-        event:
-          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
-        domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
-        actorId: userId,
-        subjectType: 'user',
-        subjectId: userId,
-        resourceType: 'identity.user',
-        resourceId: userId,
-        sessionId: currentSessionId,
-        source: 'http',
-        metadata: { session_ids: revokedIds },
-      });
   }
 
   public async findSessions(userId: string): Promise<UserSessionEntity[]> {
@@ -203,27 +141,6 @@ export class RefreshService {
     if (!session) throw new NotFoundException('Session not found.');
 
     await this.revokeSession(session);
-    await this.recordSessionRevoked(userId, session.id);
-  }
-
-  private async recordSessionRevoked(
-    userId: string | undefined,
-    sessionId: string,
-  ): Promise<void> {
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: userId,
-      subjectType: 'user',
-      subjectId: userId,
-      resourceType: 'identity.session',
-      resourceId: sessionId,
-      sessionId,
-      source: 'http',
-      metadata: {},
-    });
   }
   private async createSession(
     user: UserEntity,

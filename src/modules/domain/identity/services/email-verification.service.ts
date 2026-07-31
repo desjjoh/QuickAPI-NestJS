@@ -7,26 +7,32 @@ import {
 import { minute } from '@/common/constants/milliseconds.constants';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 
-import { UserEntity, createUserMetadata } from '../entities/user.entity';
-import { AccountTokenService, CreatedAccountToken } from './token.service';
+import {
+  UserEntity,
+  createUserMetadata,
+} from '@/modules/domain/identity/entities/user.entity';
+import {
+  AccountTokenService,
+  CreatedAccountToken,
+} from '@/modules/domain/identity/services/token.service';
 import { AccountTokenType } from '@/config/token.config';
-import { UserService } from './user.service';
-import { AccountTokenEntity } from '../entities/account-token.entity';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { EmailVerificationTemplate } from '@/modules/system/email/templates/email-verification.template';
-import { UserRepository } from '../repositories/user.repository';
-import { ROLE_KEYS } from '../../library/seeders/role.seeder';
-import { RegistrationTokenMetadata } from '../entities/registration-token.entity';
-import { RegistrationTokenService } from './registration-token.service';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { RegistrationTokenMetadata } from '@/modules/domain/identity/entities/registration-token.entity';
+import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { createHash, randomInt } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { RegistrationVerificationTemplate } from '@/modules/system/email/templates/registration-verification.template';
 import { RegistrationSuccessTemplate } from '@/modules/system/email/templates/registration-success.template';
 import { EmailChangeSuccessTemplate } from '@/modules/system/email/templates/email-changed.template';
-import { UserSessionEntity } from '../entities/session.entity';
-import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
-import { RoleEntity } from '../../library/entities/role.entity';
-import { AuditService } from '../../audit/services/audit.service';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
+import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
