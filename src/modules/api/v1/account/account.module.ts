@@ -11,6 +11,8 @@ import { SessionsApiController } from './controllers/session.controller';
 import { SessionsApiService } from './services/sessions.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 import { AuditModule } from '@/modules/domain/audit/audit.module';
+import { ActivityApiController } from './controllers/activity.controller';
+import { ActivityApiService } from './services/activity.service';
 
 @Module({
   imports: [
@@ -21,7 +23,17 @@ import { AuditModule } from '@/modules/domain/audit/audit.module';
     EmailModule,
     AuditModule,
   ],
-  providers: [MeApiService, ProfileApiService, SessionsApiService],
-  controllers: [MeApiController, ProfileApiController, SessionsApiController],
+  providers: [
+    MeApiService,
+    ProfileApiService,
+    SessionsApiService,
+    ActivityApiService,
+  ],
+  controllers: [
+    MeApiController,
+    ProfileApiController,
+    SessionsApiController,
+    ActivityApiController,
+  ],
 })
 export class AccountApiModule {}

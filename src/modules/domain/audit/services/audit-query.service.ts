@@ -25,6 +25,25 @@ export class AuditQueryService {
     return this.repository.queryAudit(filters);
   }
 
+  public actorActivity(
+    actorType: string,
+    actorId: string,
+    filters: Pick<
+      AuditQuery,
+      'domain' | 'event' | 'outcome' | 'occurredFrom' | 'occurredTo'
+    >,
+    cursor: { occurredAt: Date; id: string } | undefined,
+    take: number,
+  ) {
+    return this.repository.queryActorActivity(
+      actorType,
+      actorId,
+      filters,
+      cursor,
+      take,
+    );
+  }
+
   public byActor(
     actorType: string,
     actorId: string | null,
