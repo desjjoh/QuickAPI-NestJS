@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  PaginationDto,
+  PaginationMeta,
+  PaginationOptions,
+} from '@/common/models/pagination.model';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditQuery } from '../models/audit-query.model';
@@ -8,9 +13,6 @@ import {
   AuditQueryResult,
 } from '../models/audit-query-result.model';
 
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
-
 @Injectable()
 export class AuditRepository extends Repository<AuditEventEntity> {
   public constructor(dataSource: DataSource) {
@@ -18,24 +20,24 @@ export class AuditRepository extends Repository<AuditEventEntity> {
   }
 
   public async queryAudit(query: AuditQuery): Promise<AuditQueryResult> {
-    const limit = query.limit ?? DEFAULT_LIMIT;
-    const offset = query.offset ?? 0;
-    this.validate(query, limit, offset);
+    const pageOptions = Object.assign(new PaginationOptions(), {
+      page: query.page ?? 1,
+      take: query.take ?? 25,
+    });
+    this.validate(query, pageOptions);
 
     const builder = this.createQueryBuilder('audit');
     this.applyFilters(builder, query);
     builder
       .orderBy('audit.occurred_at', 'DESC')
       .addOrderBy('audit.id', 'DESC')
-      .take(limit)
-      .skip(offset);
+      .take(pageOptions.take)
+      .skip(pageOptions.skip);
 
-    const [entities, total] = await builder.getManyAndCount();
-    return new AuditQueryResult(
+    const [entities, itemCount] = await builder.getManyAndCount();
+    return new PaginationDto(
       entities.map((entity) => new AuditEvent(entity)),
-      total,
-      limit,
-      offset,
+      new PaginationMeta({ pageOptions, itemCount }),
     );
   }
 
@@ -75,11 +77,15 @@ export class AuditRepository extends Repository<AuditEventEntity> {
       });
   }
 
-  private validate(query: AuditQuery, limit: number, offset: number): void {
-    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT)
-      throw new BadRequestException(`limit must be between 1 and ${MAX_LIMIT}`);
-    if (!Number.isInteger(offset) || offset < 0)
-      throw new BadRequestException('offset must be a non-negative integer');
+  private validate(query: AuditQuery, pageOptions: PaginationOptions): void {
+    if (!Number.isInteger(pageOptions.page) || pageOptions.page < 1)
+      throw new BadRequestException('page must be a positive integer');
+    if (
+      !Number.isInteger(pageOptions.take) ||
+      pageOptions.take < 1 ||
+      pageOptions.take > 100
+    )
+      throw new BadRequestException('take must be between 1 and 100');
     if (
       query.occurredFrom &&
       query.occurredTo &&

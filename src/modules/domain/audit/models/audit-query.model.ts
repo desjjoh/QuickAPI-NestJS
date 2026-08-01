@@ -15,6 +15,6 @@ export interface AuditQuery {
   readonly sessionId?: string;
   readonly occurredFrom?: Date;
   readonly occurredTo?: Date;
-  readonly limit?: number;
-  readonly offset?: number;
+  readonly page?: number;
+  readonly take?: number;
 }

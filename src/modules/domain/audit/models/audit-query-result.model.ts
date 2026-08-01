@@ -1,5 +1,6 @@
 import { BaseModel } from '@/common/models/base.model';
 import { AuditEventEntity } from '../entities/audit-event.entity';
+import { PaginationDto } from '@/common/models/pagination.model';
 
 type AuditData = Readonly<Record<string, unknown>>;
 
@@ -85,22 +86,4 @@ export class AuditEvent extends BaseModel {
   }
 }
 
-export class AuditQueryResult {
-  public readonly events: readonly AuditEvent[];
-  public readonly total: number;
-  public readonly limit: number;
-  public readonly offset: number;
-
-  public constructor(
-    events: readonly AuditEvent[],
-    total: number,
-    limit: number,
-    offset: number,
-  ) {
-    this.events = Object.freeze([...events]);
-    this.total = total;
-    this.limit = limit;
-    this.offset = offset;
-    Object.freeze(this);
-  }
-}
+export type AuditQueryResult = PaginationDto<AuditEvent>;
