@@ -152,10 +152,83 @@ describe('UserAdminService', () => {
         resourceId: 'user-1',
         operationId: 'operation-1',
         idempotencyId: 'operation-1',
-        after: user,
+        after: {
+          id: user.id,
+          status: { id: user.status.id },
+          roles: [],
+        },
       }),
       manager,
     );
+  });
+
+  it.each([
+    ['grants', [], ['role-1']],
+    ['removes', ['role-1'], []],
+    ['replaces', ['role-1', 'role-2'], ['role-2', 'role-3']],
+  ])(
+    'records ID-only snapshots when an administrator %s user roles',
+    async (_operation, beforeIds, afterIds) => {
+      const { repo, service, audit, manager } = setup();
+      const before = userFixture({
+        roles: beforeIds.map((id) => ({ id, key: id })),
+      });
+      const after = userFixture({
+        roles: afterIds.map((id) => ({ id, key: id })),
+      });
+      manager.findOneOrFail.mockResolvedValue(before);
+      repo.updateUserAdministration.mockResolvedValue(after);
+
+      await service.updateUser('user-1', { role_ids: afterIds });
+
+      expect(audit.record).toHaveBeenCalledTimes(1);
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          domain: 'identity',
+          event: 'identity.admin.user_updated',
+          actorType: 'admin',
+          subjectType: 'identity.user',
+          subjectId: 'user-1',
+          resourceType: 'identity.user',
+          resourceId: 'user-1',
+          before: expect.objectContaining({ roles: beforeIds }),
+          after: expect.objectContaining({ roles: afterIds }),
+        }),
+        manager,
+      );
+    },
+  );
+
+  it('keeps duplicate role inputs out of the audit snapshots', async () => {
+    const { repo, service, audit, manager } = setup();
+    manager.findOneOrFail.mockResolvedValue(userFixture({ roles: [] }));
+    repo.updateUserAdministration.mockResolvedValue(
+      userFixture({ roles: [{ id: 'role-1', key: 'role-1' }] }),
+    );
+
+    await service.updateUser('user-1', {
+      role_ids: ['role-1', 'role-1'],
+    });
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        after: expect.objectContaining({ roles: ['role-1'] }),
+      }),
+      manager,
+    );
+  });
+
+  it('rejects the role mutation transaction when its audit fails', async () => {
+    const { repo, service, audit, dataSource } = setup();
+    repo.updateUserAdministration.mockResolvedValue(
+      userFixture({ roles: [{ id: 'role-1', key: 'role-1' }] }),
+    );
+    audit.record.mockRejectedValue(new Error('audit unavailable'));
+
+    await expect(
+      service.updateUser('user-1', { role_ids: ['role-1'] }),
+    ).rejects.toThrow('audit unavailable');
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('propagates repository validation errors when updating a user', async () => {

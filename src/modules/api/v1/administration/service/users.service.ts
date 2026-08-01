@@ -59,7 +59,7 @@ export class UserAdminService {
           IdentityAuditEvents.ADMIN_USER_DELETED,
           id,
           operationId,
-          before,
+          this.auditSnapshot(before),
           null,
         ),
         manager,
@@ -88,8 +88,8 @@ export class UserAdminService {
           IdentityAuditEvents.ADMIN_USER_UPDATED,
           id,
           operationId,
-          before,
-          after,
+          this.auditSnapshot(before),
+          this.auditSnapshot(after),
         ),
         manager,
       );
@@ -126,8 +126,8 @@ export class UserAdminService {
     event: IdentityAuditEvents,
     id: string,
     operationId: string | null,
-    before: UserEntity,
-    after: UserEntity | null,
+    before: unknown,
+    after: unknown,
   ) {
     return {
       domain: 'identity',
@@ -144,7 +144,14 @@ export class UserAdminService {
       idempotencyId: operationId,
       before,
       after,
-      meaningfulWithoutChanges: true,
+    };
+  }
+
+  private auditSnapshot(user: UserEntity) {
+    return {
+      id: user.id,
+      status: { id: user.status.id },
+      roles: user.roles?.map(({ id }) => id) ?? [],
     };
   }
 }
