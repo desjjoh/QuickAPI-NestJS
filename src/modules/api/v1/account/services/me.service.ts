@@ -34,6 +34,7 @@ import {
   AuditEventDomain,
 } from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+import { DataSource } from 'typeorm';
 
 @Injectable()
 export class MeApiService {
@@ -44,6 +45,7 @@ export class MeApiService {
     private readonly emailSvc: EmailService,
     private readonly mfaSvc: MfaService,
     private readonly auditSvc: AuditService,
+    private readonly dataSource: DataSource,
   ) {}
 
   public async deleteMe(
@@ -53,19 +55,24 @@ export class MeApiService {
   ): Promise<void> {
     await this.userSvc.validateUser(user.identity.email, dto.password);
 
-    await this.userSvc.deleteUser(user, res);
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
+    await this.dataSource.transaction(async (manager) => {
+      await this.userSvc.deleteUser(user, res, manager);
+      await this.auditSvc.record(
+        {
+          event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
+          domain: AuditEventDomain.IDENTITY,
+          outcome: 'succeeded',
+          actorType: 'user',
+          actorId: user.id,
+          subjectType: 'user',
+          subjectId: user.id,
+          resourceType: 'identity.user',
+          resourceId: user.id,
+          source: 'http',
+          metadata: {},
+        },
+        manager,
+      );
     });
   }
 
@@ -90,6 +97,8 @@ export class MeApiService {
         resourceId: user.id,
         source: 'http',
         metadata: {},
+        before: { id: user.id },
+        after: { id: user.id, metadata: { mfa_enabled: false } },
       });
 
       return;
@@ -134,6 +143,8 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: 'http',
       metadata: {},
+      before: { id: user.id },
+      after: { id: user.id, metadata: { mfa_enabled: true } },
     });
   }
 
@@ -199,8 +210,8 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: 'http',
       metadata: {},
-      before: { id: updated.id, identity: { email: previousEmail } },
-      after: { id: updated.id, identity: { email: updated.identity.email } },
+      before: { id: updated.id },
+      after: { id: updated.id, identity: { email: true } },
     });
 
     return this.refreshSvc.issueTokens(updated, res, currentSession);

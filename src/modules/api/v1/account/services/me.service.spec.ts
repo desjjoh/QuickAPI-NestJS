@@ -61,6 +61,9 @@ describe('MeApiService', () => {
     const auditSvc = {
       record: jest.fn().mockResolvedValue({}),
     };
+    const dataSource = {
+      transaction: jest.fn((work) => work({ getRepository: jest.fn() })),
+    };
     return {
       service: new MeApiService(
         userSvc as unknown as UserService,
@@ -69,6 +72,7 @@ describe('MeApiService', () => {
         emailSvc as unknown as EmailService,
         mfaSvc as unknown as MfaService,
         auditSvc as never,
+        dataSource as never,
       ),
       userSvc,
       refreshSvc,
@@ -76,6 +80,7 @@ describe('MeApiService', () => {
       emailSvc,
       mfaSvc,
       auditSvc,
+      dataSource,
     };
   };
 
@@ -86,7 +91,11 @@ describe('MeApiService', () => {
       user.identity.email,
       'old',
     );
-    expect(userSvc.deleteUser).toHaveBeenCalledWith(user, res);
+    expect(userSvc.deleteUser).toHaveBeenCalledWith(
+      user,
+      res,
+      expect.any(Object),
+    );
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.account.deleted',
@@ -95,6 +104,27 @@ describe('MeApiService', () => {
         resourceType: 'identity.user',
         resourceId: user.id,
       }),
+      expect.any(Object),
+    );
+  });
+
+  it('does not commit deletion when the subject-preserving audit fails', async () => {
+    const { service, userSvc, auditSvc, dataSource } = setup();
+    auditSvc.record.mockRejectedValue(new Error('audit unavailable'));
+
+    await expect(
+      service.deleteMe(user, { password: 'old' }, res),
+    ).rejects.toThrow('audit unavailable');
+
+    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.deleteUser).toHaveBeenCalledTimes(1);
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.account.deleted',
+        subjectId: user.id,
+        resourceId: user.id,
+      }),
+      expect.any(Object),
     );
   });
 
@@ -236,8 +266,8 @@ describe('MeApiService', () => {
         event:
           AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
         sessionId: session.id,
-        before: { id: user.id, identity: { email: user.identity.email } },
-        after: { id: user.id, identity: { email: 'new@example.test' } },
+        before: { id: user.id },
+        after: { id: user.id, identity: { email: true } },
       }),
     );
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(updated, res, session);
@@ -305,5 +335,28 @@ describe('MeApiService', () => {
         after: { id: user.id, identity: { password: true } },
       }),
     );
+  });
+
+  it('passes changed facts to the catalog without leaking credential inputs', async () => {
+    const { service, evSvc, auditSvc } = setup();
+    const updated = userFixture({
+      id: user.id,
+      identity: { ...user.identity, email: 'new-secret@example.test' },
+    });
+    evSvc.verifyEmail.mockResolvedValue(updated);
+
+    await service.confirmEmail(
+      user,
+      session,
+      { challenge_id: 'private-challenge', code: '654321' },
+      res,
+    );
+
+    const serialized = JSON.stringify(auditSvc.record.mock.calls);
+    expect(serialized).toContain('"email":true');
+    expect(serialized).not.toContain(user.identity.email);
+    expect(serialized).not.toContain('new-secret@example.test');
+    expect(serialized).not.toContain('private-challenge');
+    expect(serialized).not.toContain('654321');
   });
 });

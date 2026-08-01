@@ -178,8 +178,13 @@ export class UserService {
     });
   }
 
-  public async deleteUser(user: UserEntity, res: Response): Promise<void> {
-    await this.userRepo.removeUser(user.id);
+  public async deleteUser(
+    user: UserEntity,
+    res: Response,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (manager) await this.userRepo.removeUser(user.id, manager);
+    else await this.userRepo.removeUser(user.id);
 
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }

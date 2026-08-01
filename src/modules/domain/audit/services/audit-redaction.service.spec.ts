@@ -114,7 +114,7 @@ describe(AuditRedactionService.name, () => {
 
     expect(snapshot).toEqual({
       id: 'user-1',
-      identity: { email: 'p***@example.test', password: '[CHANGED]' },
+      identity: { email: '[CHANGED]', password: '[CHANGED]' },
       metadata: { mfa_enabled: '[CHANGED]' },
     });
     expect(JSON.stringify(snapshot)).not.toContain('must-not-appear');

@@ -2,7 +2,6 @@ import {
   AuditPolicy,
   changedOnly,
   hashed,
-  maskedEmail,
   nestedObject,
   relationshipIds,
   scalar,
@@ -11,7 +10,7 @@ import {
 export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
   'identity.user': {
     id: scalar,
-    identity: nestedObject({ email: maskedEmail, password: changedOnly }),
+    identity: nestedObject({ email: changedOnly, password: changedOnly }),
     profile: nestedObject({
       id: scalar,
       name: nestedObject({ first: scalar, last: scalar }),

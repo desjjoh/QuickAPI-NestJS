@@ -175,4 +175,209 @@ describe('ProfileApiService audit mutations', () => {
     );
     expect(audit.record).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [
+      'country',
+      (service: ProfileApiService, user: ReturnType<typeof userFixture>) =>
+        service.updateCountry(user, session, { country_id: 'country-2' }),
+      IdentityAuditEvents.PROFILE_COUNTRY_CHANGED,
+      'country_id',
+      'country-2',
+    ],
+    [
+      'timezone',
+      (service: ProfileApiService, user: ReturnType<typeof userFixture>) =>
+        service.updateTimezone(user, session, { timezone_id: 'timezone-2' }),
+      IdentityAuditEvents.PROFILE_TIMEZONE_CHANGED,
+      'timezone_id',
+      'timezone-2',
+    ],
+  ])(
+    'records a %s update with the changed region value',
+    async (_label, update, event, field, value) => {
+      const current = userFixture();
+      const after = userFixture({
+        profile: {
+          ...current.profile,
+          region: {
+            country:
+              field === 'country_id'
+                ? { id: value }
+                : current.profile.region.country,
+            timezone:
+              field === 'timezone_id'
+                ? { id: value }
+                : current.profile.region.timezone,
+          },
+        },
+      });
+      const { service, audit, manager } = setup(current, after);
+
+      await update(service, current);
+
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event,
+          before: expect.objectContaining({ [field]: expect.any(String) }),
+          after: expect.objectContaining({ [field]: value }),
+        }),
+        manager,
+      );
+    },
+  );
+
+  it.each([false, true])(
+    '%s existing avatar selects the correct image mutation and audit event',
+    async (hasAvatar) => {
+      const base = userFixture();
+      const existing = hasAvatar
+        ? {
+            id: 'avatar-old',
+            storage_key: 'avatars/old.png',
+            filename: 'old.png',
+            mime_type: 'image/png',
+            size_bytes: 100,
+            width: 10,
+            height: 10,
+          }
+        : null;
+      const current = userFixture({
+        profile: {
+          ...base.profile,
+          media: { ...base.profile.media, avatar: existing },
+        },
+      });
+      const image = {
+        id: 'avatar-new',
+        storage_key: 'avatars/new.png',
+        filename: 'new.png',
+        mime_type: 'image/png',
+        size_bytes: 200,
+        width: 20,
+        height: 20,
+      };
+      const after = userFixture({
+        profile: {
+          ...current.profile,
+          media: { ...current.profile.media, avatar: image },
+        },
+      });
+      const { service, imgSvc, audit, manager } = setup(current, after);
+      imgSvc.create.mockResolvedValue(image);
+      imgSvc.update.mockResolvedValue(image);
+      const file = { originalname: 'new.png' } as Express.Multer.File;
+
+      await service.uploadAvatar(current, session, file);
+
+      expect(hasAvatar ? imgSvc.update : imgSvc.create).toHaveBeenCalled();
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: hasAvatar
+            ? IdentityAuditEvents.PROFILE_AVATAR_REPLACED
+            : IdentityAuditEvents.PROFILE_AVATAR_ASSIGNED,
+          before: hasAvatar
+            ? expect.objectContaining({ id: 'avatar-old' })
+            : null,
+          after: expect.objectContaining({ id: 'avatar-new' }),
+        }),
+        manager,
+      );
+    },
+  );
+
+  it('creates an address without an optional second line', async () => {
+    const current = userFixture();
+    const address = {
+      id: 'address-new',
+      address_line_1: '2 Main',
+      address_line_2: null,
+      city: 'Toronto',
+      region: { id: 'region-2' },
+      postal_code: 'M5V1A1',
+      country: { id: 'country-2' },
+    };
+    const after = userFixture({
+      profile: {
+        ...current.profile,
+        contact: { ...current.profile.contact, address },
+      },
+    });
+    const { service, userSvc, audit, manager } = setup(current, after);
+
+    await service.updateAddress(current, session, {
+      address_line_1: address.address_line_1,
+      city: address.city,
+      region_id: address.region.id,
+      postal_code: address.postal_code,
+      country_id: address.country.id,
+    });
+
+    expect(userSvc.updateUser).toHaveBeenCalledWith(
+      current,
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          contact: expect.objectContaining({
+            address: expect.objectContaining({ address_line_2: null }),
+          }),
+        }),
+      }),
+      {},
+      manager,
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: IdentityAuditEvents.PROFILE_ADDRESS_CREATED,
+        before: null,
+      }),
+      manager,
+    );
+  });
+
+  it('rejects an address whose region does not belong to its country', async () => {
+    const current = userFixture();
+    const { service, regionRepo, dataSource } = setup(current);
+    regionRepo.findByIdAndCountry.mockResolvedValue(null);
+
+    await expect(
+      service.updateAddress(current, session, {
+        address_line_1: '2 Main',
+        address_line_2: 'Unit 1',
+        city: 'Toronto',
+        region_id: 'region-2',
+        postal_code: 'M5V1A1',
+        country_id: 'country-2',
+      }),
+    ).rejects.toThrow('Region must belong to the selected country.');
+    expect(dataSource.transaction).not.toHaveBeenCalled();
+  });
+
+  it('removes an existing phone and records its safe document', async () => {
+    const base = userFixture();
+    const phone = {
+      id: 'phone-1',
+      country: { id: 'country-1' },
+      phone_calling_code: '+1',
+      phone_national_number: '6135550100',
+      phone_e164: '+16135550100',
+    };
+    const current = userFixture({
+      profile: {
+        ...base.profile,
+        contact: { ...base.profile.contact, phone },
+      },
+    });
+    const { service, userSvc, audit, manager } = setup(current);
+
+    await service.removePhone(current, session);
+
+    expect(userSvc.deletePhone).toHaveBeenCalledWith(phone, manager);
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: IdentityAuditEvents.PROFILE_PHONE_REMOVED,
+        before: expect.objectContaining({ id: phone.id }),
+      }),
+      manager,
+    );
+  });
 });
