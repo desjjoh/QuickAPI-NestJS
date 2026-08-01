@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 
 import { AuditQuery } from '../models/audit-query.model';
-import { AuditQueryResult } from '../models/audit-query-result.model';
+import {
+  AuditEvent,
+  AuditQueryResult,
+} from '../models/audit-query-result.model';
 import { AuditRepository } from '../repositories/audit.repository';
 import {
   AuditResourceType,
@@ -27,6 +30,10 @@ export class AuditQueryService {
 
   public query(filters: AuditQuery): Promise<AuditQueryResult> {
     return this.repository.queryAudit(filters);
+  }
+
+  public findById(id: string): Promise<AuditEvent | null> {
+    return this.repository.findAuditById(id);
   }
 
   public actorActivity(

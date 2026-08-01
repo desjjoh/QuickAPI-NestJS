@@ -39,7 +39,8 @@ export class ActivityApiController {
   })
   @ApiOkResponse({ type: AccountActivityPageDto })
   @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT]
+      .READ_CURRENT_USER_ACTIVITY,
   )
   public findAll(
     @CurrentUser() user: UserEntity,

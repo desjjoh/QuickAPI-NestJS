@@ -380,7 +380,9 @@ describe('user administration authorization and lifecycle', () => {
     const ordinaryReader = await register('activity-reader@example.test');
     const target = await register('activity-target@example.test');
     const other = await register('activity-other@example.test');
-    await grant(auditor, 'e2e-activity-auditor', ['read_user_activity']);
+    await grant(auditor, 'e2e-activity-auditor', [
+      'read_administration_user_activity',
+    ]);
     await grant(ordinaryReader, 'e2e-ordinary-reader', ['read_users']);
     await suite.dataSource.getRepository(UserSessionEntity).clear();
 
@@ -457,7 +459,7 @@ describe('user administration authorization and lifecycle', () => {
     const auditor = await register('activity-delete-auditor@example.test');
     const target = await register('activity-delete-target@example.test');
     await grant(auditor, 'e2e-activity-delete-auditor', [
-      'read_user_activity',
+      'read_administration_user_activity',
       'delete_users',
     ]);
     await suite.dataSource.getRepository(UserSessionEntity).clear();

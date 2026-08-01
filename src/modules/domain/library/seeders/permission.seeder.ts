@@ -1,5 +1,6 @@
 import {
   AccountManagementPermissions,
+  AuditPermissions,
   SystemPermissions,
   UserAdministrationPermissions,
 } from '@/config/permissions.config';
@@ -37,6 +38,11 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
     label: 'Delete account',
     description: 'Allows the user to delete or deactivate their own account.',
   },
+  {
+    key: String(AccountManagementPermissions.READ_CURRENT_USER_ACTIVITY),
+    label: 'Read current-user activity',
+    description: 'Allows a user to view only their own retained activity.',
+  },
 
   // USER ADMINISTRATION
   {
@@ -60,10 +66,29 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
     description: 'Allows removal or deactivation of user accounts.',
   },
   {
-    key: String(UserAdministrationPermissions.READ_USER_ACTIVITY),
-    label: 'Read user activity',
+    key: String(
+      UserAdministrationPermissions.READ_ADMINISTRATION_USER_ACTIVITY,
+    ),
+    label: 'Read administration user activity',
     description:
       'Allows viewing retained audit and security activity for user accounts.',
+  },
+
+  // AUDIT ADMINISTRATION
+  {
+    key: String(AuditPermissions.SEARCH_AUDIT),
+    label: 'Search audit records',
+    description: 'Allows generic searches across retained audit records.',
+  },
+  {
+    key: String(AuditPermissions.READ_AUDIT_DETAIL),
+    label: 'Read audit detail',
+    description: 'Allows viewing an individual approved audit response.',
+  },
+  {
+    key: String(AuditPermissions.EXPORT_AUDIT),
+    label: 'Export audit records',
+    description: 'Reserved for a separately authorized future audit export.',
   },
 ];
 

@@ -19,6 +19,11 @@ export class AuditRepository extends Repository<AuditEventEntity> {
     super(AuditEventEntity, dataSource.createEntityManager());
   }
 
+  public async findAuditById(id: string): Promise<AuditEvent | null> {
+    const entity = await this.findOneBy({ id });
+    return entity ? new AuditEvent(entity) : null;
+  }
+
   public async queryAudit(query: AuditQuery): Promise<AuditQueryResult> {
     const pageOptions = Object.assign(new PaginationOptions(), {
       page: query.page ?? 1,

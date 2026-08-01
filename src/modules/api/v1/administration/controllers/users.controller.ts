@@ -122,7 +122,8 @@ export class UserAdministrationController {
   })
   @ApiOkResponse({ type: UserActivityPageDto })
   @Permissions(
-    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].READ_USER_ACTIVITY,
+    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION]
+      .READ_ADMINISTRATION_USER_ACTIVITY,
   )
   @EntityIdParam
   public getUserActivity(

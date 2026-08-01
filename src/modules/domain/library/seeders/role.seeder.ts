@@ -1,5 +1,6 @@
 import {
   AccountManagementPermissions,
+  AuditPermissions,
   SystemPermissions,
   UserAdministrationPermissions,
 } from '@/config/permissions.config';
@@ -37,16 +38,20 @@ export const ROLES_SEED: RoleSeed[] = [
     label: 'Administrator',
     description:
       'Administrative access to manage users and inspect retained user activity.',
-    permissions: Object.values(UserAdministrationPermissions),
+    permissions: [
+      ...Object.values(UserAdministrationPermissions),
+      AuditPermissions.SEARCH_AUDIT,
+      AuditPermissions.READ_AUDIT_DETAIL,
+    ],
   },
   {
     key: ROLE_KEYS.USER,
     label: 'User',
     description: 'Default role assigned to active user accounts.',
-
     permissions: [
       AccountManagementPermissions.UPDATE_ACCOUNT,
       AccountManagementPermissions.DELETE_ACCOUNT,
+      AccountManagementPermissions.READ_CURRENT_USER_ACTIVITY,
     ],
   },
 ];
