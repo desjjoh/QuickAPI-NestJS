@@ -4,6 +4,9 @@ import { Column, Entity, Index } from 'typeorm';
 type RedactedAuditData = Record<string, unknown>;
 
 @Entity('activity_audits')
+@Index('IDX_activity_audits_domain', ['domain'])
+@Index('IDX_activity_audits_event', ['event'])
+@Index('IDX_activity_audits_outcome', ['outcome'])
 @Index('IDX_activity_audits_actor_time', [
   'actor_type',
   'actor_id',
