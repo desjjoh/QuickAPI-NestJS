@@ -1,3 +1,4 @@
+import { BaseModel } from '@/common/models/base.model';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 
 type AuditData = Readonly<Record<string, unknown>>;
@@ -15,14 +16,12 @@ function deepFreeze(value: unknown): unknown {
     for (const child of Object.values(value)) deepFreeze(child);
     Object.freeze(value);
   }
+
   return value;
 }
 
 /** A persistence-independent, immutable representation of an audit event. */
-export class AuditEvent {
-  public readonly id: string;
-  public readonly createdAt: Date;
-  public readonly updatedAt: Date;
+export class AuditEvent extends BaseModel {
   public readonly domain: string;
   public readonly event: string;
   public readonly outcome: string;
@@ -51,9 +50,8 @@ export class AuditEvent {
   public readonly error: AuditData | null;
 
   public constructor(entity: AuditEventEntity) {
-    this.id = entity.id;
-    this.createdAt = new Date(entity.createdAt);
-    this.updatedAt = new Date(entity.updatedAt);
+    super(entity);
+
     this.domain = entity.domain;
     this.event = entity.event;
     this.outcome = entity.outcome;
