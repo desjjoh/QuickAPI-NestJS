@@ -210,7 +210,7 @@ describe('UserAdminService', () => {
           event: 'identity.admin.user_updated',
           actorType: 'admin',
           actorId: 'administrator-1',
-          subjectType: 'identity.user',
+          subjectType: 'user',
           subjectId: 'user-1',
           resourceType: 'identity.user',
           resourceId: 'user-1',
@@ -255,7 +255,7 @@ describe('UserAdminService', () => {
     expect(input).toMatchObject({
       actorType: 'admin',
       actorId: 'administrator-1',
-      subjectType: 'identity.user',
+      subjectType: 'user',
       subjectId: 'affected-user',
       resourceType: 'identity.user',
       resourceId: 'affected-user',

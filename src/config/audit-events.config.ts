@@ -2,6 +2,24 @@ export enum AuditEventDomain {
   IDENTITY = 'identity',
 }
 
+/** Stable aggregate keys used for audit subjects and API filtering. */
+export enum AuditSubjectType {
+  USER = 'user',
+}
+
+/** Stable, collision-resistant keys for objects affected by audit events. */
+export enum AuditResourceType {
+  IDENTITY_USER = 'identity.user',
+  IDENTITY_PROFILE = 'identity.profile',
+  IDENTITY_PHONE = 'identity.phone',
+  IDENTITY_ADDRESS = 'identity.address',
+  IDENTITY_IMAGE = 'identity.image',
+  IDENTITY_SESSION = 'identity.session',
+  IDENTITY_ROLE = 'identity.role',
+  IDENTITY_ACCOUNT_STATUS = 'identity.account_status',
+  MEDIA_IMAGE = 'media.image',
+}
+
 export enum IdentityAuditEvents {
   REGISTRATION_VERIFICATION_SUCCEEDED = 'identity.registration.verification_succeeded',
   SIGN_IN_SUCCEEDED = 'identity.sign_in.succeeded',

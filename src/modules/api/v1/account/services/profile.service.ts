@@ -1,3 +1,7 @@
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager } from 'typeorm';
 
@@ -65,7 +69,7 @@ export class ProfileApiService {
       await this.record(
         manager,
         IdentityAuditEvents.PROFILE_NAME_CHANGED,
-        'identity.profile',
+        AuditResourceType.IDENTITY_PROFILE,
         current.profile.id,
         this.profileName(current),
         this.profileName(after),
@@ -74,7 +78,7 @@ export class ProfileApiService {
       await this.record(
         manager,
         IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
-        'identity.profile',
+        AuditResourceType.IDENTITY_PROFILE,
         current.profile.id,
         this.profilePersonal(current),
         this.profilePersonal(after),
@@ -142,7 +146,7 @@ export class ProfileApiService {
         existing
           ? IdentityAuditEvents.PROFILE_AVATAR_REPLACED
           : IdentityAuditEvents.PROFILE_AVATAR_ASSIGNED,
-        'identity.image',
+        AuditResourceType.IDENTITY_IMAGE,
         image.id,
         this.imageDocument(existing),
         this.imageDocument(image),
@@ -170,7 +174,7 @@ export class ProfileApiService {
       await this.record(
         manager,
         IdentityAuditEvents.PROFILE_AVATAR_REMOVED,
-        'identity.image',
+        AuditResourceType.IDENTITY_IMAGE,
         avatar.id,
         this.imageDocument(avatar),
         null,
@@ -217,7 +221,7 @@ export class ProfileApiService {
         address
           ? IdentityAuditEvents.PROFILE_ADDRESS_UPDATED
           : IdentityAuditEvents.PROFILE_ADDRESS_CREATED,
-        'identity.address',
+        AuditResourceType.IDENTITY_ADDRESS,
         result.id,
         this.addressDocument(address),
         this.addressDocument(result),
@@ -258,7 +262,7 @@ export class ProfileApiService {
         phone
           ? IdentityAuditEvents.PROFILE_PHONE_UPDATED
           : IdentityAuditEvents.PROFILE_PHONE_CREATED,
-        'identity.phone',
+        AuditResourceType.IDENTITY_PHONE,
         result.id,
         this.phoneDocument(phone),
         this.phoneDocument(result),
@@ -299,7 +303,7 @@ export class ProfileApiService {
       await this.record(
         manager,
         event,
-        'identity.profile',
+        AuditResourceType.IDENTITY_PROFILE,
         current.profile.id,
         { id: current.profile.id, [field]: value(current) },
         { id: after.profile.id, [field]: value(after) },
@@ -335,7 +339,9 @@ export class ProfileApiService {
         kind === 'address'
           ? IdentityAuditEvents.PROFILE_ADDRESS_REMOVED
           : IdentityAuditEvents.PROFILE_PHONE_REMOVED,
-        `identity.${kind}`,
+        kind === 'address'
+          ? AuditResourceType.IDENTITY_ADDRESS
+          : AuditResourceType.IDENTITY_PHONE,
         contact.id,
         kind === 'address'
           ? this.addressDocument(contact as UserAddressEntity)
@@ -361,7 +367,7 @@ export class ProfileApiService {
   private record(
     manager: EntityManager,
     event: IdentityAuditEvents,
-    resourceType: string,
+    resourceType: AuditResourceType,
     resourceId: string,
     before: unknown,
     after: unknown,
@@ -375,7 +381,7 @@ export class ProfileApiService {
         outcome: 'succeeded',
         actorType: 'user',
         actorId: userId,
-        subjectType: 'identity.user',
+        subjectType: AuditSubjectType.USER,
         subjectId: userId,
         resourceType,
         resourceId,

@@ -59,6 +59,12 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
     label: 'Delete users',
     description: 'Allows removal or deactivation of user accounts.',
   },
+  {
+    key: String(UserAdministrationPermissions.READ_USER_ACTIVITY),
+    label: 'Read user activity',
+    description:
+      'Allows viewing retained audit and security activity for user accounts.',
+  },
 ];
 
 export class PermissionSeeder implements Seeder {

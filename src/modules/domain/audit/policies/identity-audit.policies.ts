@@ -6,9 +6,10 @@ import {
   relationshipIds,
   scalar,
 } from '../types/audit-policy.types';
+import { AuditResourceType } from '@/config/audit-events.config';
 
 export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
-  'identity.user': {
+  [AuditResourceType.IDENTITY_USER]: {
     id: scalar,
     identity: nestedObject({ email: changedOnly, password: changedOnly }),
     profile: nestedObject({
@@ -23,7 +24,7 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     deleted_at: scalar,
     metadata: nestedObject({ mfa_enabled: changedOnly }),
   },
-  'identity.profile': {
+  [AuditResourceType.IDENTITY_PROFILE]: {
     id: scalar,
     name: nestedObject({ first: scalar, last: scalar, preferred: scalar }),
     first_name: scalar,
@@ -36,14 +37,14 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     avatar_id: scalar,
     date_of_birth: changedOnly,
   },
-  'identity.phone': {
+  [AuditResourceType.IDENTITY_PHONE]: {
     id: scalar,
     country_id: changedOnly,
     calling_code: changedOnly,
     national_number: changedOnly,
     e164: changedOnly,
   },
-  'identity.address': {
+  [AuditResourceType.IDENTITY_ADDRESS]: {
     id: scalar,
     address_line_1: changedOnly,
     address_line_2: changedOnly,
@@ -52,7 +53,7 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     postal_code: changedOnly,
     country_id: changedOnly,
   },
-  'identity.image': {
+  [AuditResourceType.IDENTITY_IMAGE]: {
     id: scalar,
     filename: scalar,
     mime_type: scalar,
@@ -60,7 +61,7 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     width: scalar,
     height: scalar,
   },
-  'identity.session': {
+  [AuditResourceType.IDENTITY_SESSION]: {
     id: scalar,
     user_id: scalar,
     active: scalar,
@@ -70,6 +71,14 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     expires_at: scalar,
     revoked_at: scalar,
   },
-  'identity.role': { id: scalar, name: scalar, active: scalar },
-  'identity.account_status': { id: scalar, name: scalar, active: scalar },
+  [AuditResourceType.IDENTITY_ROLE]: {
+    id: scalar,
+    name: scalar,
+    active: scalar,
+  },
+  [AuditResourceType.IDENTITY_ACCOUNT_STATUS]: {
+    id: scalar,
+    name: scalar,
+    active: scalar,
+  },
 };

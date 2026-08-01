@@ -1,6 +1,7 @@
 import {
   AccountManagementPermissions,
   SystemPermissions,
+  UserAdministrationPermissions,
 } from '@/config/permissions.config';
 import { PermissionEntity } from '../entities/permission.entity';
 import { RoleEntity } from '../entities/role.entity';
@@ -12,6 +13,7 @@ import {
 
 export enum ROLE_KEYS {
   USER = 'user',
+  ADMINISTRATOR = 'administrator',
   SYSTEM_ADMINISTRATOR = 'system-administrator',
 }
 
@@ -29,6 +31,13 @@ export const ROLES_SEED: RoleSeed[] = [
     description:
       'Full system access. Bypasses all permission checks through override capability.',
     permissions: [SystemPermissions.HAS_ALL_PERMISSIONS],
+  },
+  {
+    key: ROLE_KEYS.ADMINISTRATOR,
+    label: 'Administrator',
+    description:
+      'Administrative access to manage users and inspect retained user activity.',
+    permissions: Object.values(UserAdministrationPermissions),
   },
   {
     key: ROLE_KEYS.USER,

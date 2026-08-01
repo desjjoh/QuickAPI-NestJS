@@ -1,3 +1,7 @@
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 import { Injectable } from '@nestjs/common';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { Response } from 'express';
@@ -40,9 +44,9 @@ export class SessionsApiService {
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
-      resourceType: 'identity.session',
+      resourceType: AuditResourceType.IDENTITY_SESSION,
       resourceId: sessionId,
       sessionId,
       source: 'http',
@@ -61,9 +65,9 @@ export class SessionsApiService {
       outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
       metadata: { session_ids: sessionIds },

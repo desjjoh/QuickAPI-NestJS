@@ -1,8 +1,12 @@
+import {
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
-import { AuditEventDomain } from '@/config/audit-events.config';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditService } from './audit.service';
 import { AuditRedactionService } from './audit-redaction.service';
@@ -22,7 +26,7 @@ describe(AuditService.name, () => {
     outcome: 'succeeded' as const,
     actorType: 'user' as const,
     actorId: 'user-1',
-    subjectType: 'user',
+    subjectType: AuditSubjectType.USER,
     subjectId: 'user-1',
     source: 'http' as const,
     metadata: { reason: 'interactive', ignored: 'not retained' },
@@ -65,29 +69,23 @@ describe(AuditService.name, () => {
     expect(repository.insert).toHaveBeenCalledWith(result);
   });
 
-  it('allows an unregistered resource type on events without snapshots', async () => {
-    await service.record({
-      ...activity,
-      event: 'identity.external_resource.observed',
-      resourceType: 'future.external_resource',
-      resourceId: 'external-1',
-    });
-
-    expect(repository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        resource_type: 'future.external_resource',
-        resource_id: 'external-1',
-        before: null,
-        after: null,
+  it('rejects an unenumerated resource type even without snapshots', () => {
+    expect(() =>
+      service.record({
+        ...activity,
+        event: 'identity.external_resource.observed',
+        resourceType: 'future.external_resource' as never,
+        resourceId: 'external-1',
       }),
-    );
+    ).toThrow('resourceType is invalid');
+    expect(repository.create).not.toHaveBeenCalled();
   });
 
   it('records a semantic event with safe snapshots and field-level changes', async () => {
     const result = await service.record({
       ...activity,
       event: 'identity.profile.updated',
-      resourceType: 'identity.profile',
+      resourceType: AuditResourceType.IDENTITY_PROFILE,
       resourceId: 'profile-1',
       before: { name: { first: 'Old' }, phone: '111', password: 'secret' },
       after: { name: { first: 'New' }, phone: '222', password: 'changed' },
@@ -128,7 +126,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.user.updated',
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: 'user-1',
       metadata: {
         password: secrets[0],
@@ -195,7 +193,7 @@ describe(AuditService.name, () => {
     const result = await service.record({
       ...activity,
       event: 'identity.user.roles_changed',
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: 'user-1',
       before: { id: 'user-1', roles: ['role-2', 'role-1'] },
       after: { id: 'user-1', roles: ['role-1', 'role-2'] },
@@ -210,7 +208,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.profile.reviewed',
-      resourceType: 'identity.profile',
+      resourceType: AuditResourceType.IDENTITY_PROFILE,
       resourceId: 'profile-1',
       before: { name: { first: 'Same' } },
       after: { name: { first: 'Same' } },
@@ -242,7 +240,7 @@ describe(AuditService.name, () => {
         before: {},
         after: {},
       }),
-    ).toThrow('resourceType has no registered snapshot policy');
+    ).toThrow('resourceType is invalid');
   });
 
   it.each([
@@ -268,6 +266,16 @@ describe(AuditService.name, () => {
   ])('rejects %s', (_name, override) => {
     expect(() => service.record({ ...activity, ...override } as never)).toThrow(
       BadRequestException,
+    );
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['subjectType', { subjectType: 'identity.user' }],
+    ['resourceType', { resourceType: 'user' }],
+  ])('rejects an unenumerated %s', (name, override) => {
+    expect(() => service.record({ ...activity, ...override } as never)).toThrow(
+      `${name} is invalid`,
     );
     expect(repository.insert).not.toHaveBeenCalled();
   });
@@ -353,7 +361,7 @@ describe(AuditService.name, () => {
           ...activity,
           actorType: 'service',
           actorId: null,
-          subjectType: 'user',
+          subjectType: AuditSubjectType.USER,
           subjectId: 'represented-user',
           source: 'service',
         }),
@@ -374,7 +382,7 @@ describe(AuditService.name, () => {
     await service.record({
       ...activity,
       event: 'identity.user.roles_changed',
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: 'user-1',
       before: { roles: [{ id: 'role-b' }, { id: 'role-a' }] },
       after: { roles: ['role-c', 'role-a', 'role-c'] },

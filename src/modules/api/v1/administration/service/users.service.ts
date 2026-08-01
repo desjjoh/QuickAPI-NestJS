@@ -1,3 +1,7 @@
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
@@ -143,9 +147,9 @@ export class UserAdminService {
       outcome: 'succeeded' as const,
       actorType: 'admin' as const,
       actorId,
-      subjectType: 'identity.user',
+      subjectType: AuditSubjectType.USER,
       subjectId: id,
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: id,
       source: 'http' as const,
       metadata: {

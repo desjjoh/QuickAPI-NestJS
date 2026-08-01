@@ -22,6 +22,7 @@ export enum UserAdministrationPermissions {
   READ_USERS = 'read_users',
   UPDATE_USERS = 'update_users',
   DELETE_USERS = 'delete_users',
+  READ_USER_ACTIVITY = 'read_user_activity',
 }
 
 export type PermissionsKey =

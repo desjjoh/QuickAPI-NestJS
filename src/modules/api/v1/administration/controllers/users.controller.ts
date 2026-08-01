@@ -37,6 +37,11 @@ import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
 import { AdministrationActionDto } from '../models/administration-action.model';
+import { UserActivityAdminService } from '../service/user-activity.service';
+import {
+  UserActivityPageDto,
+  UserActivityQueryDto,
+} from '../models/user-activity.model';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
@@ -44,7 +49,10 @@ import { AdministrationActionDto } from '../models/administration-action.model';
 @Controller('users')
 @Throttle({ default: throttlePolicies.administrationRead })
 export class UserAdministrationController {
-  public constructor(private readonly svc: UserAdminService) {}
+  public constructor(
+    private readonly svc: UserAdminService,
+    private readonly activity: UserActivityAdminService,
+  ) {}
 
   // GET /
   @Get('')
@@ -103,6 +111,25 @@ export class UserAdministrationController {
     @Param('id', NanoIdParamPipe) id: string,
   ): Promise<UserDto> {
     return this.svc.findUser(id);
+  }
+
+  // GET /:id/activity
+  @Get(':id/activity')
+  @ApiOperation({
+    summary: 'List retained activity for a user',
+    description:
+      'Returns a paginated audit history whose subject is the selected user. This works after the user record has been deleted.',
+  })
+  @ApiOkResponse({ type: UserActivityPageDto })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].READ_USER_ACTIVITY,
+  )
+  @EntityIdParam
+  public getUserActivity(
+    @Param('id', NanoIdParamPipe) id: string,
+    @Query() query: UserActivityQueryDto,
+  ): Promise<UserActivityPageDto> {
+    return this.activity.findForUser(id, query);
   }
 
   // POST /:id/delete

@@ -1,3 +1,4 @@
+import { AuditSubjectType } from '@/config/audit-events.config';
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
@@ -372,5 +373,164 @@ describe('user administration authorization and lifecycle', () => {
         operation_id: 'retry-operation',
       }),
     ).toBe(1);
+  });
+
+  it('requires the dedicated permission and returns only activity for the route subject', async () => {
+    const auditor = await register('activity-auditor@example.test');
+    const ordinaryReader = await register('activity-reader@example.test');
+    const target = await register('activity-target@example.test');
+    const other = await register('activity-other@example.test');
+    await grant(auditor, 'e2e-activity-auditor', ['read_user_activity']);
+    await grant(ordinaryReader, 'e2e-ordinary-reader', ['read_users']);
+    await suite.dataSource.getRepository(UserSessionEntity).clear();
+
+    await request(app.getHttpServer())
+      .get(`${ROOT}/${target.id}/activity`)
+      .set(await signIn('activity-reader@example.test'))
+      .expect(403);
+
+    const audit = app.get(AuditService);
+    await audit.record({
+      domain: 'identity',
+      event: IdentityAuditEvents.PASSWORD_CHANGED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: target.id,
+      subjectType: AuditSubjectType.USER,
+      subjectId: target.id,
+      source: 'service',
+      metadata: {},
+      occurredAt: new Date('2026-04-03T00:00:00.000Z'),
+    });
+    await audit.record({
+      domain: 'identity',
+      event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+      outcome: 'denied',
+      actorType: 'admin',
+      actorId: auditor.id,
+      subjectType: AuditSubjectType.USER,
+      subjectId: target.id,
+      source: 'service',
+      metadata: {},
+      occurredAt: new Date('2026-04-02T00:00:00.000Z'),
+    });
+    await audit.record({
+      domain: 'identity',
+      event: IdentityAuditEvents.SESSION_REVOKED,
+      outcome: 'succeeded',
+      actorType: 'user',
+      actorId: other.id,
+      subjectType: AuditSubjectType.USER,
+      subjectId: other.id,
+      source: 'service',
+      metadata: {},
+      occurredAt: new Date('2026-04-01T00:00:00.000Z'),
+    });
+
+    const response = await request(app.getHttpServer())
+      .get(`${ROOT}/${target.id}/activity?outcome=denied&actor=${auditor.id}`)
+      .set(await signIn('activity-auditor@example.test'))
+      .expect(200);
+    expect(response.body).toEqual({
+      data: [
+        expect.objectContaining({
+          event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+          actorType: 'admin',
+          actorId: auditor.id,
+          subjectType: AuditSubjectType.USER,
+          subjectId: target.id,
+          outcome: 'denied',
+        }),
+      ],
+      meta: {
+        page: 1,
+        take: 25,
+        itemCount: 1,
+        pageCount: 1,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
+    });
+  });
+
+  it('page-paginates a date-filtered user history and retains deletion activity', async () => {
+    const auditor = await register('activity-delete-auditor@example.test');
+    const target = await register('activity-delete-target@example.test');
+    await grant(auditor, 'e2e-activity-delete-auditor', [
+      'read_user_activity',
+      'delete_users',
+    ]);
+    await suite.dataSource.getRepository(UserSessionEntity).clear();
+    const auth = await signIn('activity-delete-auditor@example.test');
+    const audit = app.get(AuditService);
+    for (const [event, occurredAt] of [
+      [IdentityAuditEvents.MFA_ENABLED, '2026-05-03T00:00:00.000Z'],
+      [IdentityAuditEvents.PASSWORD_CHANGED, '2026-05-02T00:00:00.000Z'],
+    ] as const)
+      await audit.record({
+        domain: 'identity',
+        event,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorId: target.id,
+        subjectType: AuditSubjectType.USER,
+        subjectId: target.id,
+        source: 'service',
+        metadata: {},
+        occurredAt: new Date(occurredAt),
+      });
+
+    const first = await request(app.getHttpServer())
+      .get(
+        `${ROOT}/${target.id}/activity?take=1&occurredFrom=2026-05-01T00:00:00.000Z&occurredTo=2026-05-04T00:00:00.000Z`,
+      )
+      .set(auth)
+      .expect(200);
+    expect(first.body.data).toHaveLength(1);
+    expect(first.body.meta).toEqual({
+      page: 1,
+      take: 1,
+      itemCount: 2,
+      pageCount: 2,
+      hasPreviousPage: false,
+      hasNextPage: true,
+    });
+    const second = await request(app.getHttpServer())
+      .get(
+        `${ROOT}/${target.id}/activity?page=2&take=1&occurredFrom=2026-05-01T00:00:00.000Z&occurredTo=2026-05-04T00:00:00.000Z`,
+      )
+      .set(auth)
+      .expect(200);
+    expect(second.body.data).toHaveLength(1);
+    expect(second.body.data[0].id).not.toBe(first.body.data[0].id);
+    expect(second.body.meta).toEqual({
+      page: 2,
+      take: 1,
+      itemCount: 2,
+      pageCount: 2,
+      hasPreviousPage: true,
+      hasNextPage: false,
+    });
+
+    await request(app.getHttpServer())
+      .post(`${ROOT}/${target.id}/delete`)
+      .set(auth)
+      .send({ reason_code: 'user_request' })
+      .expect(204);
+    await expect(
+      suite.dataSource.getRepository(UserEntity).findOneBy({ id: target.id }),
+    ).resolves.toBeNull();
+    const retained = await request(app.getHttpServer())
+      .get(
+        `${ROOT}/${target.id}/activity?event=${IdentityAuditEvents.ADMIN_USER_DELETED}`,
+      )
+      .set(auth)
+      .expect(200);
+    expect(retained.body.data).toEqual([
+      expect.objectContaining({
+        event: IdentityAuditEvents.ADMIN_USER_DELETED,
+        subjectId: target.id,
+      }),
+    ]);
   });
 });

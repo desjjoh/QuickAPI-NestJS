@@ -1,4 +1,8 @@
 import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
+import {
   BadRequestException,
   ConflictException,
   Injectable,
@@ -104,9 +108,9 @@ export class RegistrationService {
       outcome: 'succeeded',
       actorType: 'anonymous',
       actorId: null,
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
       metadata: {},

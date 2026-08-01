@@ -9,6 +9,10 @@ import type { EntityManager, Repository } from 'typeorm';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRedactionService, AuditValue } from './audit-redaction.service';
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 
 export type AuditOutcome =
   | 'succeeded'
@@ -40,10 +44,10 @@ export interface RecordAuditInput {
   readonly actorType: AuditActorType;
   readonly actorId?: string | null;
   /** Aggregate owner or party affected by the action. */
-  readonly subjectType?: string | null;
+  readonly subjectType?: AuditSubjectType | null;
   readonly subjectId?: string | null;
   /** Specific object affected by the action. */
-  readonly resourceType?: string | null;
+  readonly resourceType?: AuditResourceType | null;
   readonly resourceId?: string | null;
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
@@ -92,6 +96,10 @@ const SOURCES: readonly AuditSource[] = [
   'migration',
   'system',
 ];
+const SUBJECT_TYPES: readonly AuditSubjectType[] =
+  Object.values(AuditSubjectType);
+const RESOURCE_TYPES: readonly AuditResourceType[] =
+  Object.values(AuditResourceType);
 const MAX_JSON_BYTES = 64 * 1024;
 
 @Injectable()
@@ -277,8 +285,19 @@ export class AuditService {
 
     this.optionalString('actorId', input.actorId, 255);
     this.optionalString('subjectType', input.subjectType, 64);
+
+    if (input.subjectType != null && !SUBJECT_TYPES.includes(input.subjectType))
+      throw new BadRequestException('subjectType is invalid');
+
     this.optionalString('subjectId', input.subjectId, 255);
     this.optionalString('resourceType', input.resourceType, 64);
+
+    if (
+      input.resourceType != null &&
+      !RESOURCE_TYPES.includes(input.resourceType)
+    )
+      throw new BadRequestException('resourceType is invalid');
+
     this.optionalString('resourceId', input.resourceId, 255);
     this.optionalString('requestId', input.requestId, 64);
     this.optionalString('sessionId', input.sessionId, 16);

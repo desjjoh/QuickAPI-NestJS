@@ -1,3 +1,7 @@
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
 import { minute } from '@/common/constants/milliseconds.constants';
@@ -75,9 +79,9 @@ export class PasswordResetService {
       domain: AuditEventDomain.IDENTITY,
       outcome: 'succeeded',
       actorType: 'anonymous',
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
       metadata: {},
@@ -134,9 +138,9 @@ export class PasswordResetService {
       outcome: 'succeeded',
       actorType: 'anonymous',
       actorId: null,
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
-      resourceType: 'identity.user',
+      resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
       metadata: {},

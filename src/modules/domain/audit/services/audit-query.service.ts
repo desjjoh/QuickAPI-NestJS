@@ -3,6 +3,10 @@ import { Injectable } from '@nestjs/common';
 import { AuditQuery } from '../models/audit-query.model';
 import { AuditQueryResult } from '../models/audit-query-result.model';
 import { AuditRepository } from '../repositories/audit.repository';
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 
 type QueryOptions = Omit<
   AuditQuery,
@@ -53,7 +57,7 @@ export class AuditQueryService {
   }
 
   public bySubject(
-    subjectType: string,
+    subjectType: AuditSubjectType,
     subjectId: string,
     options: QueryOptions = {},
   ): Promise<AuditQueryResult> {
@@ -61,7 +65,7 @@ export class AuditQueryService {
   }
 
   public resourceHistory(
-    resourceType: string,
+    resourceType: AuditResourceType,
     resourceId: string,
     options: QueryOptions = {},
   ): Promise<AuditQueryResult> {

@@ -1,3 +1,4 @@
+import { AuditSubjectType } from '@/config/audit-events.config';
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
@@ -67,7 +68,7 @@ describe('account activity', () => {
       event: 'activity_test.self.first',
       actorType: 'user',
       actorId: user.id,
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: 'somebody-else',
       occurredAt: new Date('2026-01-02T00:00:00.000Z'),
     });
@@ -76,7 +77,7 @@ describe('account activity', () => {
       event: 'activity_test.other.touched.me',
       actorType: 'admin',
       actorId: 'other-actor-id',
-      subjectType: 'user',
+      subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       occurredAt: new Date('2026-01-01T00:00:00.000Z'),
     });

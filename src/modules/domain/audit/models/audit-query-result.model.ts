@@ -1,6 +1,10 @@
 import { BaseModel } from '@/common/models/base.model';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { PaginationDto } from '@/common/models/pagination.model';
+import {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 
 type AuditData = Readonly<Record<string, unknown>>;
 
@@ -28,9 +32,9 @@ export class AuditEvent extends BaseModel {
   public readonly outcome: string;
   public readonly actorType: string;
   public readonly actorId: string | null;
-  public readonly subjectType: string | null;
+  public readonly subjectType: AuditSubjectType | null;
   public readonly subjectId: string | null;
-  public readonly resourceType: string | null;
+  public readonly resourceType: AuditResourceType | null;
   public readonly resourceId: string | null;
   public readonly operationId: string | null;
   public readonly idempotencyId: string | null;
@@ -58,9 +62,9 @@ export class AuditEvent extends BaseModel {
     this.outcome = entity.outcome;
     this.actorType = entity.actor_type;
     this.actorId = entity.actor_id;
-    this.subjectType = entity.subject_type;
+    this.subjectType = entity.subject_type as AuditSubjectType | null;
     this.subjectId = entity.subject_id;
-    this.resourceType = entity.resource_type;
+    this.resourceType = entity.resource_type as AuditResourceType | null;
     this.resourceId = entity.resource_id;
     this.operationId = entity.operation_id;
     this.idempotencyId = entity.idempotency_id;

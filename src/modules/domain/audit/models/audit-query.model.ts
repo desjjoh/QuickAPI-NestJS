@@ -1,4 +1,8 @@
 import type { AuditOutcome } from '../services/audit.service';
+import type {
+  AuditResourceType,
+  AuditSubjectType,
+} from '@/config/audit-events.config';
 
 /** The deliberately bounded set of columns on which audit events may be queried. */
 export interface AuditQuery {
@@ -7,9 +11,9 @@ export interface AuditQuery {
   readonly outcome?: AuditOutcome;
   readonly actorType?: string;
   readonly actorId?: string | null;
-  readonly subjectType?: string;
+  readonly subjectType?: AuditSubjectType;
   readonly subjectId?: string;
-  readonly resourceType?: string;
+  readonly resourceType?: AuditResourceType;
   readonly resourceId?: string;
   readonly requestId?: string;
   readonly sessionId?: string;
