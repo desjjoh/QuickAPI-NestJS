@@ -36,4 +36,13 @@ describe('ImageRepository behavior', () => {
     await repo.findAll();
     expect(repo.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
   });
+
+  it('deletes an image by id without resaving its loaded relations', async () => {
+    const repo = new ImageRepository(dataSource);
+    const image = { id: 'image-id' } as ImageEntity;
+    jest.spyOn(repo, 'delete').mockResolvedValue({ raw: [], affected: 1 });
+
+    await expect(repo.deleteImage(image)).resolves.toBe(image);
+    expect(repo.delete).toHaveBeenCalledWith({ id: image.id });
+  });
 });

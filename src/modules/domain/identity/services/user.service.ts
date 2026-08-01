@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import * as bcrypt from 'bcrypt';
-import { DeepPartial } from 'typeorm';
+import { DeepPartial, EntityManager } from 'typeorm';
 
 import {
   getClearRefreshCookieOptions,
@@ -89,13 +89,21 @@ export class UserService {
     return bcrypt.hash(password, 12);
   }
 
-  public async deleteAddress(address: UserAddressEntity): Promise<void> {
-    await this.userRepo.manager.delete(UserAddressEntity, {
+  public async deleteAddress(
+    address: UserAddressEntity,
+    manager: EntityManager = this.userRepo.manager,
+  ): Promise<void> {
+    await manager.delete(UserAddressEntity, {
       id: address.id,
     });
   }
 
-  public async clearProfileAvatar(profileId: string): Promise<void> {
+  public async clearProfileAvatar(
+    profileId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (manager)
+      return this.userRepo.clearProfileAvatarWithManager(profileId, manager);
     await this.userRepo.clearProfileAvatar(profileId);
   }
 
@@ -107,6 +115,7 @@ export class UserService {
     user: UserEntity,
     dto: DeepPartial<UserEntity>,
     options: UpdateUserOptions = {},
+    manager?: EntityManager,
   ): Promise<UserEntity> {
     const shouldTouchLastUpdatedAt: boolean =
       options.touchLastUpdatedAt ?? true;
@@ -124,14 +133,19 @@ export class UserService {
         })
       : dtoMetadata;
 
-    const updatedUser: UserEntity = this.userRepo.merge(user, {
+    const repository = manager
+      ? manager.getRepository(UserEntity)
+      : this.userRepo;
+    const updatedUser: UserEntity = repository.merge(user, {
       ...dto,
       ...(metadata ? { metadata } : {}),
     });
 
-    await this.userRepo.save(updatedUser);
+    await repository.save(updatedUser);
 
-    return this.userRepo.findByIdOrFail(user.id);
+    return manager
+      ? manager.findOneOrFail(UserEntity, { where: { id: user.id } })
+      : this.userRepo.findByIdOrFail(user.id);
   }
 
   public async updateMetadata(
@@ -266,8 +280,11 @@ export class UserService {
     });
   }
 
-  public async deletePhone(phone: UserPhoneEntity): Promise<void> {
-    await this.userRepo.manager.delete(UserPhoneEntity, {
+  public async deletePhone(
+    phone: UserPhoneEntity,
+    manager: EntityManager = this.userRepo.manager,
+  ): Promise<void> {
+    await manager.delete(UserPhoneEntity, {
       id: phone.id,
     });
   }

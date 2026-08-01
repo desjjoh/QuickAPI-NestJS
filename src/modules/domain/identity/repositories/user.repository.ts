@@ -104,6 +104,16 @@ export class UserRepository extends Repository<UserEntity> {
     );
   }
 
+  public async clearProfileAvatarWithManager(
+    profileId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.query(
+      'UPDATE `user_profiles` SET `avatar_id` = NULL WHERE `id` = ?',
+      [profileId],
+    );
+  }
+
   public async createUser(
     payload: DeepPartial<Base<UserEntity>>,
   ): Promise<UserEntity> {

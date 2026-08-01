@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, DeepPartial, Repository } from 'typeorm';
+import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
 
 import { Base } from '@/common/models/base.model';
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
@@ -14,15 +14,17 @@ export class ImageRepository extends Repository<ImageEntity> {
 
   public async createImage(
     payload: DeepPartial<Base<ImageEntity>>,
+    manager?: EntityManager,
   ): Promise<ImageEntity> {
-    const image: ImageEntity = this.create({
+    const repository = manager ? manager.getRepository(ImageEntity) : this;
+    const image: ImageEntity = repository.create({
       ...payload,
       alt_text: payload.alt_text ?? null,
     });
 
-    const created = await this.save(image);
+    const created = await repository.save(image);
 
-    return this.findOneByOrFail({ id: created.id });
+    return repository.findOneByOrFail({ id: created.id });
   }
 
   public async findAll(): Promise<ImageEntity[]> {
@@ -42,16 +44,25 @@ export class ImageRepository extends Repository<ImageEntity> {
   public async updateImage(
     image: ImageEntity,
     payload: DeepPartial<Base<ImageEntity>>,
+    manager?: EntityManager,
   ): Promise<ImageEntity> {
-    const updatedImage: ImageEntity = this.merge(
+    const repository = manager ? manager.getRepository(ImageEntity) : this;
+    const updatedImage: ImageEntity = repository.merge(
       image,
       omitUndefinedDeep(payload),
     );
 
-    return this.save(updatedImage);
+    return repository.save(updatedImage);
   }
 
-  public async deleteImage(image: ImageEntity): Promise<ImageEntity> {
-    return this.remove(image);
+  public async deleteImage(
+    image: ImageEntity,
+    manager?: EntityManager,
+  ): Promise<ImageEntity> {
+    const repository = manager ? manager.getRepository(ImageEntity) : this;
+
+    await repository.delete({ id: image.id });
+
+    return image;
   }
 }

@@ -99,6 +99,8 @@ export class AuditRedactionService {
       this.asRecord(safeBefore),
       this.asRecord(safeAfter),
       this.policy(resourceType),
+      this.inputRecord(before),
+      this.inputRecord(after),
     );
     return {
       before: this.fit(diff.before),
@@ -252,6 +254,8 @@ export class AuditRedactionService {
     before: Record<string, AuditValue>,
     after: Record<string, AuditValue>,
     tree: FieldTree,
+    rawBefore: Record<string, unknown> = {},
+    rawAfter: Record<string, unknown> = {},
   ): {
     before: Record<string, AuditValue>;
     after: Record<string, AuditValue>;
@@ -270,11 +274,36 @@ export class AuditRedactionService {
       const right = after[field];
       const policy = tree[field];
 
+      if (policy.kind === 'changed-only') {
+        const rawHasBefore = Object.prototype.hasOwnProperty.call(
+          rawBefore,
+          field,
+        );
+        const rawHasAfter = Object.prototype.hasOwnProperty.call(
+          rawAfter,
+          field,
+        );
+        if (
+          rawHasBefore === rawHasAfter &&
+          this.rawEqual(rawBefore[field], rawAfter[field])
+        )
+          continue;
+        if (rawHasBefore) result.before[field] = CHANGED;
+        if (rawHasAfter) result.after[field] = CHANGED;
+        result.changes[field] = {
+          before: rawHasBefore ? CHANGED : null,
+          after: rawHasAfter ? CHANGED : null,
+        };
+        continue;
+      }
+
       if (policy.kind === 'nested-object' && hasBefore && hasAfter) {
         const nested = this.diffTree(
           this.asRecord(left),
           this.asRecord(right),
           policy.fields,
+          this.inputRecord(rawBefore[field]),
+          this.inputRecord(rawAfter[field]),
         );
         if (Object.keys(nested.changes).length > 0) {
           result.before[field] = nested.before;
@@ -322,6 +351,16 @@ export class AuditRedactionService {
 
   private equal(left: AuditValue | undefined, right: AuditValue | undefined) {
     return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private rawEqual(left: unknown, right: unknown): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private inputRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
   }
 
   private asRecord(value: AuditValue): Record<string, AuditValue> {

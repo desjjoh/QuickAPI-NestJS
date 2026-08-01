@@ -15,6 +15,7 @@ import { useFileManager } from '@/common/handlers/file.handler';
 import { ImageEntity } from '../entities/image.entity';
 import { ImageRepository } from '../repositories/image.repository';
 import { StorageService } from '@/modules/system/storage/types/storage.types';
+import type { EntityManager } from 'typeorm';
 
 export type CreateImageInput = {
   file: Express.Multer.File;
@@ -52,7 +53,10 @@ export class ImageService {
     return image;
   }
 
-  public async create(input: CreateImageInput): Promise<ImageEntity> {
+  public async create(
+    input: CreateImageInput,
+    manager?: EntityManager,
+  ): Promise<ImageEntity> {
     this.validateImage(input.file);
 
     const buffer = await readFile(input.file.path);
@@ -71,7 +75,9 @@ export class ImageService {
         alt_text: input.alt_text ?? null,
       };
 
-      return await this.imgRepo.createImage(payload);
+      return await (manager
+        ? this.imgRepo.createImage(payload, manager)
+        : this.imgRepo.createImage(payload));
     } catch (error) {
       await this.removeStoredFile(storedFile.storage_key);
 
@@ -79,7 +85,10 @@ export class ImageService {
     }
   }
 
-  public async update(input: UpdateImageInput): Promise<ImageEntity> {
+  public async update(
+    input: UpdateImageInput,
+    manager?: EntityManager,
+  ): Promise<ImageEntity> {
     this.validateImage(input.file);
 
     const previousStorageKey = input.image.storage_key;
@@ -100,7 +109,9 @@ export class ImageService {
         alt_text: input.alt_text,
       };
 
-      const updatedImage = await this.imgRepo.updateImage(input.image, payload);
+      const updatedImage = manager
+        ? await this.imgRepo.updateImage(input.image, payload, manager)
+        : await this.imgRepo.updateImage(input.image, payload);
 
       await this.removeStoredFile(previousStorageKey);
 
@@ -112,10 +123,15 @@ export class ImageService {
     }
   }
 
-  public async remove(image: ImageEntity): Promise<ImageEntity> {
+  public async remove(
+    image: ImageEntity,
+    manager?: EntityManager,
+  ): Promise<ImageEntity> {
     await this.removeStoredFile(image.storage_key);
 
-    return this.imgRepo.deleteImage(image);
+    return manager
+      ? this.imgRepo.deleteImage(image, manager)
+      : this.imgRepo.deleteImage(image);
   }
 
   private validateImage(file: Express.Multer.File): void {

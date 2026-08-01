@@ -176,10 +176,12 @@ describe(AuditService.name, () => {
       for (const secret of secrets) expect(serialized).not.toContain(secret);
     }
     expect(stored.before).toEqual({
-      identity: { email: 'o***@example.test' },
+      identity: { email: 'o***@example.test', password: '[CHANGED]' },
+      metadata: { mfa_enabled: '[CHANGED]' },
     });
     expect(stored.after).toEqual({
-      identity: { email: 'n***@example.test' },
+      identity: { email: 'n***@example.test', password: '[CHANGED]' },
+      metadata: { mfa_enabled: '[CHANGED]' },
     });
     expect(stored.metadata).toMatchObject({
       ip: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
