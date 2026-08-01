@@ -6,6 +6,7 @@ import {
   type UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
 import { userFixture } from '@/../test/helpers/identity.fixtures';
+import { ADMINISTRATION_REASON_CODES } from '@/config/administration.config';
 import { UserAdminService } from './users.service';
 
 describe('UserAdminService', () => {
@@ -26,7 +27,11 @@ describe('UserAdminService', () => {
       transaction: jest.fn(async (callback) => callback(manager)),
       getRepository: jest.fn(() => auditRepository),
     };
-    const context = { get: jest.fn().mockReturnValue('operation-1') };
+    const context = {
+      get: jest.fn((key: string) =>
+        key === 'actorId' ? 'administrator-1' : 'operation-1',
+      ),
+    };
 
     return {
       repo,
@@ -105,7 +110,11 @@ describe('UserAdminService', () => {
     const { repo, service, audit, manager } = setup();
     repo.removeUser.mockResolvedValue(undefined);
 
-    await expect(service.removeUser('user-1')).resolves.toBeUndefined();
+    await expect(
+      service.removeUser('user-1', {
+        reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+      }),
+    ).resolves.toBeUndefined();
 
     expect(repo.removeUser).toHaveBeenCalledTimes(1);
     expect(repo.removeUser).toHaveBeenCalledWith('user-1', expect.any(Object));
@@ -113,14 +122,22 @@ describe('UserAdminService', () => {
       expect.objectContaining({
         event: 'identity.admin.user_deleted',
         actorType: 'admin',
+        actorId: 'administrator-1',
         subjectId: 'user-1',
         resourceId: 'user-1',
         operationId: 'operation-1',
         idempotencyId: 'operation-1',
+        metadata: expect.objectContaining({
+          reason_code: 'policy_enforcement',
+        }),
         after: null,
       }),
       manager,
     );
+    const input = audit.record.mock.calls[0][0];
+    expect(input.actorId).toBe('administrator-1');
+    expect(input.subjectId).toBe('user-1');
+    expect(input.actorId).not.toBe(input.subjectId);
   });
 
   it('delegates an administration update and converts the entity to a DTO', async () => {
@@ -128,6 +145,7 @@ describe('UserAdminService', () => {
     const dto = {
       status_id: 'status-id-000001',
       role_ids: ['role-id-0000001'],
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     };
     const user = userFixture({
       status: { key: 'disabled', label: 'Disabled' },
@@ -148,6 +166,7 @@ describe('UserAdminService', () => {
       expect.objectContaining({
         event: 'identity.admin.user_updated',
         actorType: 'admin',
+        actorId: 'administrator-1',
         subjectId: 'user-1',
         resourceId: 'user-1',
         operationId: 'operation-1',
@@ -179,7 +198,10 @@ describe('UserAdminService', () => {
       manager.findOneOrFail.mockResolvedValue(before);
       repo.updateUserAdministration.mockResolvedValue(after);
 
-      await service.updateUser('user-1', { role_ids: afterIds });
+      await service.updateUser('user-1', {
+        role_ids: afterIds,
+        reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+      });
 
       expect(audit.record).toHaveBeenCalledTimes(1);
       expect(audit.record).toHaveBeenCalledWith(
@@ -187,6 +209,7 @@ describe('UserAdminService', () => {
           domain: 'identity',
           event: 'identity.admin.user_updated',
           actorType: 'admin',
+          actorId: 'administrator-1',
           subjectType: 'identity.user',
           subjectId: 'user-1',
           resourceType: 'identity.user',
@@ -208,6 +231,7 @@ describe('UserAdminService', () => {
 
     await service.updateUser('user-1', {
       role_ids: ['role-1', 'role-1'],
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     });
 
     expect(audit.record).toHaveBeenCalledWith(
@@ -218,6 +242,29 @@ describe('UserAdminService', () => {
     );
   });
 
+  it('never reverses the administrator actor and affected-user subject', async () => {
+    const { repo, service, audit } = setup();
+    repo.updateUserAdministration.mockResolvedValue(userFixture());
+
+    await service.updateUser('affected-user', {
+      status_id: 'status-id-000001',
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+    });
+
+    const input = audit.record.mock.calls[0][0];
+    expect(input).toMatchObject({
+      actorType: 'admin',
+      actorId: 'administrator-1',
+      subjectType: 'identity.user',
+      subjectId: 'affected-user',
+      resourceType: 'identity.user',
+      resourceId: 'affected-user',
+      domain: 'identity',
+      metadata: { reason_code: 'policy_enforcement' },
+    });
+    expect(input.actorId).not.toBe(input.subjectId);
+  });
+
   it('rejects the role mutation transaction when its audit fails', async () => {
     const { repo, service, audit, dataSource } = setup();
     repo.updateUserAdministration.mockResolvedValue(
@@ -226,14 +273,20 @@ describe('UserAdminService', () => {
     audit.record.mockRejectedValue(new Error('audit unavailable'));
 
     await expect(
-      service.updateUser('user-1', { role_ids: ['role-1'] }),
+      service.updateUser('user-1', {
+        role_ids: ['role-1'],
+        reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+      }),
     ).rejects.toThrow('audit unavailable');
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('propagates repository validation errors when updating a user', async () => {
     const { repo, service, audit } = setup();
-    const dto = { role_ids: ['missing-role-id'] };
+    const dto = {
+      role_ids: ['missing-role-id'],
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+    };
     const error = new BadRequestException('One or more roles were not found.');
     repo.updateUserAdministration.mockRejectedValue(error);
 

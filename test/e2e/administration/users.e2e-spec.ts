@@ -161,7 +161,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(auth)
-      .send({ role_ids: [] })
+      .send({ role_ids: [], reason_code: 'access_review' })
       .expect(403);
   });
   it('allows only update_users (or all permissions) to update users', async () => {
@@ -179,17 +179,26 @@ describe('user administration authorization and lifecycle', () => {
       .findOneByOrFail({ key: 'disabled' });
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
-      .send({ status_id: disabled.id })
+      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(401);
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('update-reader@example.test'))
-      .send({ status_id: disabled.id })
+      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(403);
+    await request(app.getHttpServer())
+      .patch(`${ROOT}/${target.id}`)
+      .set(await signIn('updater@example.test'))
+      .send({ status_id: disabled.id })
+      .expect(422);
     const updated = await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('updater@example.test'))
-      .send({ status_id: disabled.id, role_ids: [] })
+      .send({
+        status_id: disabled.id,
+        role_ids: [],
+        reason_code: 'policy_enforcement',
+      })
       .expect(200);
     expect(updated.body).toMatchObject({
       status: { key: 'disabled' },
@@ -212,15 +221,23 @@ describe('user administration authorization and lifecycle', () => {
     await grant(deleter, 'e2e-deleter', ['delete_users']);
     await suite.dataSource.getRepository(UserSessionEntity).clear();
     await request(app.getHttpServer())
-      .delete(`${ROOT}/${target.id}`)
+      .post(`${ROOT}/${target.id}/delete`)
+      .send({ reason_code: 'user_request' })
       .expect(401);
     await request(app.getHttpServer())
-      .delete(`${ROOT}/${target.id}`)
+      .post(`${ROOT}/${target.id}/delete`)
       .set(await signIn('reader@example.test'))
+      .send({ reason_code: 'user_request' })
       .expect(403);
     await request(app.getHttpServer())
-      .delete(`${ROOT}/${target.id}`)
+      .post(`${ROOT}/${target.id}/delete`)
       .set(await signIn('deleter@example.test'))
+      .send({})
+      .expect(422);
+    await request(app.getHttpServer())
+      .post(`${ROOT}/${target.id}/delete`)
+      .set(await signIn('deleter@example.test'))
+      .send({ reason_code: 'user_request' })
       .expect(204);
     expect(
       await suite.dataSource
@@ -241,7 +258,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-commit-admin@example.test'))
-      .send({ status_id: disabled.id })
+      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(200);
 
     const event = await suite.dataSource
@@ -275,7 +292,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-rollback-admin@example.test'))
-      .send({ status_id: disabled.id })
+      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(500);
     mutation.mockRestore();
 
@@ -313,7 +330,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-failure-admin@example.test'))
-      .send({ status_id: disabled.id })
+      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(500);
     insertion.mockRestore();
 
@@ -339,7 +356,11 @@ describe('user administration authorization and lifecycle', () => {
     const invoke = () =>
       context.run(
         { requestId: 'retry-operation', actorType: 'admin', source: 'service' },
-        () => service.updateUser(target.id, { status_id: disabled.id }),
+        () =>
+          service.updateUser(target.id, {
+            status_id: disabled.id,
+            reason_code: 'policy_enforcement',
+          }),
       );
 
     await invoke();

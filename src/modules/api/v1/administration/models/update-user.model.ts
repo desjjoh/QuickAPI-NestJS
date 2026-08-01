@@ -1,7 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsOptional, IsString, Length } from 'class-validator';
 
-export class UpdateUserAdministrationDto {
+import { AdministrationActionDto } from './administration-action.model';
+
+export class UpdateUserAdministrationDto extends AdministrationActionDto {
   @ApiPropertyOptional({ description: 'Account status reference ID.' })
   @IsOptional()
   @IsString()

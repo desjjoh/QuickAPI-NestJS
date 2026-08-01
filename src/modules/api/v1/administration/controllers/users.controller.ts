@@ -13,12 +13,12 @@ import {
 import {
   Body,
   Controller,
-  Delete,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
+  Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -36,6 +36,7 @@ import { UserAdminService } from '../service/users.service';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
+import { AdministrationActionDto } from '../models/administration-action.model';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
@@ -104,8 +105,8 @@ export class UserAdministrationController {
     return this.svc.findUser(id);
   }
 
-  // DELETE /:id
-  @Delete(':id')
+  // POST /:id/delete
+  @Post(':id/delete')
   @Throttle({ default: throttlePolicies.administrationMutation })
   @ApiOperation({
     summary: 'Delete user',
@@ -125,7 +126,8 @@ export class UserAdministrationController {
   )
   public async removeUserById(
     @Param('id', NanoIdParamPipe) id: string,
+    @Body() dto: AdministrationActionDto,
   ): Promise<void> {
-    return this.svc.removeUser(id);
+    return this.svc.removeUser(id, dto);
   }
 }

@@ -16,6 +16,7 @@ import {
 } from '@/common/models/pagination.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
+import { AdministrationActionDto } from '../models/administration-action.model';
 
 @Injectable()
 export class UserAdminService {
@@ -41,7 +42,10 @@ export class UserAdminService {
     return new UserDto(await this.repo.findByIdOrFail(id));
   }
 
-  public async removeUser(id: string): Promise<void> {
+  public async removeUser(
+    id: string,
+    dto: AdministrationActionDto,
+  ): Promise<void> {
     const operationId = this.operationId();
     if (
       await this.wasCompleted(
@@ -61,6 +65,7 @@ export class UserAdminService {
           operationId,
           this.auditSnapshot(before),
           null,
+          dto.reason_code,
         ),
         manager,
       );
@@ -90,6 +95,7 @@ export class UserAdminService {
           operationId,
           this.auditSnapshot(before),
           this.auditSnapshot(after),
+          dto.reason_code,
         ),
         manager,
       );
@@ -128,18 +134,24 @@ export class UserAdminService {
     operationId: string | null,
     before: unknown,
     after: unknown,
+    reasonCode: string,
   ) {
+    const actorId = this.context.get('actorId') ?? null;
     return {
       domain: 'identity',
       event,
       outcome: 'succeeded' as const,
       actorType: 'admin' as const,
+      actorId,
       subjectType: 'identity.user',
       subjectId: id,
       resourceType: 'identity.user',
       resourceId: id,
       source: 'http' as const,
-      metadata: { operation_id: operationId },
+      metadata: {
+        operation_id: operationId,
+        reason_code: reasonCode,
+      },
       operationId,
       idempotencyId: operationId,
       before,
