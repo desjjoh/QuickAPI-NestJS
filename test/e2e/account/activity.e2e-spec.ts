@@ -95,7 +95,14 @@ describe('account activity', () => {
           outcome: 'succeeded',
         }),
       ],
-      nextCursor: null,
+      meta: {
+        page: 1,
+        take: 1,
+        itemCount: 1,
+        pageCount: 1,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
     });
     expect(response.body.data[0]).not.toHaveProperty('actorId');
     expect(response.body.data[0]).not.toHaveProperty('metadata');
@@ -109,7 +116,7 @@ describe('account activity', () => {
       .expect(422);
   });
 
-  it('cursor-paginates the authenticated actor history', async () => {
+  it('page-paginates the authenticated actor history', async () => {
     const user = await createRegisteredUser(app, suite, email);
     const agent = request.agent(app.getHttpServer());
     const csrf = await acquireCsrf(agent);
@@ -124,8 +131,8 @@ describe('account activity', () => {
     };
     const audit = app.get(AuditService);
     for (const [event, day] of [
-      ['cursor_test.page.newer', '03'],
-      ['cursor_test.page.older', '02'],
+      ['page_test.page.newer', '03'],
+      ['page_test.page.older', '02'],
     ])
       await audit.record({
         event,
@@ -133,26 +140,38 @@ describe('account activity', () => {
         actorType: 'user',
         actorId: user.id,
         source: 'service',
-        domain: 'cursor_test',
+        domain: 'page_test',
         metadata: {},
         occurredAt: new Date(`2026-01-${day}T00:00:00.000Z`),
       });
 
     const first = await agent
-      .get('/api/v1/account/activity?domain=cursor_test&take=1')
+      .get('/api/v1/account/activity?domain=page_test&take=1')
       .set(headers)
       .expect(200);
-    expect(first.body.data[0].event).toBe('cursor_test.page.newer');
-    expect(first.body.nextCursor).toEqual(expect.any(String));
+    expect(first.body.data[0].event).toBe('page_test.page.newer');
+    expect(first.body.meta).toEqual({
+      page: 1,
+      take: 1,
+      itemCount: 2,
+      pageCount: 2,
+      hasPreviousPage: false,
+      hasNextPage: true,
+    });
     const second = await agent
-      .get(
-        `/api/v1/account/activity?domain=cursor_test&take=1&cursor=${encodeURIComponent(first.body.nextCursor as string)}`,
-      )
+      .get('/api/v1/account/activity?domain=page_test&take=1&page=2')
       .set(headers)
       .expect(200);
     expect(
       second.body.data.map((item: { event: string }) => item.event),
-    ).toEqual(['cursor_test.page.older']);
-    expect(second.body.nextCursor).toBeNull();
+    ).toEqual(['page_test.page.older']);
+    expect(second.body.meta).toEqual({
+      page: 2,
+      take: 1,
+      itemCount: 2,
+      pageCount: 2,
+      hasPreviousPage: true,
+      hasNextPage: false,
+    });
   });
 });

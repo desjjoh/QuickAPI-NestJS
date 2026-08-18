@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import type { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { userFixture } from '@/../test/helpers/identity.fixtures';
@@ -27,9 +26,21 @@ function event(overrides: Partial<AuditEvent> = {}): AuditEvent {
 describe('ActivityApiService', () => {
   const user = userFixture();
 
-  function setup(result = { events: [event()], hasMore: false }) {
+  function setup(
+    result = {
+      data: [event()],
+      meta: {
+        page: 1,
+        take: 25,
+        itemCount: 1,
+        pageCount: 1,
+        hasPreviousPage: false,
+        hasNextPage: false,
+      },
+    },
+  ) {
     const auditQueries = {
-      actorActivity: jest.fn().mockResolvedValue(result),
+      query: jest.fn().mockResolvedValue(result),
     };
     return {
       service: new ActivityApiService(
@@ -50,27 +61,26 @@ describe('ActivityApiService', () => {
       outcome: AccountActivityOutcome.SUCCEEDED,
       occurredFrom,
       occurredTo,
+      page: 2,
       take: 10,
     });
 
-    expect(auditQueries.actorActivity).toHaveBeenCalledWith(
-      'user',
-      user.id,
-      {
-        domain: 'identity',
-        event: 'identity.profile.updated',
-        outcome: AccountActivityOutcome.SUCCEEDED,
-        occurredFrom,
-        occurredTo,
-      },
-      undefined,
-      10,
-    );
+    expect(auditQueries.query).toHaveBeenCalledWith({
+      actorType: 'user',
+      actorId: user.id,
+      domain: 'identity',
+      event: 'identity.profile.updated',
+      outcome: AccountActivityOutcome.SUCCEEDED,
+      occurredFrom,
+      occurredTo,
+      page: 2,
+      take: 10,
+    });
   });
 
   it('maps only account-safe event fields', async () => {
     const { service } = setup();
-    const result = await service.findForUser(user, { take: 25 });
+    const result = await service.findForUser(user, { page: 1, take: 25 });
 
     expect(result.data[0]).toEqual({
       id: 'abcdefghijklmnop',
@@ -89,38 +99,18 @@ describe('ActivityApiService', () => {
     expect(result.data[0]).not.toHaveProperty('metadata');
   });
 
-  it('returns a cursor and accepts it on the next request', async () => {
-    const first = setup({ events: [event()], hasMore: true });
-    const firstPage = await first.service.findForUser(user, { take: 1 });
-    expect(firstPage.nextCursor).toEqual(expect.any(String));
-
-    const second = setup({ events: [], hasMore: false });
-    await second.service.findForUser(user, {
-      cursor: firstPage.nextCursor!,
-      take: 1,
+  it('returns standard page metadata', async () => {
+    const { service } = setup();
+    const result = await service.findForUser(user, { page: 1, take: 25 });
+    expect(result.meta).toEqual({
+      page: 1,
+      take: 25,
+      itemCount: 1,
+      pageCount: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
     });
-    expect(second.auditQueries.actorActivity).toHaveBeenCalledWith(
-      'user',
-      user.id,
-      expect.any(Object),
-      {
-        occurredAt: new Date('2026-01-02T03:04:05.000Z'),
-        id: 'abcdefghijklmnop',
-      },
-      1,
-    );
   });
-
-  it.each(['not-base64-json', Buffer.from('{}').toString('base64url')])(
-    'rejects an invalid cursor',
-    async (cursor) => {
-      const { service, auditQueries } = setup();
-      await expect(
-        service.findForUser(user, { cursor, take: 25 }),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(auditQueries.actorActivity).not.toHaveBeenCalled();
-    },
-  );
 
   it('rejects an inverted occurred-at range before querying', async () => {
     const { service, auditQueries } = setup();
@@ -128,9 +118,10 @@ describe('ActivityApiService', () => {
       service.findForUser(user, {
         occurredFrom: new Date('2026-02-01T00:00:00.000Z'),
         occurredTo: new Date('2026-01-01T00:00:00.000Z'),
+        page: 1,
         take: 25,
       }),
     ).rejects.toThrow('occurredFrom must not follow occurredTo');
-    expect(auditQueries.actorActivity).not.toHaveBeenCalled();
+    expect(auditQueries.query).not.toHaveBeenCalled();
   });
 });

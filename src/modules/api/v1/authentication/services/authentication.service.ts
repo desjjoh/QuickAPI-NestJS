@@ -19,6 +19,10 @@ import {
   AuditEventDomain,
 } from '@/config/audit-events.config';
 
+interface CompleteSignInOptions {
+  readonly recordAudit?: boolean;
+}
+
 @Injectable()
 export class AuthService {
   public constructor(
@@ -49,25 +53,27 @@ export class AuthService {
     user: UserEntity,
     res: Response,
     req?: Request,
+    options: CompleteSignInOptions = {},
   ): Promise<JWTDto> {
     const updated = await this.userSvc.recordSignIn(user);
     const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
       : this.refreshSvc.issueTokens(updated, res));
 
-    await this.auditSvc.record({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: AuditSubjectType.USER,
-      subjectId: user.id,
-      resourceType: AuditResourceType.IDENTITY_USER,
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
-    });
+    if (options.recordAudit !== false)
+      await this.auditSvc.record({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        domain: AuditEventDomain.IDENTITY,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorId: user.id,
+        subjectType: AuditSubjectType.USER,
+        subjectId: user.id,
+        resourceType: AuditResourceType.IDENTITY_USER,
+        resourceId: user.id,
+        source: 'http',
+        metadata: {},
+      });
 
     return tokens;
   }

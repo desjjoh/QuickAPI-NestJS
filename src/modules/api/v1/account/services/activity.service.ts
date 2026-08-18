@@ -7,8 +7,6 @@ import {
   AccountActivityQueryDto,
 } from '../models/activity.model';
 
-type ActivityCursor = { occurredAt: Date; id: string };
-
 @Injectable()
 export class ActivityApiService {
   public constructor(private readonly auditQueries: AuditQueryService) {}
@@ -24,57 +22,18 @@ export class ActivityApiService {
     )
       throw new BadRequestException('occurredFrom must not follow occurredTo');
 
-    const result = await this.auditQueries.actorActivity(
-      'user',
-      user.id,
-      {
-        domain: query.domain,
-        event: query.event,
-        outcome: query.outcome,
-        occurredFrom: query.occurredFrom,
-        occurredTo: query.occurredTo,
-      },
-      this.decodeCursor(query.cursor),
-      query.take,
-    );
-    const data = result.events.map(
-      (event) => new AccountActivityEventDto(event),
-    );
-    const last = result.events.at(-1);
-    return new AccountActivityPageDto(
-      data,
-      result.hasMore && last
-        ? this.encodeCursor({ occurredAt: last.occurredAt, id: last.id })
-        : null,
-    );
-  }
-
-  private decodeCursor(value: string | undefined): ActivityCursor | undefined {
-    if (!value) return undefined;
-    try {
-      const parsed = JSON.parse(Buffer.from(value, 'base64url').toString()) as {
-        occurredAt?: unknown;
-        id?: unknown;
-      };
-      const occurredAt = new Date(String(parsed.occurredAt));
-      if (
-        typeof parsed.id !== 'string' ||
-        parsed.id.length !== 16 ||
-        Number.isNaN(occurredAt.getTime())
-      )
-        throw new Error('invalid cursor');
-      return { occurredAt, id: parsed.id };
-    } catch {
-      throw new BadRequestException('cursor is invalid');
-    }
-  }
-
-  private encodeCursor(cursor: ActivityCursor): string {
-    return Buffer.from(
-      JSON.stringify({
-        occurredAt: cursor.occurredAt.toISOString(),
-        id: cursor.id,
-      }),
-    ).toString('base64url');
+    const result = await this.auditQueries.query({
+      actorType: 'user',
+      actorId: user.id,
+      domain: query.domain,
+      event: query.event,
+      outcome: query.outcome,
+      occurredFrom: query.occurredFrom,
+      occurredTo: query.occurredTo,
+      page: query.page,
+      take: query.take,
+    });
+    const data = result.data.map((event) => new AccountActivityEventDto(event));
+    return new AccountActivityPageDto(data, result.meta);
   }
 }

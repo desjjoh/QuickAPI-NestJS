@@ -4,6 +4,12 @@ import request from 'supertest';
 
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import {
   acquireCsrf,
   CapturingEmailService,
@@ -107,6 +113,53 @@ describe('Registration request', () => {
         (item) => item.templateKey === 'registration-verification',
       ),
     ).toHaveLength(3);
+  });
+  it('captures request metadata when registration creates the session', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const csrf = await acquireCsrf(agent);
+    const payload = await registrationPayload(suite.dataSource);
+    const pending = await agent
+      .post(`${REGISTRATION_ROOT}/request`)
+      .set('x-csrf-token', csrf)
+      .send(payload)
+      .expect(201);
+    const challengeId = pending.body.challenge_id as string;
+
+    const confirmed = await agent
+      .post(`${REGISTRATION_ROOT}/confirm`)
+      .set('x-csrf-token', csrf)
+      .set('user-agent', 'QuickAPI Registration Browser/1.0')
+      .send({
+        challenge_id: challengeId,
+        code: email.verificationCodeFor(challengeId),
+      })
+      .expect(200);
+
+    const session = await suite.dataSource
+      .getRepository(UserSessionEntity)
+      .findOneByOrFail({ id: confirmed.body.user.session.id as string });
+    expect(session).toMatchObject({
+      device: 'Desktop',
+      browser: 'Unknown',
+      user_agent: 'QuickAPI Registration Browser/1.0',
+    });
+    expect(session.ip_address).toEqual(expect.any(String));
+
+    const audits = suite.dataSource.getRepository(AuditEventEntity);
+    await expect(
+      audits.countBy({
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_SUCCEEDED,
+        subject_id: confirmed.body.user.id as string,
+      }),
+    ).resolves.toBe(1);
+    await expect(
+      audits.countBy({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        subject_id: confirmed.body.user.id as string,
+      }),
+    ).resolves.toBe(0);
   });
 
   it.each([

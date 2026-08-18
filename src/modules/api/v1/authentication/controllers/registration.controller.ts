@@ -1,10 +1,11 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
   Body,
   Controller,
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -111,6 +112,7 @@ export class RegistrationApiController {
   })
   public async verifyRegistration(
     @Body() input: VerifyRegistrationDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
     const user = await this.svc.verifyRegistration(
@@ -118,6 +120,6 @@ export class RegistrationApiController {
       input.code,
     );
 
-    return this.authSvc.completeSignIn(user, res);
+    return this.authSvc.completeSignIn(user, res, req, { recordAudit: false });
   }
 }

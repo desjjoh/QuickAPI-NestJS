@@ -11,6 +11,7 @@ import {
   Min,
 } from 'class-validator';
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
+import { PaginationMeta } from '@/common/models/pagination.model';
 import {
   AuditResourceType,
   AuditSubjectType,
@@ -54,13 +55,11 @@ export class AccountActivityQueryDto {
   @IsDate()
   public readonly occurredTo?: Date;
 
-  @ApiPropertyOptional({
-    description: 'Opaque cursor returned by a prior page.',
-  })
-  @IsOptional()
-  @IsString()
-  @MaxLength(512)
-  public readonly cursor?: string;
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  public readonly page: number = 1;
 
   @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 25 })
   @IsOptional()
@@ -108,14 +107,11 @@ export class AccountActivityEventDto {
 export class AccountActivityPageDto {
   @ApiProperty({ type: AccountActivityEventDto, isArray: true })
   public readonly data: AccountActivityEventDto[];
-  @ApiProperty({ nullable: true, description: 'Cursor for the next page.' })
-  public readonly nextCursor: string | null;
+  @ApiProperty({ type: PaginationMeta })
+  public readonly meta: PaginationMeta;
 
-  public constructor(
-    data: AccountActivityEventDto[],
-    nextCursor: string | null,
-  ) {
+  public constructor(data: AccountActivityEventDto[], meta: PaginationMeta) {
     this.data = data;
-    this.nextCursor = nextCursor;
+    this.meta = meta;
   }
 }

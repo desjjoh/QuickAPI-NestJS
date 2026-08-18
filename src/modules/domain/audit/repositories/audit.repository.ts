@@ -46,36 +46,6 @@ export class AuditRepository extends Repository<AuditEventEntity> {
     );
   }
 
-  public async queryActorActivity(
-    actorType: string,
-    actorId: string,
-    query: Pick<
-      AuditQuery,
-      'domain' | 'event' | 'outcome' | 'occurredFrom' | 'occurredTo'
-    >,
-    cursor: { occurredAt: Date; id: string } | undefined,
-    take: number,
-  ): Promise<{ events: AuditEvent[]; hasMore: boolean }> {
-    const builder = this.createQueryBuilder('audit');
-    this.applyFilters(builder, { ...query, actorType, actorId });
-    if (cursor) {
-      builder.andWhere(
-        '(audit.occurred_at < :cursorTime OR (audit.occurred_at = :cursorTime AND audit.id < :cursorId))',
-        { cursorTime: cursor.occurredAt, cursorId: cursor.id },
-      );
-    }
-    builder
-      .orderBy('audit.occurred_at', 'DESC')
-      .addOrderBy('audit.id', 'DESC')
-      .take(take + 1);
-
-    const entities = await builder.getMany();
-    return {
-      events: entities.slice(0, take).map((entity) => new AuditEvent(entity)),
-      hasMore: entities.length > take,
-    };
-  }
-
   private applyFilters(
     builder: SelectQueryBuilder<AuditEventEntity>,
     query: AuditQuery,

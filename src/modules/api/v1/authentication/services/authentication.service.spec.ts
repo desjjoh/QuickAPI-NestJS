@@ -98,6 +98,24 @@ describe('AuthService', () => {
     );
   });
 
+  it('can issue a registration session without recording a second sign-in audit', async () => {
+    const { service, userSvc, refreshSvc, auditSvc } = setup();
+    const req = { ip: '127.0.0.1' } as Request;
+
+    await expect(
+      service.completeSignIn(user, res, req, { recordAudit: false }),
+    ).resolves.toBe(tokens);
+
+    expect(userSvc.recordSignIn).toHaveBeenCalledWith(user);
+    expect(refreshSvc.issueTokens).toHaveBeenCalledWith(
+      user,
+      res,
+      undefined,
+      req,
+    );
+    expect(auditSvc.record).not.toHaveBeenCalled();
+  });
+
   it('returns an MFA challenge without recording sign-in or issuing tokens', async () => {
     const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
     const expires = new Date('2026-02-01T00:00:00Z');
