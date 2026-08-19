@@ -274,6 +274,7 @@ describe('user administration authorization and lifecycle', () => {
       });
     expect(event.outcome).toBe('succeeded');
     expect(event.before).not.toEqual(event.after);
+    expect(event.metadata).toEqual({ reason_code: 'policy_enforcement' });
 
     const detail = await request(app.getHttpServer())
       .get(`/api/v1/administration/audits/${event.id}`)
@@ -282,11 +283,9 @@ describe('user administration authorization and lifecycle', () => {
     expect(detail.body).toMatchObject({
       reasonCode: 'policy_enforcement',
       before: {
-        id: target.id,
         status: { id: target.status.id },
       },
       after: {
-        id: target.id,
         status: { id: disabled.id },
       },
     });

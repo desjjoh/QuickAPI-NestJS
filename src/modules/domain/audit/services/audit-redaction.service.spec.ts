@@ -151,6 +151,7 @@ describe(AuditRedactionService.name, () => {
     const service = new AuditRedactionService();
     const metadata = service.redactMetadata({
       request_id: 'request-1',
+      reason_code: 'policy_enforcement',
       ip: '203.0.113.42',
       user_agent: 'private browser fingerprint',
       body: { email: 'body@example.test', password: 'body-password' },
@@ -166,6 +167,7 @@ describe(AuditRedactionService.name, () => {
 
     expect(metadata).toMatchObject({
       request_id: 'request-1',
+      reason_code: 'policy_enforcement',
       ip: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
       user_agent: '[CHANGED]',
     });

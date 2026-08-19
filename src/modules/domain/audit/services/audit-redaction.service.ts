@@ -47,6 +47,7 @@ const CHANGED = '[CHANGED]';
 const TRUNCATED = '[TRUNCATED]';
 const CIRCULAR = '[CIRCULAR]';
 const SAFE_ERROR_TYPE = /^(?:Error|[A-Za-z][A-Za-z0-9]*(?:Error|Exception))$/;
+const SAFE_CODE_FIELDS = new Set(['reason_code']);
 
 export interface AuditRedactionOptions {
   readonly maxDepth?: number;
@@ -156,7 +157,10 @@ export class AuditRedactionService {
       if (!(key in source)) continue;
       const policy = tree[key];
       // This guard is deliberately applied even to allowlisted future fields.
-      if (SECRET_KEY.test(key) || RAW_CONTAINER_KEY.test(key)) {
+      if (
+        (SECRET_KEY.test(key) && !SAFE_CODE_FIELDS.has(key)) ||
+        RAW_CONTAINER_KEY.test(key)
+      ) {
         result[key] = policy.kind === 'changed-only' ? CHANGED : OMITTED;
       } else {
         result[key] = this.applyPolicy(source[key], policy, seen, depth + 1);
