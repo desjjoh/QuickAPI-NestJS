@@ -22,6 +22,7 @@ enum SORT_OPTIONS {
   LAST_NAME = 'profile.name.last',
   EMAIL = 'user.identity.email',
   NAME = 'fullname',
+  LAST_SIGN_IN = 'user.metadata.last_sign_in',
 }
 
 export class UserPaginationOptions extends PaginationOptions {
