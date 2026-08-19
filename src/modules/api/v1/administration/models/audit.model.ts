@@ -13,6 +13,7 @@ import {
 import { PaginationMeta } from '@/common/models/pagination.model';
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import { AccountActivityOutcome } from '../../account/models/activity.model';
+import { AuditActorType } from '@/config/audit-events.config';
 
 export class AuditSearchQueryDto {
   @ApiPropertyOptional({ maxLength: 64 })
@@ -29,11 +30,10 @@ export class AuditSearchQueryDto {
   @IsOptional()
   @IsEnum(AccountActivityOutcome)
   public readonly outcome?: AccountActivityOutcome;
-  @ApiPropertyOptional({ maxLength: 32 })
+  @ApiPropertyOptional({ enum: AuditActorType })
   @IsOptional()
-  @IsString()
-  @MaxLength(32)
-  public readonly actorType?: string;
+  @IsEnum(AuditActorType)
+  public readonly actorType?: AuditActorType;
   @ApiPropertyOptional({ maxLength: 255 })
   @IsOptional()
   @IsString()
@@ -70,7 +70,8 @@ export class AuditSummaryDto {
   @ApiProperty() public readonly domain: string;
   @ApiProperty() public readonly event: string;
   @ApiProperty() public readonly outcome: string;
-  @ApiProperty() public readonly actorType: string;
+  @ApiProperty({ enum: AuditActorType })
+  public readonly actorType: AuditActorType;
   @ApiProperty({ nullable: true }) public readonly actorId: string | null;
   @ApiProperty({ nullable: true }) public readonly subjectType: string | null;
   @ApiProperty({ nullable: true }) public readonly subjectId: string | null;

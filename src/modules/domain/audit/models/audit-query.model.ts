@@ -1,5 +1,6 @@
 import type { AuditOutcome } from '../services/audit.service';
 import type {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -9,7 +10,7 @@ export interface AuditQuery {
   readonly domain?: string;
   readonly event?: string;
   readonly outcome?: AuditOutcome;
-  readonly actorType?: string;
+  readonly actorType?: AuditActorType;
   readonly actorId?: string | null;
   readonly subjectType?: AuditSubjectType;
   readonly subjectId?: string;

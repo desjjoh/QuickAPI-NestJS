@@ -1,3 +1,14 @@
+/** The bounded set of parties that may initiate an audited action. */
+export const AuditActorType = {
+  USER: 'user',
+  ANONYMOUS: 'anonymous',
+  SERVICE: 'service',
+  ADMIN: 'admin',
+  SYSTEM: 'system',
+} as const;
+export type AuditActorType =
+  (typeof AuditActorType)[keyof typeof AuditActorType];
+
 export enum AuditEventDomain {
   IDENTITY = 'identity',
 }

@@ -2,6 +2,7 @@ import { BaseModel } from '@/common/models/base.model';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { PaginationDto } from '@/common/models/pagination.model';
 import {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -30,7 +31,7 @@ export class AuditEvent extends BaseModel {
   public readonly domain: string;
   public readonly event: string;
   public readonly outcome: string;
-  public readonly actorType: string;
+  public readonly actorType: AuditActorType;
   public readonly actorId: string | null;
   public readonly subjectType: AuditSubjectType | null;
   public readonly subjectId: string | null;
@@ -60,7 +61,7 @@ export class AuditEvent extends BaseModel {
     this.domain = entity.domain;
     this.event = entity.event;
     this.outcome = entity.outcome;
-    this.actorType = entity.actor_type;
+    this.actorType = entity.actor_type as AuditActorType;
     this.actorId = entity.actor_id;
     this.subjectType = entity.subject_type as AuditSubjectType | null;
     this.subjectId = entity.subject_id;

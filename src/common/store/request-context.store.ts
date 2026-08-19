@@ -1,12 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable } from '@nestjs/common';
+import { AuditActorType } from '@/config/audit-events.config';
 
-export type ContextActorType =
-  | 'user'
-  | 'anonymous'
-  | 'service'
-  | 'admin'
-  | 'system';
 export type ContextSource =
   | 'http'
   | 'queue'
@@ -25,7 +20,7 @@ export type RequestContextStore = {
   ipAddress?: string;
   actorId?: string;
   sessionId?: string;
-  actorType?: ContextActorType;
+  actorType?: AuditActorType;
   userAgent?: string;
   source?: ContextSource;
 };
@@ -48,7 +43,7 @@ export class RequestContext {
   /** Run background work in an isolated, explicitly identified context. */
   public runNonHttp<T>(context: NonHttpContext, callback: () => T): T {
     return this.run(
-      { actorType: context.actorType ?? 'system', ...context },
+      { actorType: context.actorType ?? AuditActorType.SYSTEM, ...context },
       callback,
     );
   }

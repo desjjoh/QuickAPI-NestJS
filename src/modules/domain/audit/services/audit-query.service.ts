@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import type { AuditActorType } from '@/config/audit-events.config';
 
 import { AuditQuery } from '../models/audit-query.model';
 import {
@@ -37,7 +38,7 @@ export class AuditQueryService {
   }
 
   public byActor(
-    actorType: string,
+    actorType: AuditActorType,
     actorId: string | null,
     options: QueryOptions = {},
   ): Promise<AuditQueryResult> {

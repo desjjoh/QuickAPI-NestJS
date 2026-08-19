@@ -13,6 +13,7 @@ import {
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import { PaginationMeta } from '@/common/models/pagination.model';
 import {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -80,6 +81,8 @@ export class AccountActivityEventDto {
   public readonly event: string;
   @ApiProperty({ enum: AccountActivityOutcome })
   public readonly outcome: string;
+  @ApiProperty({ enum: AuditActorType })
+  public readonly actorType: AuditActorType;
   @ApiProperty({ enum: AuditSubjectType, nullable: true })
   public readonly subjectType: AuditSubjectType | null;
   @ApiProperty({ nullable: true })
@@ -96,6 +99,7 @@ export class AccountActivityEventDto {
     this.domain = event.domain;
     this.event = event.event;
     this.outcome = event.outcome;
+    this.actorType = event.actorType;
     this.subjectType = event.subjectType;
     this.subjectId = event.subjectId;
     this.resourceType = event.resourceType;

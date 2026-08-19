@@ -93,6 +93,7 @@ describe('account activity', () => {
           domain: 'activity_test',
           event: 'activity_test.other.touched.me',
           outcome: 'succeeded',
+          actorType: 'admin',
         }),
       ],
       meta: {

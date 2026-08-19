@@ -10,6 +10,7 @@ import type { EntityManager, Repository } from 'typeorm';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRedactionService, AuditValue } from './audit-redaction.service';
 import {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -20,12 +21,6 @@ export type AuditOutcome =
   | 'denied'
   | 'pending'
   | 'unknown';
-export type AuditActorType =
-  | 'user'
-  | 'anonymous'
-  | 'service'
-  | 'admin'
-  | 'system';
 export type AuditSource =
   | 'http'
   | 'queue'
@@ -80,13 +75,7 @@ const OUTCOMES: readonly AuditOutcome[] = [
   'pending',
   'unknown',
 ];
-const ACTOR_TYPES: readonly AuditActorType[] = [
-  'user',
-  'anonymous',
-  'service',
-  'admin',
-  'system',
-];
+const ACTOR_TYPES: readonly AuditActorType[] = Object.values(AuditActorType);
 const SOURCES: readonly AuditSource[] = [
   'http',
   'queue',

@@ -14,6 +14,7 @@ import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-resul
 import { AccountActivityOutcome } from '../../account/models/activity.model';
 import { PaginationMeta } from '@/common/models/pagination.model';
 import {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -70,7 +71,8 @@ export class UserActivityEventDto {
   @ApiProperty() public readonly event: string;
   @ApiProperty({ enum: AccountActivityOutcome })
   public readonly outcome: string;
-  @ApiProperty() public readonly actorType: string;
+  @ApiProperty({ enum: AuditActorType })
+  public readonly actorType: AuditActorType;
   @ApiProperty({ nullable: true }) public readonly actorId: string | null;
   @ApiProperty({ enum: AuditSubjectType, nullable: true })
   public readonly subjectType: AuditSubjectType | null;
