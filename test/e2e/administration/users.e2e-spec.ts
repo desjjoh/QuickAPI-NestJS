@@ -3,6 +3,7 @@ import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
 import { jest } from '@jest/globals';
+import { IsNull } from 'typeorm';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
@@ -347,7 +348,7 @@ describe('user administration authorization and lifecycle', () => {
     ).toBe(false);
   });
 
-  it('uses the operation ID to make a retried administrative mutation idempotent', async () => {
+  it('uses the request ID only for tracing an administrative mutation', async () => {
     const target = await register('audit-retry-target@example.test');
     const disabled = await suite.dataSource
       .getRepository(AccountStatusEntity)
@@ -370,7 +371,8 @@ describe('user administration authorization and lifecycle', () => {
     expect(
       await suite.dataSource.getRepository(AuditEventEntity).countBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
-        operation_id: 'retry-operation',
+        request_id: 'retry-operation',
+        operation_id: IsNull(),
       }),
     ).toBe(1);
   });

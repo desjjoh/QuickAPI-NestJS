@@ -22,10 +22,8 @@ describe('UserAdminService', () => {
       findOneOrFail: jest.fn().mockResolvedValue(userFixture()),
     };
     const audit = { record: jest.fn().mockResolvedValue({}) };
-    const auditRepository = { existsBy: jest.fn().mockResolvedValue(false) };
     const dataSource = {
       transaction: jest.fn(async (callback) => callback(manager)),
-      getRepository: jest.fn(() => auditRepository),
     };
     const context = {
       get: jest.fn((key: string) =>
@@ -37,7 +35,6 @@ describe('UserAdminService', () => {
       repo,
       manager,
       audit,
-      auditRepository,
       dataSource,
       context,
       service: new UserAdminService(
@@ -125,8 +122,6 @@ describe('UserAdminService', () => {
         actorId: 'administrator-1',
         subjectId: 'user-1',
         resourceId: 'user-1',
-        operationId: 'operation-1',
-        idempotencyId: 'operation-1',
         metadata: expect.objectContaining({
           reason_code: 'policy_enforcement',
         }),
@@ -138,6 +133,9 @@ describe('UserAdminService', () => {
     expect(input.actorId).toBe('administrator-1');
     expect(input.subjectId).toBe('user-1');
     expect(input.actorId).not.toBe(input.subjectId);
+    expect(input).not.toHaveProperty('operationId');
+    expect(input).not.toHaveProperty('idempotencyId');
+    expect(input.metadata).not.toHaveProperty('operation_id');
   });
 
   it('delegates an administration update and converts the entity to a DTO', async () => {
@@ -169,8 +167,6 @@ describe('UserAdminService', () => {
         actorId: 'administrator-1',
         subjectId: 'user-1',
         resourceId: 'user-1',
-        operationId: 'operation-1',
-        idempotencyId: 'operation-1',
         after: {
           id: user.id,
           status: { id: user.status.id },

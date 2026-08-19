@@ -7,7 +7,6 @@ import { DataSource, EntityManager } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
 import { IdentityAuditEvents } from '@/config/audit-events.config';
-import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
@@ -50,15 +49,6 @@ export class UserAdminService {
     id: string,
     dto: AdministrationActionDto,
   ): Promise<void> {
-    const operationId = this.operationId();
-    if (
-      await this.wasCompleted(
-        IdentityAuditEvents.ADMIN_USER_DELETED,
-        operationId,
-      )
-    )
-      return;
-
     await this.dataSource.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
       await this.repo.removeUser(id, manager);
@@ -66,7 +56,6 @@ export class UserAdminService {
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,
           id,
-          operationId,
           this.auditSnapshot(before),
           null,
           dto.reason_code,
@@ -80,15 +69,6 @@ export class UserAdminService {
     id: string,
     dto: UpdateUserAdministrationDto,
   ): Promise<UserDto> {
-    const operationId = this.operationId();
-    if (
-      await this.wasCompleted(
-        IdentityAuditEvents.ADMIN_USER_UPDATED,
-        operationId,
-      )
-    )
-      return new UserDto(await this.repo.findByIdOrFail(id));
-
     const user = await this.dataSource.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
       const after = await this.repo.updateUserAdministration(id, dto, manager);
@@ -96,7 +76,6 @@ export class UserAdminService {
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_UPDATED,
           id,
-          operationId,
           this.auditSnapshot(before),
           this.auditSnapshot(after),
           dto.reason_code,
@@ -106,19 +85,6 @@ export class UserAdminService {
       return after;
     });
     return new UserDto(user);
-  }
-
-  private operationId(): string | null {
-    return this.context.get('requestId') ?? null;
-  }
-
-  private async wasCompleted(event: string, operationId: string | null) {
-    if (!operationId) return false;
-    return this.dataSource.getRepository(AuditEventEntity).existsBy({
-      event,
-      operation_id: operationId,
-      outcome: 'succeeded',
-    });
   }
 
   /** The pessimistic read makes the captured before value part of the mutation transaction. */
@@ -135,7 +101,6 @@ export class UserAdminService {
   private successInput(
     event: IdentityAuditEvents,
     id: string,
-    operationId: string | null,
     before: unknown,
     after: unknown,
     reasonCode: string,
@@ -153,11 +118,8 @@ export class UserAdminService {
       resourceId: id,
       source: 'http' as const,
       metadata: {
-        operation_id: operationId,
         reason_code: reasonCode,
       },
-      operationId,
-      idempotencyId: operationId,
       before,
       after,
     };

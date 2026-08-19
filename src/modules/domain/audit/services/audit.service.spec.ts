@@ -214,13 +214,11 @@ describe(AuditService.name, () => {
       after: { name: { first: 'Same' } },
       meaningfulWithoutChanges: true,
       operationId: 'operation-1',
-      idempotencyId: 'retry-1',
     });
 
     expect(repository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         operation_id: 'operation-1',
-        idempotency_id: 'retry-1',
         before: {},
         after: {},
         changes: {},

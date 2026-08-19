@@ -19,7 +19,6 @@ function entity(id: string, occurredAt: string) {
     resource_type: 'user',
     resource_id: 'resource-1',
     operation_id: null,
-    idempotency_id: null,
     request_id: 'request-1',
     session_id: 'session-1',
     ip_address: null,

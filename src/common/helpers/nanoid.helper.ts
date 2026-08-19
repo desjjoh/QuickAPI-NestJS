@@ -6,3 +6,7 @@ const CUSTOM_ALPHABET_ENTITY_ID =
 
 export const generateRequestId = customAlphabet(CUSTOM_ALPHABET_REQUEST_ID, 8);
 export const generatePrimaryId = customAlphabet(CUSTOM_ALPHABET_ENTITY_ID, 16);
+export const generateOperationId = customAlphabet(
+  CUSTOM_ALPHABET_ENTITY_ID,
+  16,
+);

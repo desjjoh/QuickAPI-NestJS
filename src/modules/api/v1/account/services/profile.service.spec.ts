@@ -84,6 +84,10 @@ describe('ProfileApiService audit mutations', () => {
     });
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledTimes(2);
+    const [nameInput] = audit.record.mock.calls[0];
+    const [personalInput] = audit.record.mock.calls[1];
+    expect(nameInput.operationId).toBe('test-id');
+    expect(personalInput.operationId).toBe(nameInput.operationId);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: 'identity',

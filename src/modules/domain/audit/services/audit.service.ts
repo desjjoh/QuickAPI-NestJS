@@ -59,7 +59,6 @@ export interface RecordAuditInput {
   readonly occurredAt?: Date;
   /** Correlates retries or multiple audit events belonging to one operation. */
   readonly operationId?: string | null;
-  readonly idempotencyId?: string | null;
   readonly before?: unknown;
   readonly after?: unknown;
   /** Persist a semantic event even when its redacted snapshots have no changes. */
@@ -189,7 +188,6 @@ export class AuditService {
       resource_id: input.resourceId ?? null,
       domain: input.domain,
       operation_id: input.operationId ?? null,
-      idempotency_id: input.idempotencyId ?? null,
       request_id: this.explicitOrContext(
         input,
         'requestId',
@@ -297,7 +295,6 @@ export class AuditService {
     this.optionalString('failureReason', input.failureReason, 512);
     this.optionalString('failureCode', input.failureCode, 64);
     this.optionalString('operationId', input.operationId, 128);
-    this.optionalString('idempotencyId', input.idempotencyId, 128);
 
     if (
       input.occurredAt !== undefined &&
