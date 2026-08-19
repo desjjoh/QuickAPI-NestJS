@@ -14,6 +14,7 @@ import { MfaChallengePurpose } from '@/modules/domain/identity/entities/mfa.enti
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaChallengeResponseDto } from '../models/mfa.model';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
+import { RequestContext } from '@/common/store/request-context.store';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly refreshSvc: RefreshService,
     private readonly mfaSvc: MfaService,
     private readonly auditSvc: AuditService,
+    private readonly requestContext: RequestContext,
   ) {}
 
   public async signIn(
@@ -59,6 +61,9 @@ export class AuthService {
     const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
       : this.refreshSvc.issueTokens(updated, res));
+    const sessionId = tokens.user.session!.id;
+
+    this.requestContext.set('sessionId', sessionId);
 
     if (options.recordAudit !== false)
       await this.auditSvc.record({
@@ -69,6 +74,7 @@ export class AuthService {
         actorId: user.id,
         subjectType: AuditSubjectType.USER,
         subjectId: user.id,
+        sessionId,
         resourceType: AuditResourceType.IDENTITY_USER,
         resourceId: user.id,
         source: 'http',

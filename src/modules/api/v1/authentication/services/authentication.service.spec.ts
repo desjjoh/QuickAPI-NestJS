@@ -33,7 +33,7 @@ describe('AuthService', () => {
     iat: 1,
     exp: 2,
     refresh: 3,
-    user: {},
+    user: { session: { id: 'issued-session' } },
   };
 
   const setup = () => {
@@ -50,17 +50,20 @@ describe('AuthService', () => {
       createSignInChallenge: jest.fn().mockResolvedValue(null),
       verifyChallenge: jest.fn().mockResolvedValue(user),
     };
+    const requestContext = { set: jest.fn() };
     return {
       service: new AuthService(
         userSvc as unknown as UserService,
         refreshSvc as unknown as RefreshService,
         mfaSvc as unknown as MfaService,
         auditSvc as never,
+        requestContext as never,
       ),
       userSvc,
       refreshSvc,
       mfaSvc,
       auditSvc,
+      requestContext,
     };
   };
 
@@ -77,11 +80,23 @@ describe('AuthService', () => {
       actorId: user.id,
       subjectType: 'user',
       subjectId: user.id,
+      sessionId: 'issued-session',
       resourceType: 'identity.user',
       resourceId: user.id,
       source: 'http',
       metadata: {},
     });
+  });
+
+  it('publishes the issued session to request context', async () => {
+    const { service, requestContext } = setup();
+
+    await service.signIn(user, res);
+
+    expect(requestContext.set).toHaveBeenCalledWith(
+      'sessionId',
+      'issued-session',
+    );
   });
 
   it('passes request context when issuing tokens for an ordinary sign-in', async () => {
@@ -152,6 +167,7 @@ describe('AuthService', () => {
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         resourceType: 'identity.user',
         resourceId: user.id,
+        sessionId: 'issued-session',
       }),
     );
   });

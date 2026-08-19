@@ -146,6 +146,15 @@ describe('Registration request', () => {
     expect(session.ip_address).toEqual(expect.any(String));
 
     const audits = suite.dataSource.getRepository(AuditEventEntity);
+    const issuedSessionId = confirmed.body.user.session.id as string;
+    await expect(
+      audits.findOneByOrFail({
+        event:
+          AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
+            .REGISTRATION_VERIFICATION_SUCCEEDED,
+        subject_id: confirmed.body.user.id as string,
+      }),
+    ).resolves.toMatchObject({ session_id: issuedSessionId });
     await expect(
       audits.countBy({
         event:

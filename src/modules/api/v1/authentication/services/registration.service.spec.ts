@@ -133,19 +133,25 @@ describe('RegistrationService', () => {
     const { service, emailSvc, auditSvc } = setup();
     const created = userFixture({ id: 'created-user' });
     emailSvc.verifyRegistrationToken.mockResolvedValue(created);
+    const tokens = {
+      user: { session: { id: 'registration-session' } },
+    } as never;
+    const issueSession = jest.fn().mockResolvedValue(tokens);
     await expect(
-      service.verifyRegistration('challenge-1', '123456'),
-    ).resolves.toBe(created);
+      service.verifyRegistration('challenge-1', '123456', issueSession),
+    ).resolves.toBe(tokens);
     expect(emailSvc.verifyRegistrationToken).toHaveBeenCalledWith(
       'challenge-1',
       '123456',
     );
+    expect(issueSession).toHaveBeenCalledWith(created);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event:
           AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
             .REGISTRATION_VERIFICATION_SUCCEEDED,
         subjectId: 'created-user',
+        sessionId: 'registration-session',
       }),
     );
   });

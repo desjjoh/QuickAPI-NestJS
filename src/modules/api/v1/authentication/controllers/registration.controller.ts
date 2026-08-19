@@ -115,11 +115,8 @@ export class RegistrationApiController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<JWTDto> {
-    const user = await this.svc.verifyRegistration(
-      input.challenge_id,
-      input.code,
+    return this.svc.verifyRegistration(input.challenge_id, input.code, (user) =>
+      this.authSvc.completeSignIn(user, res, req, { recordAudit: false }),
     );
-
-    return this.authSvc.completeSignIn(user, res, req, { recordAudit: false });
   }
 }

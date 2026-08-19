@@ -11,6 +11,11 @@ import {
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import { teardownTestSuite, type TestSuite } from '../../helpers/test-app';
 import {
   acquireCsrf,
@@ -204,6 +209,13 @@ describe('Email MFA lifecycle', () => {
       refresh: expect.any(Number),
       user: expect.any(Object),
     });
+    const issuedSessionId = completed.body.user.session.id as string;
+    await expect(
+      suite.dataSource.getRepository(AuditEventEntity).findOneByOrFail({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        subject_id: completed.body.user.id as string,
+      }),
+    ).resolves.toMatchObject({ session_id: issuedSessionId });
     expect(
       await suite.dataSource.getRepository(UserSessionEntity).count(),
     ).toBe(1);

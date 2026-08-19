@@ -13,6 +13,11 @@ import { UserSessionEntity } from '@/modules/domain/identity/entities/session.en
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { TokenService } from '@/modules/system/tokens/services/token.service';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditEventDomain,
+} from '@/config/audit-events.config';
 import {
   acquireCsrf,
   CapturingEmailService,
@@ -103,6 +108,13 @@ describe('Authentication and session lifecycle', () => {
         identity: expect.objectContaining({ email: 'person@example.test' }),
       }),
     });
+    const issuedSessionId = signedIn.response.body.user.session.id as string;
+    await expect(
+      suite.dataSource.getRepository(AuditEventEntity).findOneByOrFail({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        subject_id: user.id,
+      }),
+    ).resolves.toMatchObject({ session_id: issuedSessionId });
     const refreshCookie = cookies(signedIn.response).find((value) =>
       value.startsWith(`${REFRESH_COOKIE}=`),
     );
