@@ -14,6 +14,16 @@ import { PaginationMeta } from '@/common/models/pagination.model';
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import { AccountActivityOutcome } from '../../account/models/activity.model';
 import { AuditActorType } from '@/config/audit-events.config';
+import {
+  ADMINISTRATION_REASON_CODES,
+  AdministrationReasonCode,
+} from '@/config/administration.config';
+
+type AuditDetailData = Readonly<Record<string, unknown>>;
+
+const administrationReasonCodes = new Set<string>(
+  Object.values(ADMINISTRATION_REASON_CODES),
+);
 
 export class AuditSearchQueryDto {
   @ApiPropertyOptional({ maxLength: 64 })
@@ -64,7 +74,7 @@ export class AuditSearchQueryDto {
   public readonly take: number = 25;
 }
 
-/** A deliberately narrow allowlist. Persistence metadata and payloads never cross the API boundary. */
+/** The searchable summary contract; payloads and persistence metadata never cross this boundary. */
 export class AuditSummaryDto {
   @ApiProperty() public readonly id: string;
   @ApiProperty() public readonly domain: string;
@@ -93,11 +103,63 @@ export class AuditSummaryDto {
     this.resourceId = event.resourceId;
     this.occurredAt = new Date(event.occurredAt);
     Object.freeze(this.occurredAt);
-    Object.freeze(this);
+    if (new.target === AuditSummaryDto) Object.freeze(this);
   }
 }
 
-export class AuditDetailDto extends AuditSummaryDto {}
+/** The separately authorized detail contract, containing only approved context and redacted payloads. */
+export class AuditDetailDto extends AuditSummaryDto {
+  @ApiProperty({
+    enum: ADMINISTRATION_REASON_CODES,
+    nullable: true,
+    description: 'Validated reason for an administration action.',
+  })
+  public readonly reasonCode: AdministrationReasonCode | null;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  public readonly before: AuditDetailData | null;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  public readonly after: AuditDetailData | null;
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: true,
+    nullable: true,
+  })
+  public readonly changes: AuditDetailData | null;
+  @ApiProperty({ nullable: true })
+  public readonly sessionId: string | null;
+  @ApiProperty({ nullable: true })
+  public readonly requestId: string | null;
+  @ApiProperty({ nullable: true })
+  public readonly httpMethod: string | null;
+  @ApiProperty({ nullable: true })
+  public readonly route: string | null;
+
+  public constructor(event: AuditEvent) {
+    super(event);
+    const reasonCode = event.metadata?.reason_code;
+    this.reasonCode =
+      typeof reasonCode === 'string' &&
+      administrationReasonCodes.has(reasonCode)
+        ? (reasonCode as AdministrationReasonCode)
+        : null;
+    this.before = event.before;
+    this.after = event.after;
+    this.changes = event.changes;
+    this.sessionId = event.sessionId;
+    this.requestId = event.requestId;
+    this.httpMethod = event.httpMethod;
+    this.route = event.route;
+    Object.freeze(this);
+  }
+}
 
 export class AuditSearchPageDto {
   @ApiProperty({ type: AuditSummaryDto, isArray: true })

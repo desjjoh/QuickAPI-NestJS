@@ -251,7 +251,10 @@ describe('user administration authorization and lifecycle', () => {
   it('commits an administrative write and its success audit together', async () => {
     const updater = await register('audit-commit-admin@example.test');
     const target = await register('audit-commit-target@example.test');
-    await grant(updater, 'e2e-audit-commit', ['update_users']);
+    await grant(updater, 'e2e-audit-commit', [
+      'update_users',
+      'read_audit_detail',
+    ]);
     await suite.dataSource.getRepository(UserSessionEntity).clear();
     const disabled = await suite.dataSource
       .getRepository(AccountStatusEntity)
@@ -271,6 +274,24 @@ describe('user administration authorization and lifecycle', () => {
       });
     expect(event.outcome).toBe('succeeded');
     expect(event.before).not.toEqual(event.after);
+
+    const detail = await request(app.getHttpServer())
+      .get(`/api/v1/administration/audits/${event.id}`)
+      .set(await signIn('audit-commit-admin@example.test'))
+      .expect(200);
+    expect(detail.body).toMatchObject({
+      reasonCode: 'policy_enforcement',
+      before: {
+        id: target.id,
+        status: { id: target.status.id },
+      },
+      after: {
+        id: target.id,
+        status: { id: disabled.id },
+      },
+    });
+    expect(detail.body).not.toHaveProperty('metadata');
+    expect(JSON.stringify(detail.body)).not.toMatch(/password|authorization/);
   });
 
   it('rolls back the domain write without recording a success event', async () => {

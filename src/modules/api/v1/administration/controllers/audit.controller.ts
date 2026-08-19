@@ -29,7 +29,11 @@ export class AuditAdministrationController {
   public constructor(private readonly service: AuditAdministrationService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Search audit records' })
+  @ApiOperation({
+    summary: 'Search audit record summaries',
+    description:
+      'Returns the searchable summary allowlist only. Redacted snapshots and approved request context require the separately authorized detail endpoint.',
+  })
   @ApiOkResponse({ type: AuditSearchPageDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].SEARCH_AUDIT)
   public search(
@@ -40,7 +44,11 @@ export class AuditAdministrationController {
 
   @Get(':id')
   @EntityIdParam
-  @ApiOperation({ summary: 'Read an audit record' })
+  @ApiOperation({
+    summary: 'Read approved audit record detail',
+    description:
+      'Requires audit-detail permission and adds only explicitly approved request context, a validated administration reason code, and redacted snapshots to the summary fields.',
+  })
   @ApiOkResponse({ type: AuditDetailDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].READ_AUDIT_DETAIL)
   public detail(

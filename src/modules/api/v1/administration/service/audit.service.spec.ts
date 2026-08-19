@@ -14,19 +14,24 @@ describe(AuditAdministrationService.name, () => {
     resourceType: 'identity.user',
     resourceId: 'subject-1',
     occurredAt: new Date('2026-01-01T00:00:00.000Z'),
-    metadata: { authorization: 'Bearer secret' },
-    before: { email: 'private@example.test' },
-    after: { password: 'secret-password' },
-    changes: { token: 'secret-token' },
+    metadata: {
+      reason_code: 'policy_enforcement',
+      authorization: 'Bearer secret',
+    },
+    before: { email: '[REDACTED]' },
+    after: { password: '[CHANGED]' },
+    changes: { password: true },
     error: { stack: 'internal stack' },
     ipAddress: '203.0.113.10',
     userAgent: 'browser fingerprint',
     requestId: 'internal-request',
     sessionId: 'internal-session',
+    httpMethod: 'PATCH',
+    route: '/api/v1/administration/users/:id',
     failureReason: 'private failure detail',
     createdAt: new Date(),
     updatedAt: new Date(),
-  } as never;
+  };
 
   it('defensively allowlists search responses', async () => {
     const queries = {
@@ -66,14 +71,40 @@ describe(AuditAdministrationService.name, () => {
     );
   });
 
-  it('applies the same allowlist to detail responses', async () => {
+  it('returns only explicitly allowlisted detail fields', async () => {
     const queries = { findById: jest.fn().mockResolvedValue(unsafeEvent) };
     const response = await new AuditAdministrationService(
       queries as never,
     ).detail('0123456789abcdef');
 
-    expect(JSON.stringify(response)).not.toContain('secret');
+    expect(response).toMatchObject({
+      reasonCode: 'policy_enforcement',
+      before: { email: '[REDACTED]' },
+      after: { password: '[CHANGED]' },
+      changes: { password: true },
+      sessionId: 'internal-session',
+      requestId: 'internal-request',
+      httpMethod: 'PATCH',
+      route: '/api/v1/administration/users/:id',
+    });
+    expect(JSON.stringify(response)).not.toContain('Bearer secret');
     expect(response).not.toHaveProperty('metadata');
     expect(response).not.toHaveProperty('createdAt');
+  });
+
+  it('rejects unknown reason codes rather than exposing metadata values', async () => {
+    const queries = {
+      findById: jest.fn().mockResolvedValue({
+        ...unsafeEvent,
+        metadata: { reason_code: 'attacker-controlled', secret: 'hidden' },
+      }),
+    };
+
+    const response = await new AuditAdministrationService(
+      queries as never,
+    ).detail('0123456789abcdef');
+
+    expect(response.reasonCode).toBeNull();
+    expect(JSON.stringify(response)).not.toMatch(/attacker-controlled|hidden/);
   });
 });

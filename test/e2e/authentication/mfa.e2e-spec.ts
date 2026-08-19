@@ -214,6 +214,7 @@ describe('Email MFA lifecycle', () => {
       suite.dataSource.getRepository(AuditEventEntity).findOneByOrFail({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         subject_id: completed.body.user.id as string,
+        session_id: issuedSessionId,
       }),
     ).resolves.toMatchObject({
       session_id: issuedSessionId,
