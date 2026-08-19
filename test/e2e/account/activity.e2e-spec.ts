@@ -91,7 +91,7 @@ describe('account activity', () => {
       data: [
         expect.objectContaining({
           domain: 'activity_test',
-          event: 'activity_test.self.first',
+          event: 'activity_test.other.touched.me',
           outcome: 'succeeded',
         }),
       ],

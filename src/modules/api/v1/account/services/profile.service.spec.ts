@@ -65,7 +65,15 @@ describe('ProfileApiService audit mutations', () => {
         },
       },
     });
-    const { service, audit, manager, dataSource } = setup(current, after);
+    const { service, audit, manager, dataSource, userSvc } = setup(
+      current,
+      after,
+    );
+    userSvc.updateUser.mockImplementation(async () => {
+      Object.assign(current.profile.name, after.profile.name);
+      Object.assign(current.profile.personal, after.profile.personal);
+      return after;
+    });
     await service.updateProfile(current, session, {
       first_name: 'New',
       last_name: 'Name',

@@ -71,6 +71,7 @@ describe('UserRepository', () => {
     const builder = {
       leftJoinAndSelect: jest.fn(),
       where: jest.fn(),
+      addSelect: jest.fn(),
       orderBy: jest.fn(),
       take: jest.fn(),
       skip: jest.fn(),
@@ -100,40 +101,44 @@ describe('UserRepository', () => {
     expect(builder.orderBy).toHaveBeenCalledWith({
       'user.createdAt': 'DESC',
     });
-    expect(builder.orderBy).toHaveBeenCalledWith('user.createdAt', 'DESC');
+    expect(builder.addSelect).toHaveBeenCalledWith(
+      "CONCAT(profile.name.first, ' ', profile.name.last)",
+      'fullname',
+    );
     expect(builder.take).toHaveBeenCalledWith(20);
     expect(builder.skip).toHaveBeenCalledWith(40);
   });
 
-  it.each([
-    ['fullname', "CONCAT(profile.name.first, ' ', profile.name.last)"],
-    ['user.metadata.last_sign_in', 'user.metadata.last_sign_in'],
-  ])('uses the database expression for the %s sort', async (sort, expected) => {
-    const builder = {
-      leftJoinAndSelect: jest.fn(),
-      where: jest.fn(),
-      orderBy: jest.fn(),
-      take: jest.fn(),
-      skip: jest.fn(),
-      getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
-    };
-    Object.values(builder)
-      .slice(0, -1)
-      .forEach((mock) => mock.mockReturnValue(builder));
-    jest
-      .spyOn(repository, 'createQueryBuilder')
-      .mockReturnValue(builder as never);
+  it.each(['fullname', 'user.metadata.last_sign_in'])(
+    'uses the selected column for the %s sort',
+    async (sort) => {
+      const builder = {
+        leftJoinAndSelect: jest.fn(),
+        where: jest.fn(),
+        addSelect: jest.fn(),
+        orderBy: jest.fn(),
+        take: jest.fn(),
+        skip: jest.fn(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      };
+      Object.values(builder)
+        .slice(0, -1)
+        .forEach((mock) => mock.mockReturnValue(builder));
+      jest
+        .spyOn(repository, 'createQueryBuilder')
+        .mockReturnValue(builder as never);
 
-    await repository.paginate({
-      sort,
-      search: '',
-      order: 'ASC',
-      take: 25,
-      skip: 0,
-    } as unknown as UserPaginationOptions);
+      await repository.paginate({
+        sort,
+        search: '',
+        order: 'ASC',
+        take: 25,
+        skip: 0,
+      } as unknown as UserPaginationOptions);
 
-    expect(builder.orderBy).toHaveBeenCalledWith(expected, 'ASC');
-  });
+      expect(builder.orderBy).toHaveBeenCalledWith(sort, 'ASC');
+    },
+  );
 
   it('uses the expected criteria for common user lookups', async () => {
     const find = jest.spyOn(repository, 'find').mockResolvedValue([]);

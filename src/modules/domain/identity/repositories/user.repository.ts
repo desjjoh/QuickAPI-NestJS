@@ -52,11 +52,6 @@ export class UserRepository extends Repository<UserEntity> {
     pageOptions: UserPaginationOptions,
   ): Promise<[UserEntity[], number]> {
     const { sort, search, order, take, skip } = pageOptions;
-    const sortExpression =
-      sort === 'fullname'
-        ? "CONCAT(profile.name.first, ' ', profile.name.last)"
-        : sort;
-
     return this.createQueryBuilder('user')
       .leftJoinAndSelect('user.profile', 'profile')
       .leftJoinAndSelect('user.status', 'status')
@@ -75,7 +70,11 @@ export class UserRepository extends Repository<UserEntity> {
         "user.email like :query OR CONCAT(profile.name.first, ' ', profile.name.last) like :query",
         { query: `%${search}%` },
       )
-      .orderBy(sortExpression, order)
+      .addSelect(
+        "CONCAT(profile.name.first, ' ', profile.name.last)",
+        'fullname',
+      )
+      .orderBy(sort, order)
       .take(take)
       .skip(skip)
       .getManyAndCount();

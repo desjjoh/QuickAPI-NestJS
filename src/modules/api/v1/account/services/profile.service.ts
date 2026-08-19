@@ -47,6 +47,8 @@ export class ProfileApiService {
   ): Promise<UserDto> {
     const updated = await this.dataSource.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
+      const nameBefore = this.profileName(current);
+      const personalBefore = this.profilePersonal(current);
       const after = await this.userSvc.updateUser(
         current,
         {
@@ -71,7 +73,7 @@ export class ProfileApiService {
         IdentityAuditEvents.PROFILE_NAME_CHANGED,
         AuditResourceType.IDENTITY_PROFILE,
         current.profile.id,
-        this.profileName(current),
+        nameBefore,
         this.profileName(after),
         user.id,
       );
@@ -80,12 +82,13 @@ export class ProfileApiService {
         IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
         AuditResourceType.IDENTITY_PROFILE,
         current.profile.id,
-        this.profilePersonal(current),
+        personalBefore,
         this.profilePersonal(after),
         user.id,
       );
       return after;
     });
+
     return new UserDto(updated, session);
   }
 
