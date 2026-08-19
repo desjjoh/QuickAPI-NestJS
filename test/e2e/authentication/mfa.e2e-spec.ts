@@ -215,7 +215,10 @@ describe('Email MFA lifecycle', () => {
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         subject_id: completed.body.user.id as string,
       }),
-    ).resolves.toMatchObject({ session_id: issuedSessionId });
+    ).resolves.toMatchObject({
+      session_id: issuedSessionId,
+      route: `${AUTH_ROOT}/sign-in/mfa/verify`,
+    });
     expect(
       await suite.dataSource.getRepository(UserSessionEntity).count(),
     ).toBe(1);

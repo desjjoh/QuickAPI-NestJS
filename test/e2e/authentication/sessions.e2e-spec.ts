@@ -114,7 +114,10 @@ describe('Authentication and session lifecycle', () => {
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         subject_id: user.id,
       }),
-    ).resolves.toMatchObject({ session_id: issuedSessionId });
+    ).resolves.toMatchObject({
+      session_id: issuedSessionId,
+      route: `${AUTH_ROOT}/sign-in`,
+    });
     const refreshCookie = cookies(signedIn.response).find((value) =>
       value.startsWith(`${REFRESH_COOKIE}=`),
     );

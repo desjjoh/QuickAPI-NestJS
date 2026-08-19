@@ -4,7 +4,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { isAbsolute, join } from 'node:path';
 
 import { env } from '@/config/environment.config';
-import { RequestContext } from '@/common/store/request-context.store';
+
 import { AccessTokenStrategy } from '@/common/strategies/access.strategy';
 import { minute } from '@/common/constants/milliseconds.constants';
 import { LocalStrategy } from '@/common/strategies/local.strategy';
@@ -16,7 +16,8 @@ import { ApiModule } from './api/api.module';
 import { SystemModule } from './system/system.module';
 import { RequestContextModule } from './system/context/context.module';
 import { RedisThrottlerStorage } from '@/common/throttling/redis-throttler.storage';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { RouteContextInterceptor } from '@/common/interceptors/route-context.interceptor';
 
 function resolveStaticRootPath(staticRootPath: string): string {
   return isAbsolute(staticRootPath)
@@ -53,7 +54,7 @@ const staticImports: DynamicModule[] = env.STATIC_SERVE_ENABLED
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
-    RequestContext,
+    { provide: APP_INTERCEPTOR, useClass: RouteContextInterceptor },
     LocalStrategy,
     RefreshTokenStrategy,
     AccessTokenStrategy,

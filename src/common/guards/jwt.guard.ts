@@ -24,14 +24,6 @@ class JwtAuthGuard extends AuthGuard('jwt-access') {
     if (typeof sessionId === 'string')
       this.requestContext.set('sessionId', sessionId);
 
-    const normalizedRoute = request.route?.path;
-
-    if (typeof normalizedRoute === 'string')
-      this.requestContext.set(
-        'normalizedRoute',
-        `${request.baseUrl ?? ''}${normalizedRoute}`,
-      );
-
     return result as boolean;
   }
 }

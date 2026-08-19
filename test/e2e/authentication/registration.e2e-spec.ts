@@ -154,7 +154,10 @@ describe('Registration request', () => {
             .REGISTRATION_VERIFICATION_SUCCEEDED,
         subject_id: confirmed.body.user.id as string,
       }),
-    ).resolves.toMatchObject({ session_id: issuedSessionId });
+    ).resolves.toMatchObject({
+      session_id: issuedSessionId,
+      route: `${REGISTRATION_ROOT}/confirm`,
+    });
     await expect(
       audits.countBy({
         event:
