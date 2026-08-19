@@ -94,6 +94,7 @@ describe('account activity', () => {
           event: 'activity_test.other.touched.me',
           outcome: 'succeeded',
           actorType: 'admin',
+          actorId: 'other-actor-id',
         }),
       ],
       meta: {
@@ -105,7 +106,6 @@ describe('account activity', () => {
         hasNextPage: false,
       },
     });
-    expect(response.body.data[0]).not.toHaveProperty('actorId');
     expect(response.body.data[0]).not.toHaveProperty('metadata');
     expect(response.body.data[0]).not.toHaveProperty('failureReason');
     expect(response.body.data[0]).not.toHaveProperty('ipAddress');

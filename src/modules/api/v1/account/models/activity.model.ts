@@ -83,6 +83,8 @@ export class AccountActivityEventDto {
   public readonly outcome: string;
   @ApiProperty({ enum: AuditActorType })
   public readonly actorType: AuditActorType;
+  @ApiProperty({ nullable: true })
+  public readonly actorId: string | null;
   @ApiProperty({ enum: AuditSubjectType, nullable: true })
   public readonly subjectType: AuditSubjectType | null;
   @ApiProperty({ nullable: true })
@@ -100,6 +102,7 @@ export class AccountActivityEventDto {
     this.event = event.event;
     this.outcome = event.outcome;
     this.actorType = event.actorType;
+    this.actorId = event.actorId;
     this.subjectType = event.subjectType;
     this.subjectId = event.subjectId;
     this.resourceType = event.resourceType;
