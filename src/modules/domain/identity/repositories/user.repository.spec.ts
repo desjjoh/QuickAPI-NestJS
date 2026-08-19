@@ -98,13 +98,13 @@ describe('UserRepository', () => {
     expect(builder.where).toHaveBeenCalledWith(expect.any(String), {
       query: '%Ada%',
     });
-    expect(builder.orderBy).toHaveBeenCalledWith({
-      'user.createdAt': 'DESC',
-    });
     expect(builder.addSelect).toHaveBeenCalledWith(
       "CONCAT(profile.name.first, ' ', profile.name.last)",
       'fullname',
     );
+    expect(builder.orderBy).toHaveBeenCalledWith({
+      'user.createdAt': 'DESC',
+    });
     expect(builder.take).toHaveBeenCalledWith(20);
     expect(builder.skip).toHaveBeenCalledWith(40);
   });
@@ -136,7 +136,7 @@ describe('UserRepository', () => {
         skip: 0,
       } as unknown as UserPaginationOptions);
 
-      expect(builder.orderBy).toHaveBeenCalledWith(sort, 'ASC');
+      expect(builder.orderBy).toHaveBeenCalledWith({ [sort]: 'ASC' });
     },
   );
 

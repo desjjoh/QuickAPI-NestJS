@@ -116,7 +116,7 @@ describe('account activity', () => {
       .expect(422);
   });
 
-  it('page-paginates the authenticated actor history', async () => {
+  it('page-paginates the authenticated account history', async () => {
     const user = await createRegisteredUser(app, suite, email);
     const agent = request.agent(app.getHttpServer());
     const csrf = await acquireCsrf(agent);
@@ -139,6 +139,8 @@ describe('account activity', () => {
         outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
+        subjectType: AuditSubjectType.USER,
+        subjectId: user.id,
         source: 'service',
         domain: 'page_test',
         metadata: {},

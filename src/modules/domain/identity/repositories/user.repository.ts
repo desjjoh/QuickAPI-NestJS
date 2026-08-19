@@ -74,7 +74,7 @@ export class UserRepository extends Repository<UserEntity> {
         "CONCAT(profile.name.first, ' ', profile.name.last)",
         'fullname',
       )
-      .orderBy(sort, order)
+      .orderBy({ [sort]: order })
       .take(take)
       .skip(skip)
       .getManyAndCount();
