@@ -41,7 +41,7 @@ describe('account activity', () => {
   });
   afterAll(() => teardownTestSuite(suite));
 
-  it('returns only events where the authenticated user is the actor', async () => {
+  it('returns only events where the authenticated user is the subject', async () => {
     const user = await createRegisteredUser(app, suite, email);
     const agent = request.agent(app.getHttpServer());
     const csrf = await acquireCsrf(agent);
