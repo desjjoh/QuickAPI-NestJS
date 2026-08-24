@@ -13,6 +13,7 @@ import {
   AuditEventDomain,
 } from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+import { AuditRedactionService } from '@/modules/domain/audit/services/audit-redaction.service';
 
 describe('RegistrationService', () => {
   const dto = {
@@ -152,7 +153,20 @@ describe('RegistrationService', () => {
             .REGISTRATION_VERIFICATION_SUCCEEDED,
         subjectId: 'created-user',
         sessionId: 'registration-session',
+        before: {},
+        after: expect.objectContaining({ id: 'created-user' }),
       }),
+    );
+    const input = auditSvc.record.mock.calls[0][0];
+    const diff = new AuditRedactionService().redactDiff(
+      input.resourceType,
+      input.before,
+      input.after,
+    );
+    expect(diff.before).toEqual({});
+    expect(diff.after).not.toHaveProperty('identity.password');
+    expect(diff.changes).toEqual(
+      expect.objectContaining({ id: { before: null, after: 'created-user' } }),
     );
   });
 });

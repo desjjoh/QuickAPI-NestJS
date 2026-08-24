@@ -1,7 +1,6 @@
 import {
   AuditPolicy,
   changedOnly,
-  hashed,
   nestedObject,
   relationshipIds,
   scalar,
@@ -11,18 +10,22 @@ import { AuditResourceType } from '@/config/audit-events.config';
 export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
   [AuditResourceType.IDENTITY_USER]: {
     id: scalar,
-    identity: nestedObject({ email: changedOnly, password: changedOnly }),
+    identity: nestedObject({ email: changedOnly }),
     profile: nestedObject({
       id: scalar,
       name: nestedObject({ first: scalar, last: scalar }),
     }),
     roles: relationshipIds,
-    status: nestedObject({ id: scalar, name: scalar }),
+    sessions: relationshipIds,
+    status: nestedObject({ id: scalar, key: scalar, label: scalar }),
     active: scalar,
     created_at: scalar,
     updated_at: scalar,
     deleted_at: scalar,
-    metadata: nestedObject({ mfa_enabled: changedOnly }),
+    metadata: nestedObject({
+      last_sign_in: scalar,
+      mfa_enabled: changedOnly,
+    }),
   },
   [AuditResourceType.IDENTITY_PROFILE]: {
     id: scalar,
@@ -65,11 +68,14 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     id: scalar,
     user_id: scalar,
     active: scalar,
-    ip: hashed,
+    browser: scalar,
+    browser_version: scalar,
+    device: scalar,
+    os: scalar,
+    os_version: scalar,
     user_agent: changedOnly,
     created_at: scalar,
-    expires_at: scalar,
-    revoked_at: scalar,
+    updated_at: scalar,
   },
   [AuditResourceType.IDENTITY_ROLE]: {
     id: scalar,

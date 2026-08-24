@@ -25,6 +25,7 @@ import {
 } from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 
 @Injectable()
 export class RegistrationService {
@@ -101,6 +102,7 @@ export class RegistrationService {
     issueSession: (user: UserEntity) => Promise<JWTDto>,
   ): Promise<JWTDto> {
     const user = await this.emailSvc.verifyRegistrationToken(challengeId, code);
+    const after = identityUserSnapshot(user);
     const tokens = await issueSession(user);
     const sessionId = tokens.user.session!.id;
 
@@ -119,6 +121,8 @@ export class RegistrationService {
       resourceId: user.id,
       source: 'http',
       metadata: {},
+      before: {},
+      after,
     });
 
     return tokens;

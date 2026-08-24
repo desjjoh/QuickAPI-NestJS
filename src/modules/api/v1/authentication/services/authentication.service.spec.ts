@@ -20,6 +20,7 @@ import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
 } from '@/config/audit-events.config';
+import { AuditRedactionService } from '@/modules/domain/audit/services/audit-redaction.service';
 
 describe('AuthService', () => {
   const res = {
@@ -69,22 +70,51 @@ describe('AuthService', () => {
 
   it('completes an ordinary sign-in and returns the issued token DTO', async () => {
     const { service, userSvc, refreshSvc, auditSvc } = setup();
+    const signedInAt = new Date('2026-01-03T04:05:06.000Z');
+    const updated = userFixture({
+      metadata: { ...user.metadata, last_sign_in: signedInAt },
+    });
+    userSvc.recordSignIn.mockResolvedValue(updated);
     await expect(service.signIn(user, res)).resolves.toBe(tokens);
     expect(userSvc.recordSignIn).toHaveBeenCalledWith(user);
-    expect(refreshSvc.issueTokens).toHaveBeenCalledWith(user, res);
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
-      domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      sessionId: 'issued-session',
-      resourceType: 'identity.user',
-      resourceId: user.id,
-      source: 'http',
-      metadata: {},
+    expect(refreshSvc.issueTokens).toHaveBeenCalledWith(updated, res);
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
+        domain: AuditEventDomain.IDENTITY,
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        sessionId: 'issued-session',
+        resourceType: 'identity.user',
+        resourceId: user.id,
+        source: 'http',
+        metadata: {},
+        before: expect.objectContaining({
+          metadata: { last_sign_in: null, mfa_enabled: false },
+        }),
+        after: expect.objectContaining({
+          metadata: {
+            last_sign_in: signedInAt.toISOString(),
+            mfa_enabled: false,
+          },
+        }),
+        meaningfulWithoutChanges: true,
+      }),
+    );
+    const input = auditSvc.record.mock.calls[0][0];
+    expect(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ).changes,
+    ).toEqual({
+      metadata: {
+        last_sign_in: { before: null, after: signedInAt.toISOString() },
+      },
     });
   });
 
@@ -97,6 +127,29 @@ describe('AuthService', () => {
       'sessionId',
       'issued-session',
     );
+  });
+
+  it('preserves the sign-in event when timestamp precision produces no diff', async () => {
+    const { service, userSvc, auditSvc } = setup();
+    userSvc.recordSignIn.mockResolvedValue(user);
+
+    await service.completeSignIn(user, res);
+
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        before: expect.any(Object),
+        after: expect.any(Object),
+        meaningfulWithoutChanges: true,
+      }),
+    );
+    const input = auditSvc.record.mock.calls[0][0];
+    expect(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ).changes,
+    ).toEqual({});
   });
 
   it('passes request context when issuing tokens for an ordinary sign-in', async () => {
@@ -211,8 +264,18 @@ describe('AuthService', () => {
       expect.objectContaining({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
         resourceId: session.id,
+        before: expect.objectContaining({ active: true }),
+        after: expect.objectContaining({ active: false }),
       }),
     );
+    const input = auditSvc.record.mock.calls[0][0];
+    expect(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ).changes,
+    ).toEqual({ active: { before: true, after: false } });
   });
 
   it('does not audit an ordinary refresh failure after token issuance fails', async () => {

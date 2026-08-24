@@ -2,7 +2,8 @@ import {
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
-import { Injectable } from '@nestjs/common';
+import { identitySessionSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { Response } from 'express';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -32,6 +33,15 @@ export class SessionsApiService {
     sessionId: string,
     res: Response,
   ): Promise<void> {
+    const target =
+      currentSession.id === sessionId
+        ? currentSession
+        : await this.refreshSvc.findSessionById(user.id, sessionId);
+
+    if (!target) throw new NotFoundException('Session not found.');
+
+    const before = identitySessionSnapshot(target, user.id);
+
     if (currentSession.id === sessionId) {
       await this.refreshSvc.revokeTokens(currentSession, res);
     } else {
@@ -51,6 +61,8 @@ export class SessionsApiService {
       sessionId,
       source: 'http',
       metadata: {},
+      before,
+      after: { ...before, active: false },
     });
   }
 
@@ -58,7 +70,14 @@ export class SessionsApiService {
     const sessionIds = (await this.refreshSvc.findSessions(user.id)).map(
       ({ id }) => id,
     );
+
+    const before = { id: user.id, sessions: [...sessionIds] };
     await this.refreshSvc.revokeAllSessions(user.id, res);
+
+    const remainingSessionIds = (
+      await this.refreshSvc.findSessions(user.id)
+    ).map(({ id }) => id);
+
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
       domain: AuditEventDomain.IDENTITY,
@@ -70,7 +89,9 @@ export class SessionsApiService {
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
-      metadata: { session_ids: sessionIds },
+      metadata: {},
+      before,
+      after: { id: user.id, sessions: remainingSessionIds },
     });
   }
 }

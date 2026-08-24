@@ -2,6 +2,10 @@ import {
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
+import {
+  identitySessionSnapshot,
+  identityUserSnapshot,
+} from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 import { Injectable } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { UserService } from '@/modules/domain/identity/services/user.service';
@@ -57,7 +61,9 @@ export class AuthService {
     req?: Request,
     options: CompleteSignInOptions = {},
   ): Promise<JWTDto> {
+    const before = identityUserSnapshot(user);
     const updated = await this.userSvc.recordSignIn(user);
+    const after = identityUserSnapshot(updated);
     const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
       : this.refreshSvc.issueTokens(updated, res));
@@ -79,6 +85,9 @@ export class AuthService {
         resourceId: user.id,
         source: 'http',
         metadata: {},
+        before,
+        after,
+        meaningfulWithoutChanges: true,
       });
 
     return tokens;
@@ -113,7 +122,9 @@ export class AuthService {
     session: UserSessionEntity,
     res: Response,
   ): Promise<void> {
+    const before = identitySessionSnapshot(session);
     await this.refreshSvc.revokeTokens(session, res);
+    const after = { ...before, active: false };
 
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
@@ -128,6 +139,8 @@ export class AuthService {
       resourceId: session.id,
       source: 'http',
       metadata: {},
+      before,
+      after,
     });
   }
 }

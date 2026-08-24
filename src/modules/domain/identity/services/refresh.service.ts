@@ -142,6 +142,17 @@ export class RefreshService {
 
     await this.revokeSession(session);
   }
+
+  public async findSessionById(
+    userId: string,
+    sessionId: string,
+  ): Promise<UserSessionEntity | null> {
+    return this.userRepo.manager.findOne(UserSessionEntity, {
+      where: { id: sessionId, user: { id: userId } },
+      relations: { user: true },
+    });
+  }
+
   private async createSession(
     user: UserEntity,
     req?: Request,

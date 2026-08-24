@@ -8,6 +8,7 @@ import {
   userFixture,
 } from '@/../test/helpers/identity.fixtures';
 import { SessionsApiService } from './sessions.service';
+import { AuditRedactionService } from '@/modules/domain/audit/services/audit-redaction.service';
 
 describe('SessionsApiService', () => {
   const user = userFixture();
@@ -19,6 +20,9 @@ describe('SessionsApiService', () => {
       revokeTokens: jest.fn(),
       revokeSessionById: jest.fn(),
       revokeAllSessions: jest.fn(),
+      findSessionById: jest
+        .fn()
+        .mockResolvedValue(sessionFixture({ id: 'other-session', user })),
     };
     const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     return {
@@ -51,20 +55,24 @@ describe('SessionsApiService', () => {
     await service.revoke(user, current, current.id, res);
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(current, res);
     expect(refreshSvc.revokeSessionById).not.toHaveBeenCalled();
-    expect(auditSvc.record).toHaveBeenCalledWith({
-      event: 'identity.session.revoked',
-      domain: 'identity',
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: user.id,
-      subjectType: 'user',
-      subjectId: user.id,
-      resourceType: 'identity.session',
-      resourceId: current.id,
-      sessionId: current.id,
-      source: 'http',
-      metadata: {},
-    });
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: 'identity.session.revoked',
+        domain: 'identity',
+        outcome: 'succeeded',
+        actorType: 'user',
+        actorId: user.id,
+        subjectType: 'user',
+        subjectId: user.id,
+        resourceType: 'identity.session',
+        resourceId: current.id,
+        sessionId: current.id,
+        source: 'http',
+        metadata: {},
+        before: expect.objectContaining({ active: true }),
+        after: expect.objectContaining({ active: false }),
+      }),
+    );
   });
 
   it('revokes an individual non-current session for the owning user', async () => {
@@ -74,18 +82,35 @@ describe('SessionsApiService', () => {
       user.id,
       'other-session',
     );
+    expect(refreshSvc.findSessionById).toHaveBeenCalledWith(
+      user.id,
+      'other-session',
+    );
     expect(refreshSvc.revokeTokens).not.toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.session.revoked',
         resourceId: 'other-session',
         sessionId: 'other-session',
+        before: expect.objectContaining({ id: 'other-session', active: true }),
+        after: expect.objectContaining({ id: 'other-session', active: false }),
       }),
     );
+    const input = auditSvc.record.mock.calls[0][0];
+    expect(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ).changes,
+    ).toEqual({ active: { before: true, after: false } });
   });
 
   it('revokes all sessions and delegates cookie cleanup', async () => {
     const { service, refreshSvc, auditSvc } = setup();
+    refreshSvc.findSessions
+      .mockResolvedValueOnce([current])
+      .mockResolvedValueOnce([]);
     await service.revokeAll(user, res);
     expect(refreshSvc.revokeAllSessions).toHaveBeenCalledWith(user.id, res);
     expect(auditSvc.record).toHaveBeenCalledWith({
@@ -99,7 +124,24 @@ describe('SessionsApiService', () => {
       resourceType: 'identity.user',
       resourceId: user.id,
       source: 'http',
-      metadata: { session_ids: [current.id] },
+      metadata: {},
+      before: { id: user.id, sessions: [current.id] },
+      after: { id: user.id, sessions: [] },
+    });
+    const input = auditSvc.record.mock.calls[0][0];
+    expect(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ).changes,
+    ).toEqual({
+      sessions: {
+        before: [current.id],
+        after: [],
+        added_ids: [],
+        removed_ids: [current.id],
+      },
     });
   });
 });
