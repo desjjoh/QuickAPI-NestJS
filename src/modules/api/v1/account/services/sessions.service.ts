@@ -58,7 +58,7 @@ export class SessionsApiService {
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_SESSION,
       resourceId: sessionId,
-      sessionId,
+      sessionId: currentSession.id,
       source: 'http',
       metadata: {},
       before,

@@ -90,8 +90,9 @@ describe('SessionsApiService', () => {
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.session.revoked',
+        resourceType: 'identity.session',
         resourceId: 'other-session',
-        sessionId: 'other-session',
+        sessionId: current.id,
         before: expect.objectContaining({ id: 'other-session', active: true }),
         after: expect.objectContaining({ id: 'other-session', active: false }),
       }),

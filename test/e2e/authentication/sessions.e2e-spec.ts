@@ -304,6 +304,16 @@ describe('Authentication and session lifecycle', () => {
         .getRepository(UserSessionEntity)
         .findOneByOrFail({ id: secondId }),
     ).toMatchObject({ active: true });
+    await expect(
+      suite.dataSource.getRepository(AuditEventEntity).findOneByOrFail({
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
+        resource_id: firstId,
+      }),
+    ).resolves.toMatchObject({
+      resource_type: 'identity.session',
+      resource_id: firstId,
+      session_id: secondId,
+    });
   });
 
   it('revokes all sessions including the current session and clears its cookie', async () => {
