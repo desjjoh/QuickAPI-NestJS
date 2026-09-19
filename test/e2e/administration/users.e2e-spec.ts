@@ -289,7 +289,9 @@ describe('user administration authorization and lifecycle', () => {
         status: { id: disabled.id },
       },
     });
-    expect(detail.body).not.toHaveProperty('metadata');
+    expect(detail.body.metadata).toEqual({
+      reason_code: 'policy_enforcement',
+    });
     expect(JSON.stringify(detail.body)).not.toMatch(/password|authorization/);
   });
 

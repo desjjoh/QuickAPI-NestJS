@@ -5,7 +5,7 @@ import { IpLocationService } from '@/modules/system/geolocation/services/ip-loca
 import {
   AuditEventDto,
   AuditEventPageDto,
-  AuditSearchQueryDto,
+  UserActivitySearchQueryDto,
 } from '@/common/models/audit.model';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class UserActivityAdminService {
 
   public async findForUser(
     userId: string,
-    query: AuditSearchQueryDto,
+    query: UserActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
     if (
       query.occurredFrom &&
@@ -29,7 +29,7 @@ export class UserActivityAdminService {
     const result = await this.auditQueries.query({
       subjectType: AuditSubjectType.USER,
       subjectId: userId,
-      actorId: query.actorId,
+      actorId: query.actor,
       event: query.event,
       outcome: query.outcome,
       occurredFrom: query.occurredFrom,

@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDate,
@@ -445,4 +445,21 @@ export class AuditSearchQueryDto {
   @Min(1)
   @Max(100)
   public readonly take: number = 25;
+}
+
+export class AccountActivitySearchQueryDto extends OmitType(
+  AuditSearchQueryDto,
+  ['actorType', 'actorId'] as const,
+) {}
+
+export class UserActivitySearchQueryDto extends OmitType(AuditSearchQueryDto, [
+  'domain',
+  'actorType',
+  'actorId',
+] as const) {
+  @ApiPropertyOptional({ description: 'Exact actor ID.', maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  public readonly actor?: string;
 }

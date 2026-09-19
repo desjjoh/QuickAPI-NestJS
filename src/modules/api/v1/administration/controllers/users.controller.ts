@@ -41,7 +41,7 @@ import { UserActivityAdminService } from '../service/user-activity.service';
 
 import {
   AuditEventPageDto,
-  AuditSearchQueryDto,
+  UserActivitySearchQueryDto,
 } from '@/common/models/audit.model';
 
 @ApiPlatformAdmin()
@@ -129,7 +129,7 @@ export class UserAdministrationController {
   @EntityIdParam
   public getUserActivity(
     @Param('id', NanoIdParamPipe) id: string,
-    @Query() query: AuditSearchQueryDto,
+    @Query() query: UserActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
     return this.activity.findForUser(id, query);
   }

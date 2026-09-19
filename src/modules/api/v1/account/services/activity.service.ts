@@ -6,7 +6,7 @@ import { IpLocationService } from '@/modules/system/geolocation/services/ip-loca
 import {
   AuditEventDto,
   AuditEventPageDto,
-  AuditSearchQueryDto,
+  AccountActivitySearchQueryDto,
 } from '@/common/models/audit.model';
 
 @Injectable()
@@ -18,7 +18,7 @@ export class ActivityApiService {
 
   public async findForUser(
     user: UserEntity,
-    query: AuditSearchQueryDto,
+    query: AccountActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
     if (
       query.occurredFrom &&

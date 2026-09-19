@@ -106,10 +106,12 @@ describe('account activity', () => {
         hasNextPage: false,
       },
     });
-    expect(response.body.data[0]).not.toHaveProperty('metadata');
-    expect(response.body.data[0]).not.toHaveProperty('failureReason');
-    expect(response.body.data[0]).not.toHaveProperty('ipAddress');
-    expect(response.body.data[0]).not.toHaveProperty('userAgent');
+    expect(response.body.data[0]).toMatchObject({
+      metadata: {},
+      failureReason: null,
+      ipAddress: '192.0.2.1',
+      userAgent: 'private-client',
+    });
 
     await agent
       .get(`/api/v1/account/activity?actorId=${user.id}`)

@@ -20,7 +20,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ActivityApiService } from '../services/activity.service';
 import {
   AuditEventPageDto,
-  AuditSearchQueryDto,
+  AccountActivitySearchQueryDto,
 } from '@/common/models/audit.model';
 
 @ApiTags('Account Activity')
@@ -44,7 +44,7 @@ export class ActivityApiController {
   )
   public findAll(
     @CurrentUser() user: UserEntity,
-    @Query() query: AuditSearchQueryDto,
+    @Query() query: AccountActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
     return this.service.findForUser(user, query);
   }
