@@ -27,6 +27,7 @@ export const identityUserSnapshot = (
   updated_at: timestamp(user.updatedAt),
   metadata: {
     last_sign_in: timestamp(user.metadata.last_sign_in),
+    last_changed_mfa: timestamp(user.metadata.last_changed_mfa),
     mfa_enabled: user.metadata.mfa_enabled,
   },
 });

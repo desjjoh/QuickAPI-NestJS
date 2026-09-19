@@ -1,7 +1,18 @@
 import { AuditAdministrationService } from './audit.service';
-import { AuditSearchQueryDto } from '../models/audit.model';
+import { AuditSearchQueryDto } from '@/common/models/audit.model';
 
 describe(AuditAdministrationService.name, () => {
+  const location = {
+    ip: '203.0.113.10',
+    countryCode: 'CA',
+    countryName: 'Canada',
+    regionCode: 'ON',
+    regionName: 'Ontario',
+    city: 'Ottawa',
+    source: 'maxmind' as const,
+    resolvedAt: new Date('2026-01-01T00:01:00.000Z'),
+  };
+  const ipLocations = { resolveIp: jest.fn().mockResolvedValue(location) };
   const unsafeEvent = {
     id: '0123456789abcdef',
     domain: 'identity',
@@ -33,7 +44,7 @@ describe(AuditAdministrationService.name, () => {
     updatedAt: new Date(),
   };
 
-  it('defensively allowlists search responses', async () => {
+  it('maps search responses to the shared complete audit representation', async () => {
     const queries = {
       query: jest.fn().mockResolvedValue({
         data: [unsafeEvent],
@@ -42,39 +53,27 @@ describe(AuditAdministrationService.name, () => {
     };
     const response = await new AuditAdministrationService(
       queries as never,
+      ipLocations as never,
     ).search(new AuditSearchQueryDto());
-    const serialized = JSON.stringify(response);
 
     expect(response.data[0]).toEqual(
       expect.objectContaining({
         id: '0123456789abcdef',
         event: 'user.updated',
+        ipAddress: '203.0.113.10',
+        ipLocation: location,
+        userAgent: 'browser fingerprint',
+        requestId: 'internal-request',
       }),
     );
-    expect(serialized).not.toMatch(
-      /Bearer secret|private@example|secret-password|secret-token|internal stack|203\.0\.113|browser fingerprint|internal-request|internal-session|private failure/,
-    );
-    expect(Object.keys(response.data[0]).sort()).toEqual(
-      [
-        'actorId',
-        'actorType',
-        'domain',
-        'event',
-        'id',
-        'occurredAt',
-        'outcome',
-        'resourceId',
-        'resourceType',
-        'subjectId',
-        'subjectType',
-      ].sort(),
-    );
+    expect(ipLocations.resolveIp).toHaveBeenCalledWith('203.0.113.10');
   });
 
-  it('returns only explicitly allowlisted detail fields', async () => {
+  it('maps detail responses to the shared complete audit representation', async () => {
     const queries = { findById: jest.fn().mockResolvedValue(unsafeEvent) };
     const response = await new AuditAdministrationService(
       queries as never,
+      ipLocations as never,
     ).detail('0123456789abcdef');
 
     expect(response).toMatchObject({
@@ -87,12 +86,11 @@ describe(AuditAdministrationService.name, () => {
       httpMethod: 'PATCH',
       route: '/api/v1/administration/users/:id',
     });
-    expect(JSON.stringify(response)).not.toContain('Bearer secret');
-    expect(response).not.toHaveProperty('metadata');
-    expect(response).not.toHaveProperty('createdAt');
+    expect(response.metadata).toEqual(unsafeEvent.metadata);
+    expect(response.createdAt).toEqual(unsafeEvent.createdAt);
   });
 
-  it('rejects unknown reason codes rather than exposing metadata values', async () => {
+  it('does not promote unknown metadata values to a reason code', async () => {
     const queries = {
       findById: jest.fn().mockResolvedValue({
         ...unsafeEvent,
@@ -102,9 +100,13 @@ describe(AuditAdministrationService.name, () => {
 
     const response = await new AuditAdministrationService(
       queries as never,
+      ipLocations as never,
     ).detail('0123456789abcdef');
 
     expect(response.reasonCode).toBeNull();
-    expect(JSON.stringify(response)).not.toMatch(/attacker-controlled|hidden/);
+    expect(response.metadata).toEqual({
+      reason_code: 'attacker-controlled',
+      secret: 'hidden',
+    });
   });
 });

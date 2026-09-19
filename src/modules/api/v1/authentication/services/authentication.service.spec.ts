@@ -93,11 +93,16 @@ describe('AuthService', () => {
         source: 'http',
         metadata: {},
         before: expect.objectContaining({
-          metadata: { last_sign_in: null, mfa_enabled: false },
+          metadata: {
+            last_sign_in: null,
+            last_changed_mfa: null,
+            mfa_enabled: false,
+          },
         }),
         after: expect.objectContaining({
           metadata: {
             last_sign_in: signedInAt.toISOString(),
+            last_changed_mfa: null,
             mfa_enabled: false,
           },
         }),

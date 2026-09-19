@@ -88,7 +88,7 @@ export class MeApiService {
 
     if (!dto.enabled) {
       await this.mfaSvc.disable(user);
-      await this.userSvc.updateMetadata(user, { mfa_enabled: false });
+      await this.userSvc.recordMfaChanged(user, false);
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
@@ -132,7 +132,7 @@ export class MeApiService {
       throw new UnauthorizedException('Invalid MFA challenge.');
 
     await this.mfaSvc.enable(user);
-    await this.userSvc.updateMetadata(user, { mfa_enabled: true });
+    await this.userSvc.recordMfaChanged(user, true);
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,

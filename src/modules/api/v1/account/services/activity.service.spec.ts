@@ -1,8 +1,19 @@
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import type { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { userFixture } from '@/../test/helpers/identity.fixtures';
-import { AccountActivityOutcome } from '../models/activity.model';
+import { AuditEventOutcome } from '@/common/models/audit.model';
 import { ActivityApiService } from './activity.service';
+
+const location = {
+  ip: '192.0.2.1',
+  countryCode: null,
+  countryName: null,
+  regionCode: null,
+  regionName: null,
+  city: null,
+  source: 'unknown' as const,
+  resolvedAt: new Date('2026-01-02T03:05:00.000Z'),
+};
 
 function event(overrides: Partial<AuditEvent> = {}): AuditEvent {
   return {
@@ -44,11 +55,15 @@ describe('ActivityApiService', () => {
     const auditQueries = {
       query: jest.fn().mockResolvedValue(result),
     };
+    const ipLocations = { resolveIp: jest.fn().mockResolvedValue(location) };
+
     return {
       service: new ActivityApiService(
         auditQueries as unknown as AuditQueryService,
+        ipLocations as never,
       ),
       auditQueries,
+      ipLocations,
     };
   }
 
@@ -60,7 +75,7 @@ describe('ActivityApiService', () => {
     await service.findForUser(user, {
       domain: 'identity',
       event: 'identity.profile.updated',
-      outcome: AccountActivityOutcome.SUCCEEDED,
+      outcome: AuditEventOutcome.SUCCEEDED,
       occurredFrom,
       occurredTo,
       page: 2,
@@ -72,7 +87,7 @@ describe('ActivityApiService', () => {
       subjectId: user.id,
       domain: 'identity',
       event: 'identity.profile.updated',
-      outcome: AccountActivityOutcome.SUCCEEDED,
+      outcome: AuditEventOutcome.SUCCEEDED,
       occurredFrom,
       occurredTo,
       page: 2,
@@ -80,27 +95,30 @@ describe('ActivityApiService', () => {
     });
   });
 
-  it('maps only account-safe event fields', async () => {
+  it('maps events to the shared complete audit representation', async () => {
     const { service } = setup();
     const result = await service.findForUser(user, { page: 1, take: 25 });
 
-    expect(result.data[0]).toEqual({
-      id: 'abcdefghijklmnop',
-      domain: 'identity',
-      event: 'identity.profile.updated',
-      outcome: 'succeeded',
-      actorType: 'admin',
-      actorId: 'administrator-id',
-      subjectType: 'user',
-      subjectId: 'subject-id',
-      resourceType: 'identity.user',
-      resourceId: 'resource-id',
-      occurredAt: new Date('2026-01-02T03:04:05.000Z'),
-    });
-    expect(result.data[0]).not.toHaveProperty('ipAddress');
-    expect(result.data[0]).not.toHaveProperty('userAgent');
-    expect(result.data[0]).not.toHaveProperty('failureReason');
-    expect(result.data[0]).not.toHaveProperty('metadata');
+    expect(result.data[0]).toEqual(
+      expect.objectContaining({
+        id: 'abcdefghijklmnop',
+        domain: 'identity',
+        event: 'identity.profile.updated',
+        outcome: 'succeeded',
+        actorType: 'admin',
+        actorId: 'administrator-id',
+        subjectType: 'user',
+        subjectId: 'subject-id',
+        resourceType: 'identity.user',
+        resourceId: 'resource-id',
+        occurredAt: new Date('2026-01-02T03:04:05.000Z'),
+        ipAddress: '192.0.2.1',
+        ipLocation: location,
+        userAgent: 'private client',
+        failureReason: 'internal reason',
+        metadata: { administratorNote: 'private' },
+      }),
+    );
   });
 
   it('returns standard page metadata', async () => {

@@ -132,14 +132,21 @@ describe('UserService', () => {
     );
   });
 
-  it('records sign-in, email-change, and password-change metadata', async () => {
+  it('records security metadata changes', async () => {
     await service.recordSignIn(user as never);
     await service.recordEmailChanged(user as never);
     await service.recordPasswordChanged(user as never);
+    await service.recordMfaChanged(user as never, true);
     const merged = userRepo.merge.mock.calls.map((call) => call[1].metadata);
     expect(merged[0].last_sign_in).toBeInstanceOf(Date);
     expect(merged[1].last_changed_email).toBeInstanceOf(Date);
     expect(merged[2].last_changed_password).toBeInstanceOf(Date);
+    expect(merged[3]).toEqual(
+      expect.objectContaining({
+        last_changed_mfa: expect.any(Date),
+        mfa_enabled: true,
+      }),
+    );
   });
 
   it('deletes a user and clears the refresh cookie', async () => {
