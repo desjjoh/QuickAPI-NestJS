@@ -1,20 +1,24 @@
 import { AuditSubjectType } from '@/config/audit-events.config';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
+import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
 import {
-  UserActivityEventDto,
-  UserActivityPageDto,
-  UserActivityQueryDto,
-} from '../models/user-activity.model';
+  AuditEventDto,
+  AuditEventPageDto,
+  AuditSearchQueryDto,
+} from '@/common/models/audit.model';
 
 @Injectable()
 export class UserActivityAdminService {
-  public constructor(private readonly auditQueries: AuditQueryService) {}
+  public constructor(
+    private readonly auditQueries: AuditQueryService,
+    private readonly ipLocations: IpLocationService,
+  ) {}
 
   public async findForUser(
     userId: string,
-    query: UserActivityQueryDto,
-  ): Promise<UserActivityPageDto> {
+    query: AuditSearchQueryDto,
+  ): Promise<AuditEventPageDto> {
     if (
       query.occurredFrom &&
       query.occurredTo &&
@@ -25,7 +29,7 @@ export class UserActivityAdminService {
     const result = await this.auditQueries.query({
       subjectType: AuditSubjectType.USER,
       subjectId: userId,
-      actorId: query.actor,
+      actorId: query.actorId,
       event: query.event,
       outcome: query.outcome,
       occurredFrom: query.occurredFrom,
@@ -33,7 +37,12 @@ export class UserActivityAdminService {
       page: query.page,
       take: query.take,
     });
-    const data = result.data.map((event) => new UserActivityEventDto(event));
-    return new UserActivityPageDto(data, result.meta);
+    const data = await Promise.all(
+      result.data.map(async (event) => {
+        const location = await this.ipLocations.resolveIp(event.ipAddress);
+        return new AuditEventDto(event, location);
+      }),
+    );
+    return new AuditEventPageDto(data, result.meta);
   }
 }

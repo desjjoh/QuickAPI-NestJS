@@ -2,20 +2,24 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuditSubjectType } from '@/config/audit-events.config';
 import { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
 import {
-  AccountActivityEventDto,
-  AccountActivityPageDto,
-  AccountActivityQueryDto,
-} from '../models/activity.model';
+  AuditEventDto,
+  AuditEventPageDto,
+  AuditSearchQueryDto,
+} from '@/common/models/audit.model';
 
 @Injectable()
 export class ActivityApiService {
-  public constructor(private readonly auditQueries: AuditQueryService) {}
+  public constructor(
+    private readonly auditQueries: AuditQueryService,
+    private readonly ipLocations: IpLocationService,
+  ) {}
 
   public async findForUser(
     user: UserEntity,
-    query: AccountActivityQueryDto,
-  ): Promise<AccountActivityPageDto> {
+    query: AuditSearchQueryDto,
+  ): Promise<AuditEventPageDto> {
     if (
       query.occurredFrom &&
       query.occurredTo &&
@@ -34,7 +38,12 @@ export class ActivityApiService {
       page: query.page,
       take: query.take,
     });
-    const data = result.data.map((event) => new AccountActivityEventDto(event));
-    return new AccountActivityPageDto(data, result.meta);
+    const data = await Promise.all(
+      result.data.map(async (event) => {
+        const location = await this.ipLocations.resolveIp(event.ipAddress);
+        return new AuditEventDto(event, location);
+      }),
+    );
+    return new AuditEventPageDto(data, result.meta);
   }
 }

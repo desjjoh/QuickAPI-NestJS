@@ -38,10 +38,8 @@ import { Throttle } from '@nestjs/throttler';
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
 import { AdministrationActionDto } from '../models/administration-action.model';
 import { UserActivityAdminService } from '../service/user-activity.service';
-import {
-  UserActivityPageDto,
-  UserActivityQueryDto,
-} from '../models/user-activity.model';
+
+import { AuditSearchPageDto, AuditSearchQueryDto } from '../models/audit.model';
 
 @ApiPlatformAdmin()
 @ApiBearerAuth('access-token')
@@ -120,7 +118,7 @@ export class UserAdministrationController {
     description:
       'Returns a paginated audit history whose subject is the selected user. This works after the user record has been deleted.',
   })
-  @ApiOkResponse({ type: UserActivityPageDto })
+  @ApiOkResponse({ type: AuditSearchPageDto })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION]
       .READ_ADMINISTRATION_USER_ACTIVITY,
@@ -128,8 +126,8 @@ export class UserAdministrationController {
   @EntityIdParam
   public getUserActivity(
     @Param('id', NanoIdParamPipe) id: string,
-    @Query() query: UserActivityQueryDto,
-  ): Promise<UserActivityPageDto> {
+    @Query() query: AuditSearchQueryDto,
+  ): Promise<AuditSearchPageDto> {
     return this.activity.findForUser(id, query);
   }
 

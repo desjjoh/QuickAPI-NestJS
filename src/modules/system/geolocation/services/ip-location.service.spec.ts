@@ -74,6 +74,22 @@ describe('IpLocationService', () => {
     expect(service.opened).toEqual(['GeoLite2-City.mmdb']);
   });
 
+  it('resolves a captured IP without requiring an HTTP request', async () => {
+    const service = new TestIpLocationService({
+      'GeoLite2-City.mmdb': {
+        get: jest.fn().mockReturnValue({
+          country: { iso_code: 'CA', names: { en: 'Canada' } },
+        }),
+      },
+    });
+
+    await expect(service.resolveIp('8.8.8.8')).resolves.toMatchObject({
+      ip: '8.8.8.8',
+      countryCode: 'CA',
+      source: 'maxmind',
+    });
+  });
+
   it('falls back to Country when the City database cannot be opened', async () => {
     const service = new TestIpLocationService({
       'GeoLite2-City.mmdb': new Error('corrupt city database'),

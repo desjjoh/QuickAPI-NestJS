@@ -17,11 +17,11 @@ import {
 } from '@/config/permissions.config';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import {
-  AccountActivityPageDto,
-  AccountActivityQueryDto,
-} from '../models/activity.model';
 import { ActivityApiService } from '../services/activity.service';
+import {
+  AuditEventPageDto,
+  AuditSearchQueryDto,
+} from '@/common/models/audit.model';
 
 @ApiTags('Account Activity')
 @ApiBearerAuth('access-token')
@@ -37,15 +37,15 @@ export class ActivityApiController {
     description:
       'Returns activity affecting the authenticated user across all domains, including actions performed by administrators or system actors. The account subject cannot be supplied by the request.',
   })
-  @ApiOkResponse({ type: AccountActivityPageDto })
+  @ApiOkResponse({ type: AuditEventPageDto })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT]
       .READ_CURRENT_USER_ACTIVITY,
   )
   public findAll(
     @CurrentUser() user: UserEntity,
-    @Query() query: AccountActivityQueryDto,
-  ): Promise<AccountActivityPageDto> {
+    @Query() query: AuditSearchQueryDto,
+  ): Promise<AuditEventPageDto> {
     return this.service.findForUser(user, query);
   }
 }
