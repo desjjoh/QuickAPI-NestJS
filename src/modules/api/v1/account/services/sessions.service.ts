@@ -1,19 +1,21 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
-import { identitySessionSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { Response } from 'express';
+import { Injectable, NotFoundException } from '@nestjs/common';
+
+import {
+  AuditActorType,
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSource,
+  AuditSubjectType,
+  AUDIT_EVENT_MATRIX,
+} from '@/config/audit-events.config';
+
+import { identitySessionSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { SessionDto } from '@/modules/domain/identity/models/user.model';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 @Injectable()
 export class SessionsApiService {
@@ -51,14 +53,14 @@ export class SessionsApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
       domain: AuditEventDomain.IDENTITY,
-      actorType: 'user',
+      actorType: AuditActorType.USER,
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_SESSION,
       resourceId: sessionId,
       sessionId: currentSession.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before,
       after: { ...before, active: false },
@@ -80,13 +82,13 @@ export class SessionsApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
       domain: AuditEventDomain.IDENTITY,
-      actorType: 'user',
+      actorType: AuditActorType.USER,
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before,
       after: { id: user.id, sessions: remainingSessionIds },

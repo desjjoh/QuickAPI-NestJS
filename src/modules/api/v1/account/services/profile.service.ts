@@ -1,14 +1,19 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager } from 'typeorm';
+
+import {
+  IdentityAuditEvents,
+  AuditResourceType,
+  AuditSubjectType,
+  AuditActorType,
+  AuditEventDomain,
+  AuditSource,
+} from '@/config/audit-events.config';
 
 import { AddressEntity } from '@/common/entities/address.entity';
 import { PhoneEntity } from '@/common/entities/phone.entity';
 import { generateOperationId } from '@/common/helpers/nanoid.helper';
-import { IdentityAuditEvents } from '@/config/audit-events.config';
+
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
@@ -23,6 +28,7 @@ import {
   CreateImageInput,
   ImageService,
 } from '@/modules/domain/media/services/image.service';
+
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import {
@@ -376,15 +382,15 @@ export class ProfileApiService {
   ) {
     return this.audit.record(
       {
-        domain: 'identity',
+        domain: AuditEventDomain.IDENTITY,
         event,
-        actorType: 'user',
+        actorType: AuditActorType.USER,
         actorId: userId,
         subjectType: AuditSubjectType.USER,
         subjectId: userId,
         resourceType,
         resourceId,
-        source: 'http',
+        source: AuditSource.HTTP,
         metadata: {},
         operationId,
         before,

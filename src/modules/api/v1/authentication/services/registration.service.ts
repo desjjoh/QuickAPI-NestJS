@@ -1,17 +1,18 @@
 import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
-import {
   BadRequestException,
   ConflictException,
   Injectable,
 } from '@nestjs/common';
+
 import {
-  RegisterDto,
-  RegisterMapper,
-  RegistrationPendingDto,
-} from '../models/register.model';
+  AuditActorType,
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSource,
+  AuditSubjectType,
+  AUDIT_EVENT_MATRIX,
+} from '@/config/audit-events.config';
+
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
@@ -19,13 +20,15 @@ import { RegistrationTokenService } from '@/modules/domain/identity/services/reg
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+
+import {
+  RegisterDto,
+  RegisterMapper,
+  RegistrationPendingDto,
+} from '../models/register.model';
 
 @Injectable()
 export class RegistrationService {
@@ -111,14 +114,14 @@ export class RegistrationService {
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
           .REGISTRATION_VERIFICATION_SUCCEEDED,
       domain: AuditEventDomain.IDENTITY,
-      actorType: 'anonymous',
+      actorType: AuditActorType.ANONYMOUS,
       actorId: null,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       sessionId,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before: {},
       after,

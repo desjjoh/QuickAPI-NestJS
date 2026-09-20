@@ -9,6 +9,18 @@ export const AuditActorType = {
 export type AuditActorType =
   (typeof AuditActorType)[keyof typeof AuditActorType];
 
+/** Bounded channels from which an audited action may originate. */
+export const AuditSource = {
+  HTTP: 'http',
+  QUEUE: 'queue',
+  SCHEDULED_JOB: 'scheduled_job',
+  SEED: 'seed',
+  SERVICE: 'service',
+  MIGRATION: 'migration',
+  SYSTEM: 'system',
+} as const;
+export type AuditSource = (typeof AuditSource)[keyof typeof AuditSource];
+
 export enum AuditEventDomain {
   IDENTITY = 'identity',
 }

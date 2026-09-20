@@ -12,17 +12,9 @@ import { AuditRedactionService, AuditValue } from './audit-redaction.service';
 import {
   AuditActorType,
   AuditResourceType,
+  AuditSource,
   AuditSubjectType,
 } from '@/config/audit-events.config';
-
-export type AuditSource =
-  | 'http'
-  | 'queue'
-  | 'scheduled_job'
-  | 'seed'
-  | 'service'
-  | 'migration'
-  | 'system';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
@@ -57,15 +49,7 @@ export interface RecordAuditInput {
 const MACHINE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/;
 const EVENT_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$/;
 const ACTOR_TYPES: readonly AuditActorType[] = Object.values(AuditActorType);
-const SOURCES: readonly AuditSource[] = [
-  'http',
-  'queue',
-  'scheduled_job',
-  'seed',
-  'service',
-  'migration',
-  'system',
-];
+const SOURCES: readonly AuditSource[] = Object.values(AuditSource);
 const SUBJECT_TYPES: readonly AuditSubjectType[] =
   Object.values(AuditSubjectType);
 const RESOURCE_TYPES: readonly AuditResourceType[] =
