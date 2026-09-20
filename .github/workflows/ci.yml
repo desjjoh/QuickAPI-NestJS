@@ -320,3 +320,50 @@ jobs:
           E2E: ${{ needs.e2e-tests.result }}
           SMOKE: ${{ needs.container-smoke.result }}
         run: test "$MIGRATIONS" = success -a "$E2E" = success -a "$SMOKE" = success
+
+  # Keep the legacy required-check contexts reported while retaining the
+  # independently named jobs above. Repository branch protection requires
+  # these exact job names.
+  check:
+    name: Check
+    if: always()
+    needs:
+      - formatting
+      - linting
+      - type-checking
+      - unit-tests
+      - integration-tests
+      - e2e-tests
+      - container-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all application checks
+        env:
+          FORMATTING: ${{ needs.formatting.result }}
+          LINTING: ${{ needs.linting.result }}
+          TYPE_CHECKING: ${{ needs.type-checking.result }}
+          UNIT_TESTS: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS: ${{ needs.integration-tests.result }}
+          E2E_TESTS: ${{ needs.e2e-tests.result }}
+          CONTAINER_SMOKE: ${{ needs.container-smoke.result }}
+        run: |
+          test "$FORMATTING" = success
+          test "$LINTING" = success
+          test "$TYPE_CHECKING" = success
+          test "$UNIT_TESTS" = success
+          test "$INTEGRATION_TESTS" = success
+          test "$E2E_TESTS" = success
+          test "$CONTAINER_SMOKE" = success
+
+  migration-check:
+    name: Migration Check
+    if: always()
+    needs: [migration-validation]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require production migration validation
+        env:
+          MIGRATION_VALIDATION: ${{ needs.migration-validation.result }}
+        run: test "$MIGRATION_VALIDATION" = success

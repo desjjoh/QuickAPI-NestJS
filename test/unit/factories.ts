@@ -108,6 +108,7 @@ export const buildUser = (
         last_sign_in: null,
         last_changed_email: null,
         last_changed_password: null,
+        last_changed_mfa: null,
         last_updated_at: null,
         mfa_enabled: false,
       },

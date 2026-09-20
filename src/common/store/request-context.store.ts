@@ -1,16 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { Injectable } from '@nestjs/common';
-import { AuditActorType } from '@/config/audit-events.config';
+import { AuditActorType, AuditSource } from '@/config/audit-events.config';
 
-export type ContextSource =
-  | 'http'
-  | 'queue'
-  | 'scheduled_job'
-  | 'seed'
-  | 'service'
-  | 'migration'
-  | 'system';
-export type NonHttpContextSource = Exclude<ContextSource, 'http'>;
+export type ContextSource = AuditSource;
+export type NonHttpContextSource = Exclude<
+  AuditSource,
+  typeof AuditSource.HTTP
+>;
 
 /** Deliberately contains only allowlisted correlation and audit attributes. */
 export type RequestContextStore = {

@@ -6,7 +6,6 @@ type RedactedAuditData = Record<string, unknown>;
 @Entity('activity_audits')
 @Index('IDX_activity_audits_domain', ['domain'])
 @Index('IDX_activity_audits_event', ['event'])
-@Index('IDX_activity_audits_outcome', ['outcome'])
 @Index('IDX_activity_audits_actor_time', [
   'actor_type',
   'actor_id',
@@ -30,9 +29,6 @@ type RedactedAuditData = Record<string, unknown>;
 export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128 })
   public readonly event!: string;
-
-  @Column({ type: 'varchar', length: 32 })
-  public readonly outcome!: string;
 
   @Column({ type: 'varchar', length: 32 })
   public readonly actor_type!: string;
@@ -79,12 +75,6 @@ export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 512, nullable: true })
   public readonly route!: string | null;
 
-  @Column({ type: 'varchar', length: 512, nullable: true })
-  public readonly failure_reason!: string | null;
-
-  @Column({ type: 'varchar', length: 64, nullable: true })
-  public readonly failure_code!: string | null;
-
   @Column({ type: 'varchar', length: 32 })
   public readonly source!: string;
 
@@ -103,7 +93,4 @@ export class AuditEventEntity extends BaseEntity {
 
   @Column({ type: 'json', nullable: true })
   public readonly metadata!: RedactedAuditData | null;
-
-  @Column({ type: 'json', nullable: true })
-  public readonly error!: RedactedAuditData | null;
 }

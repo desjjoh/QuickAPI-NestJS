@@ -1,9 +1,17 @@
-import { AuditSubjectType } from '@/config/audit-events.config';
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
 import { jest } from '@jest/globals';
-import { IsNull } from 'typeorm';
+
+import { RequestContext } from '@/common/store/request-context.store';
+
+import {
+  AuditActorType,
+  AuditSource,
+  AuditSubjectType,
+  IdentityAuditEvents,
+} from '@/config/audit-events.config';
+
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
@@ -11,11 +19,10 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { IdentityAuditEvents } from '@/config/audit-events.config';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserAdminService } from '@/modules/api/v1/administration/service/users.service';
-import { RequestContext } from '@/common/store/request-context.store';
 import { EmailService } from '@/modules/system/email/services/email.service';
+
 import {
   acquireCsrf,
   CapturingEmailService,
@@ -272,7 +279,6 @@ describe('user administration authorization and lifecycle', () => {
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         resource_id: target.id,
       });
-    expect(event.outcome).toBe('succeeded');
     expect(event.before).not.toEqual(event.after);
     expect(event.metadata).toEqual({ reason_code: 'policy_enforcement' });
 
@@ -289,7 +295,9 @@ describe('user administration authorization and lifecycle', () => {
         status: { id: disabled.id },
       },
     });
-    expect(detail.body).not.toHaveProperty('metadata');
+    expect(detail.body.metadata).toEqual({
+      reason_code: 'policy_enforcement',
+    });
     expect(JSON.stringify(detail.body)).not.toMatch(/password|authorization/);
   });
 
@@ -344,7 +352,7 @@ describe('user administration authorization and lifecycle', () => {
     const insertion = jest
       .spyOn(audit, 'record')
       .mockImplementation((input, manager) => {
-        if (manager && input.outcome === 'succeeded')
+        if (manager)
           return Promise.reject(new Error('simulated audit insert failure'));
         return implementation(input, manager);
       });
@@ -368,7 +376,7 @@ describe('user administration authorization and lifecycle', () => {
     ).toBe(false);
   });
 
-  it('uses the request ID only for tracing an administrative mutation', async () => {
+  it('uses the request ID to correlate retries of an administrative mutation', async () => {
     const target = await register('audit-retry-target@example.test');
     const disabled = await suite.dataSource
       .getRepository(AccountStatusEntity)
@@ -377,7 +385,11 @@ describe('user administration authorization and lifecycle', () => {
     const context = app.get(RequestContext);
     const invoke = () =>
       context.run(
-        { requestId: 'retry-operation', actorType: 'admin', source: 'service' },
+        {
+          requestId: 'retry-operation',
+          actorType: AuditActorType.ADMIN,
+          source: AuditSource.SERVICE,
+        },
         () =>
           service.updateUser(target.id, {
             status_id: disabled.id,
@@ -392,7 +404,7 @@ describe('user administration authorization and lifecycle', () => {
       await suite.dataSource.getRepository(AuditEventEntity).countBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         request_id: 'retry-operation',
-        operation_id: IsNull(),
+        operation_id: 'retry-operation',
       }),
     ).toBe(1);
   });
@@ -417,7 +429,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.PASSWORD_CHANGED,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: target.id,
       subjectType: AuditSubjectType.USER,
@@ -429,7 +440,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.ADMIN_USER_UPDATED,
-      outcome: 'denied',
       actorType: 'admin',
       actorId: auditor.id,
       subjectType: AuditSubjectType.USER,
@@ -441,7 +451,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.SESSION_REVOKED,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: other.id,
       subjectType: AuditSubjectType.USER,
@@ -452,7 +461,7 @@ describe('user administration authorization and lifecycle', () => {
     });
 
     const response = await request(app.getHttpServer())
-      .get(`${ROOT}/${target.id}/activity?outcome=denied&actor=${auditor.id}`)
+      .get(`${ROOT}/${target.id}/activity?actor=${auditor.id}`)
       .set(await signIn('activity-auditor@example.test'))
       .expect(200);
     expect(response.body).toEqual({
@@ -463,7 +472,6 @@ describe('user administration authorization and lifecycle', () => {
           actorId: auditor.id,
           subjectType: AuditSubjectType.USER,
           subjectId: target.id,
-          outcome: 'denied',
         }),
       ],
       meta: {
@@ -494,7 +502,6 @@ describe('user administration authorization and lifecycle', () => {
       await audit.record({
         domain: 'identity',
         event,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: target.id,
         subjectType: AuditSubjectType.USER,

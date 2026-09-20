@@ -59,7 +59,6 @@ describe('SessionsApiService', () => {
       expect.objectContaining({
         event: 'identity.session.revoked',
         domain: 'identity',
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
         subjectType: 'user',
@@ -117,7 +116,6 @@ describe('SessionsApiService', () => {
     expect(auditSvc.record).toHaveBeenCalledWith({
       event: 'identity.session.all_revoked',
       domain: 'identity',
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
       subjectType: 'user',

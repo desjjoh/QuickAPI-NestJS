@@ -75,7 +75,6 @@ describe('PasswordResetService', () => {
     expect(auditSvc.record).toHaveBeenCalledWith({
       event: 'identity.password_reset.requested',
       domain: 'identity',
-      outcome: 'succeeded',
       actorType: 'anonymous',
       subjectType: 'user',
       subjectId: 'u1',
@@ -83,6 +82,14 @@ describe('PasswordResetService', () => {
       resourceId: 'u1',
       source: 'http',
       metadata: {},
+      before: {
+        id: 'u1',
+        metadata: { password_reset_requested: false },
+      },
+      after: {
+        id: 'u1',
+        metadata: { password_reset_requested: true },
+      },
     });
   });
 
@@ -147,7 +154,6 @@ describe('PasswordResetService', () => {
     expect(auditSvc.record).toHaveBeenCalledWith({
       event: 'identity.password_reset.completed',
       domain: 'identity',
-      outcome: 'succeeded',
       actorType: 'anonymous',
       actorId: null,
       subjectType: 'user',

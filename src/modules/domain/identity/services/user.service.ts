@@ -178,6 +178,16 @@ export class UserService {
     });
   }
 
+  public async recordMfaChanged(
+    user: UserEntity,
+    enabled: boolean,
+  ): Promise<UserEntity> {
+    return this.updateMetadata(user, {
+      last_changed_mfa: new Date(),
+      mfa_enabled: enabled,
+    });
+  }
+
   public async deleteUser(
     user: UserEntity,
     res: Response,

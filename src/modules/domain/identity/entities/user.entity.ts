@@ -31,6 +31,9 @@ class Metadata {
   public readonly last_changed_password!: Date | null;
 
   @Column({ type: 'datetime', nullable: true })
+  public readonly last_changed_mfa!: Date | null;
+
+  @Column({ type: 'datetime', nullable: true })
   public readonly last_updated_at!: Date | null;
 
   @Column({ type: 'boolean', default: false })
@@ -45,6 +48,7 @@ export const createUserMetadata = (
   last_sign_in: null,
   last_changed_email: null,
   last_changed_password: null,
+  last_changed_mfa: null,
   last_updated_at: null,
   mfa_enabled: false,
   ...overrides,

@@ -51,7 +51,7 @@ describe('ProfileApiService audit mutations', () => {
     };
   };
 
-  it('records separate name and personal-information events in the mutation transaction', async () => {
+  it('records one personal-information event for the profile mutation', async () => {
     const current = userFixture();
     const after = userFixture({
       profile: {
@@ -83,29 +83,25 @@ describe('ProfileApiService audit mutations', () => {
       gender_id: 'gender-2',
     });
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
-    expect(audit.record).toHaveBeenCalledTimes(2);
-    const [nameInput] = audit.record.mock.calls[0];
-    const [personalInput] = audit.record.mock.calls[1];
-    expect(nameInput.operationId).toBe('test-id');
-    expect(personalInput.operationId).toBe(nameInput.operationId);
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    const [personalInput] = audit.record.mock.calls[0];
+    expect(personalInput.operationId).toBe('test-id');
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         domain: 'identity',
-        event: IdentityAuditEvents.PROFILE_NAME_CHANGED,
+        event: IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
         actorType: 'user',
         actorId: current.id,
         subjectId: current.id,
         resourceType: 'identity.profile',
-        before: expect.any(Object),
-        after: expect.any(Object),
-      }),
-      manager,
-    );
-    expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event: IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
-        before: expect.objectContaining({ date_of_birth: '1990-01-01' }),
-        after: expect.objectContaining({ date_of_birth: '1991-02-03' }),
+        before: expect.objectContaining({
+          first_name: 'Pat',
+          date_of_birth: '1990-01-01',
+        }),
+        after: expect.objectContaining({
+          first_name: 'New',
+          date_of_birth: '1991-02-03',
+        }),
       }),
       manager,
     );

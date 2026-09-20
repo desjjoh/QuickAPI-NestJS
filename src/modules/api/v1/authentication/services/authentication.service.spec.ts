@@ -82,7 +82,6 @@ describe('AuthService', () => {
       expect.objectContaining({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
         subjectType: 'user',
@@ -93,11 +92,16 @@ describe('AuthService', () => {
         source: 'http',
         metadata: {},
         before: expect.objectContaining({
-          metadata: { last_sign_in: null, mfa_enabled: false },
+          metadata: {
+            last_sign_in: null,
+            last_changed_mfa: null,
+            mfa_enabled: false,
+          },
         }),
         after: expect.objectContaining({
           metadata: {
             last_sign_in: signedInAt.toISOString(),
+            last_changed_mfa: null,
             mfa_enabled: false,
           },
         }),
@@ -258,7 +262,7 @@ describe('AuthService', () => {
 
   it('revokes the session and clears response cookies on sign-out', async () => {
     const { service, refreshSvc, auditSvc } = setup();
-    await expect(service.signOut(session, res)).resolves.toBeUndefined();
+    await expect(service.signOut(user, session, res)).resolves.toBeUndefined();
     expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(session, res);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({

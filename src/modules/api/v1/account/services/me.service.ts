@@ -1,44 +1,49 @@
+import { Response } from 'express';
+import { DataSource } from 'typeorm';
+
 import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+
+import {
+  AUDIT_EVENT_MATRIX,
+  AuditActorType,
+  AuditEventDomain,
   AuditResourceType,
+  AuditSource,
   AuditSubjectType,
 } from '@/config/audit-events.config';
-import { Response } from 'express';
 
-import { BadRequestException, Injectable } from '@nestjs/common';
-
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
-
-import { UpdateEmailDto } from '../models/updateEmail.model';
-import { UpdatePasswordDto } from '../models/updatePassword.model';
-import { DeleteAccountDto } from '../models/deleteAccount.model';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { MfaService } from '@/modules/domain/identity/services/mfa.service';
+import {
+  MfaChallengePurpose,
+  MfaMethod,
+} from '@/modules/domain/identity/entities/mfa.entity';
+import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+
+import { UpdateEmailDto } from '../models/updateEmail.model';
+import { UpdatePasswordDto } from '../models/updatePassword.model';
+import { DeleteAccountDto } from '../models/deleteAccount.model';
 import {
   MfaChallengeResponseDto,
   VerifyMfaChallengeDto,
 } from '../../authentication/models/mfa.model';
 import { UpdateMfaDto } from '../models/updateMfa.model';
 import {
-  MfaChallengePurpose,
-  MfaMethod,
-} from '@/modules/domain/identity/entities/mfa.entity';
-import { UnauthorizedException } from '@nestjs/common';
-import {
   EmailVerificationChallengeDto,
   VerifyEmailDto,
 } from '../../authentication/models/verify-email.model';
-import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
-import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
-import { DataSource } from 'typeorm';
 
 @Injectable()
 export class MeApiService {
@@ -65,15 +70,16 @@ export class MeApiService {
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
           domain: AuditEventDomain.IDENTITY,
-          outcome: 'succeeded',
-          actorType: 'user',
+          actorType: AuditActorType.USER,
           actorId: user.id,
           subjectType: AuditSubjectType.USER,
           subjectId: user.id,
           resourceType: AuditResourceType.IDENTITY_USER,
           resourceId: user.id,
-          source: 'http',
+          source: AuditSource.HTTP,
           metadata: {},
+          before: identityUserSnapshot(user),
+          after: null,
         },
         manager,
       );
@@ -88,18 +94,17 @@ export class MeApiService {
 
     if (!dto.enabled) {
       await this.mfaSvc.disable(user);
-      await this.userSvc.updateMetadata(user, { mfa_enabled: false });
+      await this.userSvc.recordMfaChanged(user, false);
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
+        actorType: AuditActorType.USER,
         actorId: user.id,
         subjectType: AuditSubjectType.USER,
         subjectId: user.id,
         resourceType: AuditResourceType.IDENTITY_USER,
         resourceId: user.id,
-        source: 'http',
+        source: AuditSource.HTTP,
         metadata: {},
         before: { id: user.id },
         after: { id: user.id, metadata: { mfa_enabled: false } },
@@ -132,20 +137,19 @@ export class MeApiService {
       throw new UnauthorizedException('Invalid MFA challenge.');
 
     await this.mfaSvc.enable(user);
-    await this.userSvc.updateMetadata(user, { mfa_enabled: true });
+    await this.userSvc.recordMfaChanged(user, true);
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
+      actorType: AuditActorType.USER,
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       sessionId: currentSession.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before: { id: user.id },
       after: { id: user.id, metadata: { mfa_enabled: true } },
@@ -204,7 +208,6 @@ export class MeApiService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: updated.id,
       subjectType: AuditSubjectType.USER,
@@ -240,15 +243,14 @@ export class MeApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
+      actorType: AuditActorType.USER,
       actorId: updated.id,
       subjectType: AuditSubjectType.USER,
       subjectId: updated.id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: updated.id,
       sessionId: currentSession.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before: { id: updated.id },
       after: { id: updated.id, identity: { password: true } },

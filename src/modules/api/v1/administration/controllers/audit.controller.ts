@@ -16,10 +16,10 @@ import {
 } from '@/config/permissions.config';
 import { AuditAdministrationService } from '../service/audit.service';
 import {
-  AuditDetailDto,
-  AuditSearchPageDto,
+  AuditEventDto,
+  AuditEventPageDto,
   AuditSearchQueryDto,
-} from '../models/audit.model';
+} from '@/common/models/audit.model';
 
 @ApiTags('Audit Administration')
 @ApiBearerAuth('access-token')
@@ -30,15 +30,15 @@ export class AuditAdministrationController {
 
   @Get()
   @ApiOperation({
-    summary: 'Search audit record summaries',
+    summary: 'Search audit records',
     description:
-      'Returns the searchable summary allowlist only. Redacted snapshots and approved request context require the separately authorized detail endpoint.',
+      'Returns complete redacted audit events, including request context, metadata, diffs, and IP geolocation.',
   })
-  @ApiOkResponse({ type: AuditSearchPageDto })
+  @ApiOkResponse({ type: AuditEventPageDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].SEARCH_AUDIT)
   public search(
     @Query() query: AuditSearchQueryDto,
-  ): Promise<AuditSearchPageDto> {
+  ): Promise<AuditEventPageDto> {
     return this.service.search(query);
   }
 
@@ -47,13 +47,13 @@ export class AuditAdministrationController {
   @ApiOperation({
     summary: 'Read approved audit record detail',
     description:
-      'Requires audit-detail permission and adds only explicitly approved request context, a validated administration reason code, and redacted snapshots to the summary fields.',
+      'Returns the complete redacted audit event with IP geolocation and a validated administration reason code.',
   })
-  @ApiOkResponse({ type: AuditDetailDto })
+  @ApiOkResponse({ type: AuditEventDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].READ_AUDIT_DETAIL)
   public detail(
     @Param('id', NanoIdParamPipe) id: string,
-  ): Promise<AuditDetailDto> {
+  ): Promise<AuditEventDto> {
     return this.service.detail(id);
   }
 }

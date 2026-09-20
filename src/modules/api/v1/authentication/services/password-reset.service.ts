@@ -1,29 +1,29 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash, randomInt } from 'crypto';
+
+import {
+  AuditActorType,
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSource,
+  AuditSubjectType,
+  AUDIT_EVENT_MATRIX,
+} from '@/config/audit-events.config';
+import { AccountTokenType } from '@/config/token.config';
 
 import { minute } from '@/common/constants/milliseconds.constants';
-import { createHash, randomInt } from 'crypto';
+
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { PasswordResetTemplate } from '@/modules/system/email/templates/password-reset.template';
-
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
-
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import {
   AccountTokenService,
   CreatedAccountToken,
 } from '@/modules/domain/identity/services/token.service';
-import { AccountTokenType } from '@/config/token.config';
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
 
 const PASSWORD_RESET_CODE_EXPIRES_IN_MINUTES = 10;
 const PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES = 10;
@@ -77,14 +77,15 @@ export class PasswordResetService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_REQUESTED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
+      actorType: AuditActorType.ANONYMOUS,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
+      before: { id: user.id, metadata: { password_reset_requested: false } },
+      after: { id: user.id, metadata: { password_reset_requested: true } },
     });
   }
 
@@ -135,8 +136,7 @@ export class PasswordResetService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
+      actorType: AuditActorType.ANONYMOUS,
       actorId: null,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,

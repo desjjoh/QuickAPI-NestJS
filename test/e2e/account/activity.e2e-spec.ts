@@ -56,7 +56,6 @@ describe('account activity', () => {
     };
     const audit = app.get(AuditService);
     const base = {
-      outcome: 'succeeded' as const,
       source: 'service' as const,
       domain: 'activity_test',
       metadata: { administratorNote: 'must not be returned' },
@@ -92,7 +91,6 @@ describe('account activity', () => {
         expect.objectContaining({
           domain: 'activity_test',
           event: 'activity_test.other.touched.me',
-          outcome: 'succeeded',
           actorType: 'admin',
           actorId: 'other-actor-id',
         }),
@@ -106,10 +104,11 @@ describe('account activity', () => {
         hasNextPage: false,
       },
     });
-    expect(response.body.data[0]).not.toHaveProperty('metadata');
-    expect(response.body.data[0]).not.toHaveProperty('failureReason');
-    expect(response.body.data[0]).not.toHaveProperty('ipAddress');
-    expect(response.body.data[0]).not.toHaveProperty('userAgent');
+    expect(response.body.data[0]).toMatchObject({
+      metadata: {},
+      ipAddress: '192.0.2.1',
+      userAgent: 'private-client',
+    });
 
     await agent
       .get(`/api/v1/account/activity?actorId=${user.id}`)
@@ -137,7 +136,6 @@ describe('account activity', () => {
     ])
       await audit.record({
         event,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
         subjectType: AuditSubjectType.USER,

@@ -1,6 +1,7 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RequestContext } from '../store/request-context.store';
+import { AuditActorType, AuditSource } from '@/config/audit-events.config';
 
 @Injectable()
 class RefreshTokenGuard extends AuthGuard('jwt-refresh') {
@@ -16,8 +17,8 @@ class RefreshTokenGuard extends AuthGuard('jwt-refresh') {
 
     if (user?.sub) this.requestContext.set('actorId', user.sub);
 
-    this.requestContext.set('actorType', 'user');
-    this.requestContext.set('source', 'http');
+    this.requestContext.set('actorType', AuditActorType.USER);
+    this.requestContext.set('source', AuditSource.HTTP);
 
     const sessionId = user?.sessionEntity?.id ?? user?.sid ?? user?.sessionId;
 

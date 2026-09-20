@@ -110,6 +110,11 @@ export class IpLocationService {
 
   public async resolve(req: Request): Promise<SessionIpLocation> {
     const ip = req.ip ?? req.socket.remoteAddress ?? null;
+
+    return this.resolveIp(ip);
+  }
+
+  public async resolveIp(ip: string | null): Promise<SessionIpLocation> {
     const resolvedAt = new Date();
 
     if (!this.isPublicIp(ip)) return this.unknown(ip, resolvedAt);
