@@ -84,7 +84,14 @@ describe('UserAdminService', () => {
 
   it('finds a user by id and converts the entity to a DTO', async () => {
     const { repo, service } = setup();
-    const user = userFixture();
+    const lastChangedMfa = new Date('2026-01-02T03:04:05.000Z');
+    const user = userFixture({
+      metadata: {
+        ...userFixture().metadata,
+        last_changed_mfa: lastChangedMfa,
+      },
+    });
+
     repo.findByIdOrFail.mockResolvedValue(user);
 
     const result = await service.findUser('user-1');
@@ -93,6 +100,7 @@ describe('UserAdminService', () => {
     expect(repo.findByIdOrFail).toHaveBeenCalledWith('user-1');
     expect(result).toBeInstanceOf(UserDto);
     expect(result.id).toBe(user.id);
+    expect(result.metadata.lastChangedMfa).toBe(lastChangedMfa.toISOString());
   });
 
   it('propagates repository not-found errors when finding a user', async () => {

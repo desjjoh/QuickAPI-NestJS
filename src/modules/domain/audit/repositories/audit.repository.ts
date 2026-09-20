@@ -53,7 +53,6 @@ export class AuditRepository extends Repository<AuditEventEntity> {
     const filters: ReadonlyArray<[keyof AuditQuery, string]> = [
       ['domain', 'domain'],
       ['event', 'event'],
-      ['outcome', 'outcome'],
       ['actorType', 'actor_type'],
       ['actorId', 'actor_id'],
       ['subjectType', 'subject_type'],

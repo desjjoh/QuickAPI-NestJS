@@ -1,13 +1,18 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
-import {
-  identitySessionSnapshot,
-  identityUserSnapshot,
-} from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 import { Injectable } from '@nestjs/common';
 import { Request, Response } from 'express';
+
+import { RequestContext } from '@/common/store/request-context.store';
+
+import {
+  AuditActorType,
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSource,
+  AuditSubjectType,
+  AUDIT_EVENT_MATRIX,
+} from '@/config/audit-events.config';
+
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -16,13 +21,12 @@ import { UserSessionEntity } from '@/modules/domain/identity/entities/session.en
 import { MfaService } from '@/modules/domain/identity/services/mfa.service';
 import { MfaChallengePurpose } from '@/modules/domain/identity/entities/mfa.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
-import { MfaChallengeResponseDto } from '../models/mfa.model';
-import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { RequestContext } from '@/common/store/request-context.store';
 import {
-  AUDIT_EVENT_MATRIX,
-  AuditEventDomain,
-} from '@/config/audit-events.config';
+  identitySessionSnapshot,
+  identityUserSnapshot,
+} from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+
+import { MfaChallengeResponseDto } from '../models/mfa.model';
 
 interface CompleteSignInOptions {
   readonly recordAudit?: boolean;
@@ -75,15 +79,14 @@ export class AuthService {
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
-        actorType: 'user',
+        actorType: AuditActorType.USER,
         actorId: user.id,
         subjectType: AuditSubjectType.USER,
         subjectId: user.id,
         sessionId,
         resourceType: AuditResourceType.IDENTITY_USER,
         resourceId: user.id,
-        source: 'http',
+        source: AuditSource.HTTP,
         metadata: {},
         before,
         after,
@@ -119,6 +122,7 @@ export class AuthService {
   }
 
   public async signOut(
+    user: UserEntity,
     session: UserSessionEntity,
     res: Response,
   ): Promise<void> {
@@ -129,15 +133,14 @@ export class AuthService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'user',
-      actorId: session.user?.id ?? null,
+      actorType: AuditActorType.USER,
+      actorId: user.id,
       subjectType: AuditSubjectType.USER,
-      subjectId: session.user?.id ?? null,
+      subjectId: user.id,
       sessionId: session.id,
       resourceType: AuditResourceType.IDENTITY_SESSION,
       resourceId: session.id,
-      source: 'http',
+      source: AuditSource.HTTP,
       metadata: {},
       before,
       after,

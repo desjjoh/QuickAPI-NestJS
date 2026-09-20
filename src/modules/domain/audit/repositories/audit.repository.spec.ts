@@ -11,7 +11,6 @@ function entity(id: string, occurredAt: string) {
     updatedAt: new Date(occurredAt),
     domain: 'identity',
     event: 'user.updated',
-    outcome: 'succeeded',
     actor_type: 'user',
     actor_id: 'actor-1',
     subject_type: 'user',
@@ -25,15 +24,12 @@ function entity(id: string, occurredAt: string) {
     user_agent: null,
     http_method: null,
     route: null,
-    failure_reason: null,
-    failure_code: null,
     source: 'api',
     occurred_at: new Date(occurredAt),
     before: null,
     after: null,
     changes: null,
     metadata: null,
-    error: null,
   } as AuditEventEntity;
 }
 
@@ -121,7 +117,6 @@ describe('AuditRepository page pagination', () => {
       event: 'user.updated',
       actorType: 'user',
       actorId: 'actor-1',
-      outcome: 'succeeded',
     });
 
     expect(builder.skip).toHaveBeenCalledWith(20);
@@ -129,7 +124,6 @@ describe('AuditRepository page pagination', () => {
       expect.arrayContaining([
         ['audit.domain = :domain', { domain: 'identity' }],
         ['audit.event = :event', { event: 'user.updated' }],
-        ['audit.outcome = :outcome', { outcome: 'succeeded' }],
         ['audit.actor_type = :actorType', { actorType: 'user' }],
         ['audit.actor_id = :actorId', { actorId: 'actor-1' }],
       ]),

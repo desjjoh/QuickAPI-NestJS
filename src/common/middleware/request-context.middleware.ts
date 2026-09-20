@@ -3,6 +3,8 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { requestContextRef } from '@/common/store/request-context.store';
 import { generateRequestId } from '@/common/helpers/nanoid.helper';
 
+import { AuditActorType, AuditSource } from '@/config/audit-events.config';
+
 export function requestContextMiddleware(): RequestHandler {
   return function requestContext(
     req: Request,
@@ -13,10 +15,11 @@ export function requestContextMiddleware(): RequestHandler {
     const ctx = {
       requestId: generateRequestId(),
       method: req.method,
+      normalizedRoute: req.path,
       ipAddress: req.ip,
       ...(userAgent ? { userAgent } : {}),
-      actorType: 'anonymous' as const,
-      source: 'http' as const,
+      actorType: AuditActorType.ANONYMOUS,
+      source: AuditSource.HTTP,
     };
 
     if (!requestContextRef) return next();

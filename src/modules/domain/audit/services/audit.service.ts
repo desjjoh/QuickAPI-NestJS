@@ -12,29 +12,14 @@ import { AuditRedactionService, AuditValue } from './audit-redaction.service';
 import {
   AuditActorType,
   AuditResourceType,
+  AuditSource,
   AuditSubjectType,
 } from '@/config/audit-events.config';
-
-export type AuditOutcome =
-  | 'succeeded'
-  | 'failed'
-  | 'denied'
-  | 'pending'
-  | 'unknown';
-export type AuditSource =
-  | 'http'
-  | 'queue'
-  | 'scheduled_job'
-  | 'seed'
-  | 'service'
-  | 'migration'
-  | 'system';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
   readonly domain: string;
   readonly event: string;
-  readonly outcome: AuditOutcome;
   /** Party which initiated the action. The ID may be null for anonymous/system actors. */
   readonly actorType: AuditActorType;
   readonly actorId?: string | null;
@@ -46,16 +31,12 @@ export interface RecordAuditInput {
   readonly resourceId?: string | null;
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
-  /** An associated exception; only its redacted classification is stored. */
-  readonly error?: unknown;
   readonly requestId?: string | null;
   readonly sessionId?: string | null;
   readonly ipAddress?: string | null;
   readonly userAgent?: string | null;
   readonly httpMethod?: string | null;
   readonly route?: string | null;
-  readonly failureReason?: string | null;
-  readonly failureCode?: string | null;
   readonly occurredAt?: Date;
   /** Correlates retries or multiple audit events belonging to one operation. */
   readonly operationId?: string | null;
@@ -67,23 +48,8 @@ export interface RecordAuditInput {
 
 const MACHINE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/;
 const EVENT_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$/;
-const OUTCOMES: readonly AuditOutcome[] = [
-  'succeeded',
-  'failed',
-  'denied',
-  'pending',
-  'unknown',
-];
 const ACTOR_TYPES: readonly AuditActorType[] = Object.values(AuditActorType);
-const SOURCES: readonly AuditSource[] = [
-  'http',
-  'queue',
-  'scheduled_job',
-  'seed',
-  'service',
-  'migration',
-  'system',
-];
+const SOURCES: readonly AuditSource[] = Object.values(AuditSource);
 const SUBJECT_TYPES: readonly AuditSubjectType[] =
   Object.values(AuditSubjectType);
 const RESOURCE_TYPES: readonly AuditResourceType[] =
@@ -111,13 +77,16 @@ export class AuditService {
         'before and after must be supplied together',
       );
 
-    if (!hasBefore) {
+    if (!hasBefore)
       return this.persist(
         input,
-        { before: null, after: null, changes: null },
+        {
+          before: {},
+          after: { event: input.event },
+          changes: { event: { before: null, after: input.event } },
+        },
         manager,
       );
-    }
 
     this.requiredString('resourceType', input.resourceType, 64);
     if (!this.redaction.hasPolicy(input.resourceType as string))
@@ -161,17 +130,7 @@ export class AuditService {
       this.redaction.redactMetadata(input.metadata),
     );
 
-    const error = Object.prototype.hasOwnProperty.call(input, 'error')
-      ? this.asRecord(this.redaction.serializeError(input.error))
-      : null;
-
-    this.enforcePayloadBounds(
-      data.before,
-      data.after,
-      data.changes,
-      metadata,
-      error,
-    );
+    this.enforcePayloadBounds(data.before, data.after, data.changes, metadata);
 
     const repository = manager
       ? manager.getRepository(AuditEventEntity)
@@ -179,7 +138,6 @@ export class AuditService {
     const entity = repository.create({
       ...data,
       event: input.event,
-      outcome: input.outcome,
       actor_type: input.actorType ?? context?.actorType,
       actor_id: this.explicitOrContext(input, 'actorId', context?.actorId),
       subject_type: input.subjectType ?? null,
@@ -187,7 +145,7 @@ export class AuditService {
       resource_type: input.resourceType ?? null,
       resource_id: input.resourceId ?? null,
       domain: input.domain,
-      operation_id: input.operationId ?? null,
+      operation_id: input.operationId ?? context?.requestId ?? null,
       request_id: this.explicitOrContext(
         input,
         'requestId',
@@ -214,12 +172,9 @@ export class AuditService {
         context?.method,
       )?.toUpperCase(),
       route: this.explicitOrContext(input, 'route', context?.normalizedRoute),
-      failure_reason: input.failureReason ?? null,
-      failure_code: input.failureCode ?? null,
       source: input.source ?? context?.source,
       occurred_at: input.occurredAt ?? new Date(),
       metadata,
-      error,
     });
 
     await repository.insert(entity as never);
@@ -255,8 +210,6 @@ export class AuditService {
       throw new BadRequestException(
         'event must begin with the declared domain namespace',
       );
-    if (!OUTCOMES.includes(input.outcome))
-      throw new BadRequestException('outcome is invalid');
     if (!ACTOR_TYPES.includes(input.actorType))
       throw new BadRequestException('actorType is invalid');
     if (!SOURCES.includes(input.source))
@@ -292,8 +245,6 @@ export class AuditService {
     this.optionalString('userAgent', input.userAgent, 512);
     this.optionalString('httpMethod', input.httpMethod, 16);
     this.optionalString('route', input.route, 512);
-    this.optionalString('failureReason', input.failureReason, 512);
-    this.optionalString('failureCode', input.failureCode, 64);
     this.optionalString('operationId', input.operationId, 128);
 
     if (

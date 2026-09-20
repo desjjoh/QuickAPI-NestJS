@@ -240,6 +240,14 @@ export class MetadataDto {
   @ApiPropertyOptional({
     example: '2026-06-25T14:30:00.000Z',
     description:
+      'Most recent multi-factor authentication setting change timestamp, in ISO 8601 format.',
+    nullable: true,
+  })
+  public readonly lastChangedMfa: string | null;
+
+  @ApiPropertyOptional({
+    example: '2026-06-25T14:30:00.000Z',
+    description:
       'Most recent user account or profile mutation timestamp, in ISO 8601 format.',
     nullable: true,
   })
@@ -252,6 +260,7 @@ export class MetadataDto {
     this.lastChangedEmail = metadata.last_changed_email?.toISOString() ?? null;
     this.lastChangedPassword =
       metadata.last_changed_password?.toISOString() ?? null;
+    this.lastChangedMfa = metadata.last_changed_mfa?.toISOString() ?? null;
     this.lastUpdatedAt = metadata.last_updated_at?.toISOString() ?? null;
     this.mfaEnabled = metadata.mfa_enabled ?? false;
   }

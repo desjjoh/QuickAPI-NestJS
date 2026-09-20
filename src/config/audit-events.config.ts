@@ -9,6 +9,18 @@ export const AuditActorType = {
 export type AuditActorType =
   (typeof AuditActorType)[keyof typeof AuditActorType];
 
+/** Bounded channels from which an audited action may originate. */
+export const AuditSource = {
+  HTTP: 'http',
+  QUEUE: 'queue',
+  SCHEDULED_JOB: 'scheduled_job',
+  SEED: 'seed',
+  SERVICE: 'service',
+  MIGRATION: 'migration',
+  SYSTEM: 'system',
+} as const;
+export type AuditSource = (typeof AuditSource)[keyof typeof AuditSource];
+
 export enum AuditEventDomain {
   IDENTITY = 'identity',
 }
@@ -45,7 +57,6 @@ export enum IdentityAuditEvents {
   ALL_SESSIONS_REVOKED = 'identity.session.all_revoked',
   ACCOUNT_DELETED = 'identity.account.deleted',
 
-  PROFILE_NAME_CHANGED = 'identity.profile.name_changed',
   PROFILE_PERSONAL_INFORMATION_CHANGED = 'identity.profile.personal_information_changed',
   PROFILE_COUNTRY_CHANGED = 'identity.profile.country_changed',
   PROFILE_TIMEZONE_CHANGED = 'identity.profile.timezone_changed',

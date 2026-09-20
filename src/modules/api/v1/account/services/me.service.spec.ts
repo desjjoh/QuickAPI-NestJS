@@ -33,6 +33,7 @@ describe('MeApiService', () => {
       validateUser: jest.fn().mockResolvedValue(user),
       deleteUser: jest.fn(),
       updateMetadata: jest.fn().mockResolvedValue(user),
+      recordMfaChanged: jest.fn().mockResolvedValue(user),
       hashPassword: jest.fn().mockResolvedValue('new-hash'),
       updateUser: jest.fn().mockResolvedValue(user),
       recordPasswordChanged: jest.fn().mockResolvedValue(user),
@@ -134,9 +135,7 @@ describe('MeApiService', () => {
       service.updateMfa(user, { password: 'old', enabled: false }),
     ).resolves.toBeUndefined();
     expect(mfaSvc.disable).toHaveBeenCalledWith(user);
-    expect(userSvc.updateMetadata).toHaveBeenCalledWith(user, {
-      mfa_enabled: false,
-    });
+    expect(userSvc.recordMfaChanged).toHaveBeenCalledWith(user, false);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.mfa.disabled',
@@ -173,9 +172,7 @@ describe('MeApiService', () => {
       user.id,
     );
     expect(mfaSvc.enable).toHaveBeenCalledWith(user);
-    expect(userSvc.updateMetadata).toHaveBeenCalledWith(user, {
-      mfa_enabled: true,
-    });
+    expect(userSvc.recordMfaChanged).toHaveBeenCalledWith(user, true);
     expect(refreshSvc.revokeOtherSessions).toHaveBeenCalledWith(
       user.id,
       session.id,

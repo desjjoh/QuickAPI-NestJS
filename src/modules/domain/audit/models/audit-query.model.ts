@@ -1,4 +1,3 @@
-import type { AuditOutcome } from '../services/audit.service';
 import type {
   AuditActorType,
   AuditResourceType,
@@ -9,7 +8,6 @@ import type {
 export interface AuditQuery {
   readonly domain?: string;
   readonly event?: string;
-  readonly outcome?: AuditOutcome;
   readonly actorType?: AuditActorType;
   readonly actorId?: string | null;
   readonly subjectType?: AuditSubjectType;

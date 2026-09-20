@@ -1,23 +1,29 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
+import {
+  AuditActorType,
+  AuditEventDomain,
+  AuditResourceType,
+  AuditSource,
+  AuditSubjectType,
+  IdentityAuditEvents,
+} from '@/config/audit-events.config';
+
 import { RequestContext } from '@/common/store/request-context.store';
-import { IdentityAuditEvents } from '@/config/audit-events.config';
+import {
+  PaginationDto,
+  PaginationMeta,
+} from '@/common/models/pagination.model';
+
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
   UserDto,
   UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
-import {
-  PaginationDto,
-  PaginationMeta,
-} from '@/common/models/pagination.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
 import { AdministrationActionDto } from '../models/administration-action.model';
 
@@ -106,17 +112,17 @@ export class UserAdminService {
     reasonCode: string,
   ) {
     const actorId = this.context.get('actorId') ?? null;
+
     return {
-      domain: 'identity',
+      domain: AuditEventDomain.IDENTITY,
       event,
-      outcome: 'succeeded' as const,
-      actorType: 'admin' as const,
+      actorType: AuditActorType.ADMIN,
       actorId,
       subjectType: AuditSubjectType.USER,
       subjectId: id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: id,
-      source: 'http' as const,
+      source: AuditSource.HTTP,
       metadata: {
         reason_code: reasonCode,
       },

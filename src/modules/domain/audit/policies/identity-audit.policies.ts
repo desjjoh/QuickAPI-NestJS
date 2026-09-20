@@ -24,7 +24,9 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     deleted_at: scalar,
     metadata: nestedObject({
       last_sign_in: scalar,
+      last_changed_mfa: scalar,
       mfa_enabled: changedOnly,
+      password_reset_requested: scalar,
     }),
   },
   [AuditResourceType.IDENTITY_PROFILE]: {

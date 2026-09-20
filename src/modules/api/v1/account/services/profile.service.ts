@@ -1,14 +1,19 @@
-import {
-  AuditResourceType,
-  AuditSubjectType,
-} from '@/config/audit-events.config';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { DataSource, DeepPartial, EntityManager } from 'typeorm';
+
+import {
+  IdentityAuditEvents,
+  AuditResourceType,
+  AuditSubjectType,
+  AuditActorType,
+  AuditEventDomain,
+  AuditSource,
+} from '@/config/audit-events.config';
 
 import { AddressEntity } from '@/common/entities/address.entity';
 import { PhoneEntity } from '@/common/entities/phone.entity';
 import { generateOperationId } from '@/common/helpers/nanoid.helper';
-import { IdentityAuditEvents } from '@/config/audit-events.config';
+
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
@@ -23,6 +28,7 @@ import {
   CreateImageInput,
   ImageService,
 } from '@/modules/domain/media/services/image.service';
+
 import { UpdateAddressDto } from '../models/updateAddress.model';
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import {
@@ -49,7 +55,6 @@ export class ProfileApiService {
     const operationId = generateOperationId();
     const updated = await this.dataSource.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
-      const nameBefore = this.profileName(current);
       const personalBefore = this.profilePersonal(current);
       const after = await this.userSvc.updateUser(
         current,
@@ -70,17 +75,7 @@ export class ProfileApiService {
         {},
         manager,
       );
-      await this.record(
-        manager,
-        IdentityAuditEvents.PROFILE_NAME_CHANGED,
-        AuditResourceType.IDENTITY_PROFILE,
-        current.profile.id,
-        nameBefore,
-        this.profileName(after),
-        user.id,
-        false,
-        operationId,
-      );
+
       await this.record(
         manager,
         IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
@@ -92,6 +87,7 @@ export class ProfileApiService {
         false,
         operationId,
       );
+
       return after;
     });
 
@@ -386,16 +382,15 @@ export class ProfileApiService {
   ) {
     return this.audit.record(
       {
-        domain: 'identity',
+        domain: AuditEventDomain.IDENTITY,
         event,
-        outcome: 'succeeded',
-        actorType: 'user',
+        actorType: AuditActorType.USER,
         actorId: userId,
         subjectType: AuditSubjectType.USER,
         subjectId: userId,
         resourceType,
         resourceId,
-        source: 'http',
+        source: AuditSource.HTTP,
         metadata: {},
         operationId,
         before,
@@ -406,18 +401,12 @@ export class ProfileApiService {
     );
   }
 
-  private profileName(user: UserEntity) {
+  private profilePersonal(user: UserEntity) {
     return {
       id: user.profile.id,
       first_name: user.profile.name.first,
       last_name: user.profile.name.last,
       preferred_name: user.profile.name.preferred,
-    };
-  }
-
-  private profilePersonal(user: UserEntity) {
-    return {
-      id: user.profile.id,
       biography: user.profile.personal.bio,
       date_of_birth: user.profile.personal.dob,
       gender_id: user.profile.personal.gender.id,

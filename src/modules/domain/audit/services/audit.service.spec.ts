@@ -23,7 +23,6 @@ describe(AuditService.name, () => {
   const activity = {
     event: 'identity.sign_in.succeeded',
     domain: AuditEventDomain.IDENTITY,
-    outcome: 'succeeded' as const,
     actorType: 'user' as const,
     actorId: 'user-1',
     subjectType: AuditSubjectType.USER,
@@ -60,9 +59,9 @@ describe(AuditService.name, () => {
         subject_type: 'user',
         subject_id: 'user-1',
         metadata: { reason: 'interactive' },
-        before: null,
-        after: null,
-        changes: null,
+        before: {},
+        after: { event: activity.event },
+        changes: { event: { before: null, after: activity.event } },
       }),
     );
     expect(result).not.toHaveProperty('category');
@@ -156,10 +155,6 @@ describe(AuditService.name, () => {
         metadata: { mfa_enabled: true, verification_code: secrets[2] },
         access_token: secrets[3],
       },
-      error: Object.assign(new Error(secrets[9]), {
-        response: { body: secrets[8] },
-        authorization: secrets[7],
-      }),
     });
 
     const [stored] = repository.insert.mock.calls[0] as [AuditEventEntity];
@@ -168,7 +163,6 @@ describe(AuditService.name, () => {
       stored.after,
       stored.changes,
       stored.metadata,
-      stored.error,
     ]) {
       const serialized = JSON.stringify(column);
       for (const secret of secrets) expect(serialized).not.toContain(secret);
@@ -186,7 +180,6 @@ describe(AuditService.name, () => {
       ip: expect.stringMatching(/^sha256:[a-f0-9]{64}$/),
       user_agent: '[CHANGED]',
     });
-    expect(stored.error).toEqual({ type: 'Error', message: '[REDACTED]' });
   });
 
   it('does not persist an entity record without a meaningful safe change', async () => {
@@ -305,6 +298,7 @@ describe(AuditService.name, () => {
       expect.objectContaining({
         actor_id: 'context-user',
         session_id: 'session-1',
+        operation_id: 'request-1',
         ip_address: '127.0.0.1',
         user_agent: 'test-agent',
         http_method: 'POST',
