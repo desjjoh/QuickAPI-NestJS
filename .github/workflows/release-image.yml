@@ -136,7 +136,7 @@ jobs:
           output-file: quickapi.spdx.json
 
       - name: Report high-severity vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
           format: table
@@ -146,7 +146,7 @@ jobs:
           exit-code: '0'
 
       - name: Block unresolved critical vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@0.33.0
         with:
           image-ref: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
           format: sarif
