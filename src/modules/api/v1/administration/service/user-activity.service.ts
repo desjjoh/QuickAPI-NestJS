@@ -31,7 +31,6 @@ export class UserActivityAdminService {
       subjectId: userId,
       actorId: query.actor,
       event: query.event,
-      outcome: query.outcome,
       occurredFrom: query.occurredFrom,
       occurredTo: query.occurredTo,
       page: query.page,

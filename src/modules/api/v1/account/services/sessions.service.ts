@@ -51,7 +51,6 @@ export class SessionsApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
@@ -81,7 +80,6 @@ export class SessionsApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ALL_SESSIONS_REVOKED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
       subjectType: AuditSubjectType.USER,

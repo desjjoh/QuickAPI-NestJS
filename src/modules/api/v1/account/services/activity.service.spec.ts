@@ -1,7 +1,6 @@
 import type { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import type { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { userFixture } from '@/../test/helpers/identity.fixtures';
-import { AuditEventOutcome } from '@/common/models/audit.model';
 import { ActivityApiService } from './activity.service';
 
 const location = {
@@ -20,7 +19,6 @@ function event(overrides: Partial<AuditEvent> = {}): AuditEvent {
     id: 'abcdefghijklmnop',
     domain: 'identity',
     event: 'identity.profile.updated',
-    outcome: 'succeeded',
     actorType: 'admin',
     actorId: 'administrator-id',
     subjectType: 'user',
@@ -30,7 +28,6 @@ function event(overrides: Partial<AuditEvent> = {}): AuditEvent {
     occurredAt: new Date('2026-01-02T03:04:05.000Z'),
     ipAddress: '192.0.2.1',
     userAgent: 'private client',
-    failureReason: 'internal reason',
     metadata: { administratorNote: 'private' },
     ...overrides,
   } as AuditEvent;
@@ -75,7 +72,6 @@ describe('ActivityApiService', () => {
     await service.findForUser(user, {
       domain: 'identity',
       event: 'identity.profile.updated',
-      outcome: AuditEventOutcome.SUCCEEDED,
       occurredFrom,
       occurredTo,
       page: 2,
@@ -87,7 +83,6 @@ describe('ActivityApiService', () => {
       subjectId: user.id,
       domain: 'identity',
       event: 'identity.profile.updated',
-      outcome: AuditEventOutcome.SUCCEEDED,
       occurredFrom,
       occurredTo,
       page: 2,
@@ -104,7 +99,6 @@ describe('ActivityApiService', () => {
         id: 'abcdefghijklmnop',
         domain: 'identity',
         event: 'identity.profile.updated',
-        outcome: 'succeeded',
         actorType: 'admin',
         actorId: 'administrator-id',
         subjectType: 'user',
@@ -115,7 +109,6 @@ describe('ActivityApiService', () => {
         ipAddress: '192.0.2.1',
         ipLocation: location,
         userAgent: 'private client',
-        failureReason: 'internal reason',
         metadata: { administratorNote: 'private' },
       }),
     );

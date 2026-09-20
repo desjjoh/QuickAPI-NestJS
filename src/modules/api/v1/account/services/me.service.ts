@@ -39,6 +39,7 @@ import {
 } from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { DataSource } from 'typeorm';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 
 @Injectable()
 export class MeApiService {
@@ -65,7 +66,6 @@ export class MeApiService {
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
           domain: AuditEventDomain.IDENTITY,
-          outcome: 'succeeded',
           actorType: 'user',
           actorId: user.id,
           subjectType: AuditSubjectType.USER,
@@ -74,6 +74,8 @@ export class MeApiService {
           resourceId: user.id,
           source: 'http',
           metadata: {},
+          before: identityUserSnapshot(user),
+          after: null,
         },
         manager,
       );
@@ -92,7 +94,6 @@ export class MeApiService {
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
         subjectType: AuditSubjectType.USER,
@@ -137,7 +138,6 @@ export class MeApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
@@ -204,7 +204,6 @@ export class MeApiService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: updated.id,
       subjectType: AuditSubjectType.USER,
@@ -240,7 +239,6 @@ export class MeApiService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: updated.id,
       subjectType: AuditSubjectType.USER,

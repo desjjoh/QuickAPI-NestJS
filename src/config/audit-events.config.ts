@@ -45,7 +45,6 @@ export enum IdentityAuditEvents {
   ALL_SESSIONS_REVOKED = 'identity.session.all_revoked',
   ACCOUNT_DELETED = 'identity.account.deleted',
 
-  PROFILE_NAME_CHANGED = 'identity.profile.name_changed',
   PROFILE_PERSONAL_INFORMATION_CHANGED = 'identity.profile.personal_information_changed',
   PROFILE_COUNTRY_CHANGED = 'identity.profile.country_changed',
   PROFILE_TIMEZONE_CHANGED = 'identity.profile.timezone_changed',

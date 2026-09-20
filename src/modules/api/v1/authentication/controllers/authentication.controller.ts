@@ -143,10 +143,11 @@ export class AuthApiController {
   @Throttle({ default: throttlePolicies.signOut })
   @UseGuards(CsrfGuard, RefreshTokenGuard)
   async signOut(
+    @CurrentUser() user: UserEntity,
     @CurrentSession() session: UserSessionEntity,
     @Res({ passthrough: true }) res: Response,
   ): Promise<SignOutResponseDto> {
-    await this.svc.signOut(session, res);
+    await this.svc.signOut(user, session, res);
 
     return new SignOutResponseDto({ message: 'Signed out successfully.' });
   }

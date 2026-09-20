@@ -272,7 +272,6 @@ describe('user administration authorization and lifecycle', () => {
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         resource_id: target.id,
       });
-    expect(event.outcome).toBe('succeeded');
     expect(event.before).not.toEqual(event.after);
     expect(event.metadata).toEqual({ reason_code: 'policy_enforcement' });
 
@@ -346,7 +345,7 @@ describe('user administration authorization and lifecycle', () => {
     const insertion = jest
       .spyOn(audit, 'record')
       .mockImplementation((input, manager) => {
-        if (manager && input.outcome === 'succeeded')
+        if (manager)
           return Promise.reject(new Error('simulated audit insert failure'));
         return implementation(input, manager);
       });
@@ -419,7 +418,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.PASSWORD_CHANGED,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: target.id,
       subjectType: AuditSubjectType.USER,
@@ -431,7 +429,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.ADMIN_USER_UPDATED,
-      outcome: 'denied',
       actorType: 'admin',
       actorId: auditor.id,
       subjectType: AuditSubjectType.USER,
@@ -443,7 +440,6 @@ describe('user administration authorization and lifecycle', () => {
     await audit.record({
       domain: 'identity',
       event: IdentityAuditEvents.SESSION_REVOKED,
-      outcome: 'succeeded',
       actorType: 'user',
       actorId: other.id,
       subjectType: AuditSubjectType.USER,
@@ -454,7 +450,7 @@ describe('user administration authorization and lifecycle', () => {
     });
 
     const response = await request(app.getHttpServer())
-      .get(`${ROOT}/${target.id}/activity?outcome=denied&actor=${auditor.id}`)
+      .get(`${ROOT}/${target.id}/activity?actor=${auditor.id}`)
       .set(await signIn('activity-auditor@example.test'))
       .expect(200);
     expect(response.body).toEqual({
@@ -465,7 +461,6 @@ describe('user administration authorization and lifecycle', () => {
           actorId: auditor.id,
           subjectType: AuditSubjectType.USER,
           subjectId: target.id,
-          outcome: 'denied',
         }),
       ],
       meta: {
@@ -496,7 +491,6 @@ describe('user administration authorization and lifecycle', () => {
       await audit.record({
         domain: 'identity',
         event,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: target.id,
         subjectType: AuditSubjectType.USER,

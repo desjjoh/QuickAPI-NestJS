@@ -1,4 +1,5 @@
 import {
+  AuditActorType,
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
@@ -77,14 +78,15 @@ export class PasswordResetService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_REQUESTED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
+      actorType: AuditActorType.ANONYMOUS,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       resourceType: AuditResourceType.IDENTITY_USER,
       resourceId: user.id,
       source: 'http',
       metadata: {},
+      before: { id: user.id, metadata: { password_reset_requested: false } },
+      after: { id: user.id, metadata: { password_reset_requested: true } },
     });
   }
 
@@ -135,8 +137,7 @@ export class PasswordResetService {
       event:
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_RESET_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
-      actorType: 'anonymous',
+      actorType: AuditActorType.ANONYMOUS,
       actorId: null,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,

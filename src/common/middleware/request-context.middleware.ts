@@ -13,6 +13,7 @@ export function requestContextMiddleware(): RequestHandler {
     const ctx = {
       requestId: generateRequestId(),
       method: req.method,
+      normalizedRoute: req.path,
       ipAddress: req.ip,
       ...(userAgent ? { userAgent } : {}),
       actorType: 'anonymous' as const,

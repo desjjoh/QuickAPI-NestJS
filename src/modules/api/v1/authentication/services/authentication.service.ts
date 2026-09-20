@@ -75,7 +75,6 @@ export class AuthService {
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_IN_SUCCEEDED,
         domain: AuditEventDomain.IDENTITY,
-        outcome: 'succeeded',
         actorType: 'user',
         actorId: user.id,
         subjectType: AuditSubjectType.USER,
@@ -119,6 +118,7 @@ export class AuthService {
   }
 
   public async signOut(
+    user: UserEntity,
     session: UserSessionEntity,
     res: Response,
   ): Promise<void> {
@@ -129,11 +129,10 @@ export class AuthService {
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
       domain: AuditEventDomain.IDENTITY,
-      outcome: 'succeeded',
       actorType: 'user',
-      actorId: session.user?.id ?? null,
+      actorId: user.id,
       subjectType: AuditSubjectType.USER,
-      subjectId: session.user?.id ?? null,
+      subjectId: user.id,
       sessionId: session.id,
       resourceType: AuditResourceType.IDENTITY_SESSION,
       resourceId: session.id,

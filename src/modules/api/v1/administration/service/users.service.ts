@@ -106,10 +106,10 @@ export class UserAdminService {
     reasonCode: string,
   ) {
     const actorId = this.context.get('actorId') ?? null;
+
     return {
       domain: 'identity',
       event,
-      outcome: 'succeeded' as const,
       actorType: 'admin' as const,
       actorId,
       subjectType: AuditSubjectType.USER,

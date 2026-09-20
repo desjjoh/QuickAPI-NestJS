@@ -16,7 +16,6 @@ describe('AuditQueryService', () => {
     const { service, repository } = setup();
     const filters = {
       domain: 'identity',
-      outcome: 'succeeded' as const,
       occurredFrom: new Date('2026-01-01T00:00:00.000Z'),
       take: 10,
     };

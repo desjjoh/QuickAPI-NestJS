@@ -36,14 +36,6 @@ const administrationReasonCodes = new Set<string>(
   Object.values(ADMINISTRATION_REASON_CODES),
 );
 
-export enum AuditEventOutcome {
-  SUCCEEDED = 'succeeded',
-  FAILED = 'failed',
-  DENIED = 'denied',
-  PENDING = 'pending',
-  UNKNOWN = 'unknown',
-}
-
 export class AuditIpLocationDto {
   @ApiPropertyOptional({
     example: '203.0.113.10',
@@ -125,12 +117,6 @@ export class AuditEventDto {
     description: 'Stable machine-readable event name.',
   })
   public readonly event: string;
-  @ApiProperty({
-    enum: AuditEventOutcome,
-    example: AuditEventOutcome.SUCCEEDED,
-    description: 'Outcome recorded for the audited operation.',
-  })
-  public readonly outcome: string;
   @ApiProperty({
     enum: AuditActorType,
     example: AuditActorType.USER,
@@ -255,19 +241,6 @@ export class AuditEventDto {
     nullable: true,
   })
   public readonly route: string | null;
-  @ApiPropertyOptional({
-    example: 'Profile update was rejected by policy.',
-    description:
-      'Redacted human-readable explanation for an unsuccessful outcome.',
-    nullable: true,
-  })
-  public readonly failureReason: string | null;
-  @ApiPropertyOptional({
-    example: 'PROFILE_UPDATE_DENIED',
-    description: 'Stable machine-readable failure code.',
-    nullable: true,
-  })
-  public readonly failureCode: string | null;
   @ApiProperty({
     example: 'http',
     description: 'Channel or subsystem from which the audit event originated.',
@@ -306,14 +279,6 @@ export class AuditEventDto {
   })
   public readonly metadata: AuditData | null;
   @ApiPropertyOptional({
-    type: 'object',
-    additionalProperties: true,
-    example: { name: 'ForbiddenException', message: 'Operation denied' },
-    description: 'Redacted serialized error details for a failed operation.',
-    nullable: true,
-  })
-  public readonly error: AuditData | null;
-  @ApiPropertyOptional({
     enum: ADMINISTRATION_REASON_CODES,
     example: 'policy_enforcement',
     nullable: true,
@@ -339,7 +304,6 @@ export class AuditEventDto {
     this.id = event.id;
     this.domain = event.domain;
     this.event = event.event;
-    this.outcome = event.outcome;
     this.actorType = event.actorType;
     this.actorId = event.actorId;
     this.subjectType = event.subjectType;
@@ -360,14 +324,11 @@ export class AuditEventDto {
     this.osVersion = getOsVersion(event.userAgent);
     this.httpMethod = event.httpMethod;
     this.route = event.route;
-    this.failureReason = event.failureReason;
-    this.failureCode = event.failureCode;
     this.source = event.source;
     this.before = event.before;
     this.after = event.after;
     this.changes = event.changes;
     this.metadata = event.metadata;
-    this.error = event.error;
     const reasonCode = event.metadata?.reason_code;
     this.reasonCode =
       typeof reasonCode === 'string' &&
@@ -409,10 +370,6 @@ export class AuditSearchQueryDto {
   @IsString()
   @MaxLength(128)
   public readonly event?: string;
-  @ApiPropertyOptional({ enum: AuditEventOutcome })
-  @IsOptional()
-  @IsEnum(AuditEventOutcome)
-  public readonly outcome?: AuditEventOutcome;
   @ApiPropertyOptional({ enum: AuditActorType })
   @IsOptional()
   @IsEnum(AuditActorType)

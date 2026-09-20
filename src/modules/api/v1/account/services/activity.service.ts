@@ -32,7 +32,6 @@ export class ActivityApiService {
       subjectId: user.id,
       domain: query.domain,
       event: query.event,
-      outcome: query.outcome,
       occurredFrom: query.occurredFrom,
       occurredTo: query.occurredTo,
       page: query.page,

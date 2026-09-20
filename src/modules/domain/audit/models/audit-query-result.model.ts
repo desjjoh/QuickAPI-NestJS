@@ -30,7 +30,6 @@ function deepFreeze(value: unknown): unknown {
 export class AuditEvent extends BaseModel {
   public readonly domain: string;
   public readonly event: string;
-  public readonly outcome: string;
   public readonly actorType: AuditActorType;
   public readonly actorId: string | null;
   public readonly subjectType: AuditSubjectType | null;
@@ -44,22 +43,18 @@ export class AuditEvent extends BaseModel {
   public readonly userAgent: string | null;
   public readonly httpMethod: string | null;
   public readonly route: string | null;
-  public readonly failureReason: string | null;
-  public readonly failureCode: string | null;
   public readonly source: string;
   public readonly occurredAt: Date;
   public readonly before: AuditData | null;
   public readonly after: AuditData | null;
   public readonly changes: AuditData | null;
   public readonly metadata: AuditData | null;
-  public readonly error: AuditData | null;
 
   public constructor(entity: AuditEventEntity) {
     super(entity);
 
     this.domain = entity.domain;
     this.event = entity.event;
-    this.outcome = entity.outcome;
     this.actorType = entity.actor_type as AuditActorType;
     this.actorId = entity.actor_id;
     this.subjectType = entity.subject_type as AuditSubjectType | null;
@@ -73,15 +68,12 @@ export class AuditEvent extends BaseModel {
     this.userAgent = entity.user_agent;
     this.httpMethod = entity.http_method;
     this.route = entity.route;
-    this.failureReason = entity.failure_reason;
-    this.failureCode = entity.failure_code;
     this.source = entity.source;
     this.occurredAt = new Date(entity.occurred_at);
     this.before = immutableData(entity.before);
     this.after = immutableData(entity.after);
     this.changes = immutableData(entity.changes);
     this.metadata = immutableData(entity.metadata);
-    this.error = immutableData(entity.error);
     Object.freeze(this.createdAt);
     Object.freeze(this.updatedAt);
     Object.freeze(this.occurredAt);

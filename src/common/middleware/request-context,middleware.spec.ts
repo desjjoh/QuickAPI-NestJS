@@ -36,7 +36,10 @@ describe(requestContextMiddleware.name, () => {
           }),
         );
         expect(context.getStore()).not.toHaveProperty('request');
-        expect(context.getStore()).not.toHaveProperty('normalizedRoute');
+        expect(context.getStore()).toHaveProperty(
+          'normalizedRoute',
+          '/users/123',
+        );
       }) as NextFunction,
     );
   });
