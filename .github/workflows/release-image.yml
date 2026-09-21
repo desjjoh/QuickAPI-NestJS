@@ -35,7 +35,9 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
+    # Keep release tooling on a deliberate runner image instead of inheriting
+    # a future ubuntu-latest migration without validation.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: staging
     outputs:
