@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsNotEmpty,
@@ -33,8 +34,10 @@ export class UpdateProfileDto {
       'Optional preferred name used for display when different from the legal first name.',
     maxLength: 100,
   })
+  @Transform(({ value }) => (value === '' ? null : value))
   @ValidateIf((_, value) => value !== null)
   @IsString()
+  @IsNotEmpty()
   @MaxLength(100)
   public readonly preferred_name!: string | null;
 
@@ -67,8 +70,10 @@ export class UpdateProfileDto {
     description: 'Optional plain-text profile bio.',
     maxLength: 255,
   })
+  @Transform(({ value }) => (value === '' ? null : value))
   @ValidateIf((_, value) => value !== null)
   @IsString()
+  @IsNotEmpty()
   @MaxLength(255)
   public readonly bio!: string | null;
 }
