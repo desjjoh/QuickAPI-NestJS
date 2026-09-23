@@ -29,6 +29,7 @@ concurrency:
 env:
   REGISTRY: ${{ vars.CONTAINER_REGISTRY || 'ghcr.io' }}
   IMAGE_REPOSITORY: ${{ vars.CONTAINER_REPOSITORY || github.repository }}
+  TRIVY_SCANNER_IMAGE: aquasec/trivy:0.58.1
 
 jobs:
   release:
@@ -138,24 +139,35 @@ jobs:
           output-file: quickapi.spdx.json
 
       - name: Report high-severity vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
-          format: table
-          output: high-vulnerabilities.txt
-          severity: HIGH
-          ignore-unfixed: true
-          exit-code: '0'
+        env:
+          IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm \
+            --volume "$HOME/.docker:/root/.docker:ro" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            "$TRIVY_SCANNER_IMAGE" image \
+            --format table \
+            --output /workspace/high-vulnerabilities.txt \
+            --severity HIGH \
+            --ignore-unfixed \
+            --exit-code 0 \
+            "$IMAGE_REF"
 
       - name: Block unresolved critical vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
-          format: sarif
-          output: critical-vulnerabilities.sarif
-          severity: CRITICAL
-          ignore-unfixed: false
-          exit-code: '1'
+        env:
+          IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
+        run: |
+          docker run --rm \
+            --volume "$HOME/.docker:/root/.docker:ro" \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            "$TRIVY_SCANNER_IMAGE" image \
+            --format sarif \
+            --output /workspace/critical-vulnerabilities.sarif \
+            --severity CRITICAL \
+            --exit-code 1 \
+            "$IMAGE_REF"
 
       - name: Upload vulnerability report to code scanning
         if: always() && hashFiles('critical-vulnerabilities.sarif') != ''
