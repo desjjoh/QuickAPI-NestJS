@@ -55,7 +55,8 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package*.json ./
 
-RUN addgroup -S nodeapp \
+RUN apk upgrade --no-cache \
+  && addgroup -S nodeapp \
   && adduser -S nodeapp -G nodeapp \
   && mkdir -p /app/public /app/tmp /app/data/geoip \
   && chown -R nodeapp:nodeapp /app/public /app/tmp /app/data

@@ -142,11 +142,14 @@ jobs:
         env:
           IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
         run: |
+          mkdir -p "$RUNNER_TEMP/trivy-cache"
           docker run --rm \
             --volume "$HOME/.docker:/root/.docker:ro" \
+            --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
             "$TRIVY_SCANNER_IMAGE" image \
+            --scanners vuln \
             --format table \
             --output /workspace/high-vulnerabilities.txt \
             --severity HIGH \
@@ -158,16 +161,29 @@ jobs:
         env:
           IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
         run: |
+          set +e
           docker run --rm \
             --volume "$HOME/.docker:/root/.docker:ro" \
+            --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
             --volume "$PWD:/workspace" \
             --workdir /workspace \
             "$TRIVY_SCANNER_IMAGE" image \
+            --scanners vuln \
             --format sarif \
             --output /workspace/critical-vulnerabilities.sarif \
             --severity CRITICAL \
+            --ignore-unfixed \
             --exit-code 1 \
             "$IMAGE_REF"
+          status=$?
+          set -e
+          if [[ "$status" -eq 1 ]]; then
+            count="$(jq '[.runs[]?.results[]?] | length' critical-vulnerabilities.sarif)"
+            echo "::error::Trivy found $count critical vulnerabilities with available fixes; review the SARIF report."
+          elif [[ "$status" -ne 0 ]]; then
+            echo "::error::Trivy could not complete the critical vulnerability scan (exit code $status)."
+          fi
+          exit "$status"
 
       - name: Upload vulnerability report to code scanning
         if: always() && hashFiles('critical-vulnerabilities.sarif') != ''
