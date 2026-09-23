@@ -170,15 +170,46 @@ jobs:
             --workdir /workspace \
             "$TRIVY_SCANNER_IMAGE" image \
             --scanners vuln \
-            --format sarif \
-            --output /workspace/critical-vulnerabilities.sarif \
+            --format json \
+            --output /workspace/critical-vulnerabilities.json \
             --severity CRITICAL \
             --ignore-unfixed \
             --exit-code 0 \
             "$IMAGE_REF"
-          count="$(jq '[.runs[]?.results[]?] | length' critical-vulnerabilities.sarif)"
+          # Keep SARIF for code scanning, and retain JSON so the package and
+          # minimum fixed version are visible in the job log and artifacts.
+          docker run --rm \
+            --volume "$PWD:/workspace" \
+            --workdir /workspace \
+            "$TRIVY_SCANNER_IMAGE" convert \
+            --format sarif \
+            --output /workspace/critical-vulnerabilities.sarif \
+            /workspace/critical-vulnerabilities.json
+          count="$(jq '[.Results[]?.Vulnerabilities[]?] | length' critical-vulnerabilities.json)"
           if [[ "$count" -gt 0 ]]; then
-            echo "::warning::Trivy found $count critical vulnerabilities with available fixes; review the SARIF report."
+            summary="$RUNNER_TEMP/critical-vulnerabilities.md"
+            {
+              echo '### Fixable critical vulnerabilities'
+              echo
+              echo '| Vulnerability | Package | Installed | Fixed version | Image target |'
+              echo '| --- | --- | --- | --- | --- |'
+            } > "$summary"
+            jq -r '.Results[] as $result | $result.Vulnerabilities[]? | [
+                .VulnerabilityID,
+                .PkgName,
+                .InstalledVersion,
+                .FixedVersion,
+                $result.Target
+              ] | @tsv' critical-vulnerabilities.json |
+              while IFS=$'\t' read -r vulnerability package installed fixed target; do
+                echo "| \`$vulnerability\` | \`$package\` | \`$installed\` | \`$fixed\` | \`$target\` |" >> "$summary"
+                echo "::warning title=$vulnerability in $package::Installed $installed; upgrade to $fixed (target: $target)."
+              done
+            {
+              echo
+              echo 'Download `critical-vulnerabilities.json` from the release evidence artifact for the complete Trivy findings.'
+            } >> "$summary"
+            tee -a "$GITHUB_STEP_SUMMARY" < "$summary"
           fi
 
       - name: Upload vulnerability report to code scanning
@@ -196,6 +227,7 @@ jobs:
             release-image.env
             quickapi.spdx.json
             high-vulnerabilities.txt
+            critical-vulnerabilities.json
             critical-vulnerabilities.sarif
             security/container-vulnerability-exceptions.md
           if-no-files-found: warn
