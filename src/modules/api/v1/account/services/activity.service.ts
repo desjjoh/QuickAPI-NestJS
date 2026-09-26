@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { AuditSubjectType } from '@/config/audit-events.config';
+import { AuditActorType } from '@/config/audit-events.config';
 import { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
@@ -28,12 +28,14 @@ export class ActivityApiService {
       throw new BadRequestException('occurredFrom must not follow occurredTo');
 
     const result = await this.auditQueries.query({
-      subjectType: AuditSubjectType.USER,
-      subjectId: user.id,
+      actorType: AuditActorType.USER,
+      actorId: user.id,
       domain: query.domain,
       event: query.event,
       occurredFrom: query.occurredFrom,
       occurredTo: query.occurredTo,
+      sort: query.sort,
+      order: query.order,
       page: query.page,
       take: query.take,
     });

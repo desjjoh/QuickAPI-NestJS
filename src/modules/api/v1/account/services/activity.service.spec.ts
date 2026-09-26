@@ -64,7 +64,7 @@ describe('ActivityApiService', () => {
     };
   }
 
-  it('derives the account subject from the authenticated entity and forwards filters', async () => {
+  it('derives the account actor from the authenticated entity and forwards filters', async () => {
     const { service, auditQueries } = setup();
     const occurredFrom = new Date('2026-01-01T00:00:00.000Z');
     const occurredTo = new Date('2026-01-31T23:59:59.999Z');
@@ -79,14 +79,16 @@ describe('ActivityApiService', () => {
     });
 
     expect(auditQueries.query).toHaveBeenCalledWith({
-      subjectType: 'user',
-      subjectId: user.id,
+      actorType: 'user',
+      actorId: user.id,
       domain: 'identity',
       event: 'identity.profile.updated',
       occurredFrom,
       occurredTo,
       page: 2,
       take: 10,
+      sort: undefined,
+      order: undefined,
     });
   });
 

@@ -3,6 +3,8 @@ import type {
   AuditResourceType,
   AuditSubjectType,
 } from '@/config/audit-events.config';
+import type { AuditSort } from '@/common/models/audit.model';
+import type { Order } from '@/common/models/pagination.model';
 
 /** The deliberately bounded set of columns on which audit events may be queried. */
 export interface AuditQuery {
@@ -18,6 +20,8 @@ export interface AuditQuery {
   readonly sessionId?: string;
   readonly occurredFrom?: Date;
   readonly occurredTo?: Date;
+  readonly sort?: AuditSort;
+  readonly order?: Order;
   readonly page?: number;
   readonly take?: number;
 }

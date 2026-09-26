@@ -12,7 +12,6 @@ import {
 
 import { AddressEntity } from '@/common/entities/address.entity';
 import { PhoneEntity } from '@/common/entities/phone.entity';
-import { generateOperationId } from '@/common/helpers/nanoid.helper';
 
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
@@ -52,7 +51,6 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdateProfileDto,
   ): Promise<UserDto> {
-    const operationId = generateOperationId();
     const updated = await this.dataSource.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const personalBefore = this.profilePersonal(current);
@@ -85,7 +83,6 @@ export class ProfileApiService {
         this.profilePersonal(after),
         user.id,
         false,
-        operationId,
       );
 
       return after;
@@ -378,7 +375,6 @@ export class ProfileApiService {
     after: unknown,
     userId: string,
     meaningfulWithoutChanges = false,
-    operationId?: string,
   ) {
     return this.audit.record(
       {
@@ -392,7 +388,6 @@ export class ProfileApiService {
         resourceId,
         source: AuditSource.HTTP,
         metadata: {},
-        operationId,
         before,
         after,
         meaningfulWithoutChanges,

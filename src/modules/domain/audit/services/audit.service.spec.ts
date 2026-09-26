@@ -7,6 +7,7 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import type { EntityManager, Repository } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
+import * as nanoidHelper from '@/common/helpers/nanoid.helper';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditService } from './audit.service';
 import { AuditRedactionService } from './audit-redaction.service';
@@ -66,6 +67,33 @@ describe(AuditService.name, () => {
     );
     expect(result).not.toHaveProperty('category');
     expect(repository.insert).toHaveBeenCalledWith(result);
+  });
+
+  it('generates a unique operation ID instead of reusing the request ID', async () => {
+    jest
+      .spyOn(nanoidHelper, 'generateOperationId')
+      .mockReturnValueOnce('first-operation1')
+      .mockReturnValueOnce('second-operation');
+    await context.run(
+      { requestId: 'shared-request', source: 'http' },
+      async () => {
+        await service.record(activity);
+        await service.record({
+          ...activity,
+          event: 'identity.sign_out.succeeded',
+        });
+      },
+    );
+
+    const [first, second] = repository.create.mock.calls.map(
+      ([entity]) => entity as AuditEventEntity,
+    );
+    expect(first.request_id).toBe('shared-request');
+    expect(second.request_id).toBe('shared-request');
+    expect(first.operation_id).toHaveLength(16);
+    expect(second.operation_id).toHaveLength(16);
+    expect(first.operation_id).not.toBe(second.operation_id);
+    expect(first.operation_id).not.toBe(first.request_id);
   });
 
   it('rejects an unenumerated resource type even without snapshots', () => {
@@ -298,12 +326,17 @@ describe(AuditService.name, () => {
       expect.objectContaining({
         actor_id: 'context-user',
         session_id: 'session-1',
-        operation_id: 'request-1',
+        request_id: 'request-1',
+        operation_id: expect.any(String),
         ip_address: '127.0.0.1',
         user_agent: 'test-agent',
         http_method: 'POST',
         route: '/api/users/:id',
       }),
+    );
+
+    expect(repository.create.mock.calls[0][0].operation_id).not.toBe(
+      'request-1',
     );
   });
 

@@ -41,7 +41,7 @@ describe('account activity', () => {
   });
   afterAll(() => teardownTestSuite(suite));
 
-  it('returns only events where the authenticated user is the subject', async () => {
+  it('returns only actions initiated by the authenticated user', async () => {
     const user = await createRegisteredUser(app, suite, email);
     const agent = request.agent(app.getHttpServer());
     const csrf = await acquireCsrf(agent);
@@ -90,9 +90,9 @@ describe('account activity', () => {
       data: [
         expect.objectContaining({
           domain: 'activity_test',
-          event: 'activity_test.other.touched.me',
-          actorType: 'admin',
-          actorId: 'other-actor-id',
+          event: 'activity_test.self.first',
+          actorType: 'user',
+          actorId: user.id,
         }),
       ],
       meta: {

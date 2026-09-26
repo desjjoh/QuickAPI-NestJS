@@ -10,6 +10,7 @@ import type { RegisterDto } from '../models/register.model';
 import { RegistrationService } from './registration.service';
 import {
   AUDIT_EVENT_MATRIX,
+  AuditActorType,
   AuditEventDomain,
 } from '@/config/audit-events.config';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
@@ -151,6 +152,8 @@ describe('RegistrationService', () => {
         event:
           AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
             .REGISTRATION_VERIFICATION_SUCCEEDED,
+        actorType: AuditActorType.USER,
+        actorId: 'created-user',
         subjectId: 'created-user',
         sessionId: 'registration-session',
         before: {},

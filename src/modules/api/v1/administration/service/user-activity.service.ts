@@ -33,6 +33,8 @@ export class UserActivityAdminService {
       event: query.event,
       occurredFrom: query.occurredFrom,
       occurredTo: query.occurredTo,
+      sort: query.sort,
+      order: query.order,
       page: query.page,
       take: query.take,
     });

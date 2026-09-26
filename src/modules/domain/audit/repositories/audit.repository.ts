@@ -12,6 +12,16 @@ import {
   AuditEvent,
   AuditQueryResult,
 } from '../models/audit-query-result.model';
+import { AuditSort } from '@/common/models/audit.model';
+import { Order } from '@/common/models/pagination.model';
+
+const SORT_COLUMNS: Readonly<Record<AuditSort, string>> = {
+  [AuditSort.OCCURRED_AT]: 'audit.occurred_at',
+  [AuditSort.CREATED_AT]: 'audit.createdAt',
+  [AuditSort.DOMAIN]: 'audit.domain',
+  [AuditSort.EVENT]: 'audit.event',
+  [AuditSort.ACTOR_TYPE]: 'audit.actor_type',
+};
 
 @Injectable()
 export class AuditRepository extends Repository<AuditEventEntity> {
@@ -33,9 +43,11 @@ export class AuditRepository extends Repository<AuditEventEntity> {
 
     const builder = this.createQueryBuilder('audit');
     this.applyFilters(builder, query);
+    const sort = query.sort ?? AuditSort.OCCURRED_AT;
+    const order = query.order ?? Order.DESC;
     builder
-      .orderBy('audit.occurred_at', 'DESC')
-      .addOrderBy('audit.id', 'DESC')
+      .orderBy(SORT_COLUMNS[sort], order)
+      .addOrderBy('audit.id', order)
       .take(pageOptions.take)
       .skip(pageOptions.skip);
 
@@ -82,6 +94,15 @@ export class AuditRepository extends Repository<AuditEventEntity> {
   }
 
   private validate(query: AuditQuery, pageOptions: PaginationOptions): void {
+    if (query.sort !== undefined && !(query.sort in SORT_COLUMNS))
+      throw new BadRequestException('sort is invalid');
+
+    if (
+      query.order !== undefined &&
+      !Object.values(Order).includes(query.order)
+    )
+      throw new BadRequestException('order is invalid');
+
     if (!Number.isInteger(pageOptions.page) || pageOptions.page < 1)
       throw new BadRequestException('page must be a positive integer');
     if (
