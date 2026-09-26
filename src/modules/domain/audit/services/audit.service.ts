@@ -15,6 +15,7 @@ import {
   AuditSource,
   AuditSubjectType,
 } from '@/config/audit-events.config';
+import { generateOperationId } from '@/common/helpers/nanoid.helper';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
@@ -38,8 +39,8 @@ export interface RecordAuditInput {
   readonly httpMethod?: string | null;
   readonly route?: string | null;
   readonly occurredAt?: Date;
-  /** Correlates retries or multiple audit events belonging to one operation. */
-  readonly operationId?: string | null;
+  /** Correlates multiple audit events belonging to one logical operation. */
+  readonly operationId?: string;
   readonly before?: unknown;
   readonly after?: unknown;
   /** Persist a semantic event even when its redacted snapshots have no changes. */
@@ -145,7 +146,7 @@ export class AuditService {
       resource_type: input.resourceType ?? null,
       resource_id: input.resourceId ?? null,
       domain: input.domain,
-      operation_id: input.operationId ?? context?.requestId ?? null,
+      operation_id: input.operationId ?? generateOperationId(),
       request_id: this.explicitOrContext(
         input,
         'requestId',

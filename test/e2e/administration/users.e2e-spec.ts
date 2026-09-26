@@ -404,7 +404,6 @@ describe('user administration authorization and lifecycle', () => {
       await suite.dataSource.getRepository(AuditEventEntity).countBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         request_id: 'retry-operation',
-        operation_id: 'retry-operation',
       }),
     ).toBe(1);
   });

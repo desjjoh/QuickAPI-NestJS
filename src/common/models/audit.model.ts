@@ -17,7 +17,7 @@ import {
   getOs,
   getOsVersion,
 } from '@/common/helpers/session-info.helper';
-import { PaginationMeta } from '@/common/models/pagination.model';
+import { Order, PaginationMeta } from '@/common/models/pagination.model';
 import {
   ADMINISTRATION_REASON_CODES,
   AdministrationReasonCode,
@@ -163,8 +163,9 @@ export class AuditEventDto {
   })
   public readonly occurredAt: Date;
   @ApiPropertyOptional({
-    example: 'profile-update-U1s2e3r4',
-    description: 'Identifier correlating events from one logical operation.',
+    example: 'O1p2e3r4A5t6i7o8',
+    description:
+      'Unique identifier for the logical operation, distinct from its containing HTTP request.',
     nullable: true,
   })
   public readonly operationId: string | null;
@@ -359,6 +360,14 @@ export class AuditEventPageDto {
   }
 }
 
+export enum AuditSort {
+  OCCURRED_AT = 'occurredAt',
+  CREATED_AT = 'createdAt',
+  DOMAIN = 'domain',
+  EVENT = 'event',
+  ACTOR_TYPE = 'actorType',
+}
+
 export class AuditSearchQueryDto {
   @ApiPropertyOptional({ maxLength: 64 })
   @IsOptional()
@@ -389,6 +398,18 @@ export class AuditSearchQueryDto {
   @Type(() => Date)
   @IsDate()
   public readonly occurredTo?: Date;
+  @ApiPropertyOptional({
+    enum: AuditSort,
+    default: AuditSort.OCCURRED_AT,
+    description: 'Audit-event field used to sort the result rows.',
+  })
+  @IsOptional()
+  @IsEnum(AuditSort)
+  public readonly sort?: AuditSort = AuditSort.OCCURRED_AT;
+  @ApiPropertyOptional({ enum: Order, default: Order.DESC })
+  @IsOptional()
+  @IsEnum(Order)
+  public readonly order?: Order = Order.DESC;
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)

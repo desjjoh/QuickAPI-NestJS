@@ -35,7 +35,7 @@ export class ActivityApiController {
   @ApiOperation({
     summary: 'List my account activity',
     description:
-      'Returns activity affecting the authenticated user across all domains, including actions performed by administrators or system actors. The account subject cannot be supplied by the request.',
+      'Returns actions initiated by the authenticated user across all domains. Activity performed on the account by administrators or system actors is excluded.',
   })
   @ApiOkResponse({ type: AuditEventPageDto })
   @Permissions(

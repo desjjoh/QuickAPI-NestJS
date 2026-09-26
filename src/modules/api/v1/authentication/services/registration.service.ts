@@ -114,8 +114,8 @@ export class RegistrationService {
         AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY]
           .REGISTRATION_VERIFICATION_SUCCEEDED,
       domain: AuditEventDomain.IDENTITY,
-      actorType: AuditActorType.ANONYMOUS,
-      actorId: null,
+      actorType: AuditActorType.USER,
+      actorId: user.id,
       subjectType: AuditSubjectType.USER,
       subjectId: user.id,
       sessionId,

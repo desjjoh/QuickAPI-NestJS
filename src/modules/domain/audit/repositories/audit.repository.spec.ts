@@ -3,6 +3,8 @@ import { DataSource, SelectQueryBuilder } from 'typeorm';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRepository } from './audit.repository';
+import { AuditSort } from '@/common/models/audit.model';
+import { Order } from '@/common/models/pagination.model';
 
 function entity(id: string, occurredAt: string) {
   return {
@@ -17,7 +19,7 @@ function entity(id: string, occurredAt: string) {
     subject_id: 'subject-1',
     resource_type: 'user',
     resource_id: 'resource-1',
-    operation_id: null,
+    operation_id: 'operation-1',
     request_id: 'request-1',
     session_id: 'session-1',
     ip_address: null,
@@ -95,6 +97,13 @@ describe('AuditRepository page pagination', () => {
     await repository.queryAudit({});
     expect(builder.orderBy).toHaveBeenCalledWith('audit.occurred_at', 'DESC');
     expect(builder.addOrderBy).toHaveBeenCalledWith('audit.id', 'DESC');
+  });
+
+  it('applies a requested bounded sort field and direction', async () => {
+    const { repository, builder } = setup([]);
+    await repository.queryAudit({ sort: AuditSort.EVENT, order: Order.ASC });
+    expect(builder.orderBy).toHaveBeenCalledWith('audit.event', 'ASC');
+    expect(builder.addOrderBy).toHaveBeenCalledWith('audit.id', 'ASC');
   });
 
   it.each([
