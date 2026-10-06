@@ -4,7 +4,7 @@ import { BaseEntity } from '@/common/entities/base.entity';
 
 import { ImageEntity } from '../../media/entities/image.entity';
 import { UserEntity } from '../../identity/entities/user.entity';
-import { ArticleStatusEntity } from './publicationStatus.entity';
+import { ArticleStatusEntity } from './articleStatus.entity';
 
 class Content {
   @Column({ type: 'varchar', length: 255 })
