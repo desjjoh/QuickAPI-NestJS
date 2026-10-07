@@ -20,17 +20,21 @@ class Content {
 class Media {
   @ManyToOne(() => ImageEntity, {
     eager: true,
-    nullable: true,
-    onDelete: 'SET NULL',
+    nullable: false,
+    onDelete: 'RESTRICT',
   })
   @JoinColumn({ name: 'hero_id', referencedColumnName: 'id' })
-  public readonly hero!: Relation<ImageEntity | null>;
+  public readonly hero!: Relation<ImageEntity>;
 }
 
 class Attribution {
-  @ManyToOne(() => UserEntity, { eager: true })
+  @ManyToOne(() => UserEntity, {
+    eager: true,
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
   @JoinColumn({ name: 'author_id', referencedColumnName: 'id' })
-  public readonly author!: Relation<UserEntity>;
+  public readonly author!: Relation<UserEntity | null>;
 }
 
 class Publication {

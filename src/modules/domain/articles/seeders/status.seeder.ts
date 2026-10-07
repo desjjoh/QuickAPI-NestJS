@@ -4,7 +4,6 @@ import {
   Seeder,
   SeederResult,
 } from '@/modules/system/seeder/types/seeder.types';
-
 import { ArticleStatusEntity } from '../entities/articleStatus.entity';
 
 export type ArticleStatusSeed = {
