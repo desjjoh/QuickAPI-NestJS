@@ -9,7 +9,7 @@ import {
   Seeder,
   SeederResult,
 } from '@/modules/system/seeder/types/seeder.types';
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 export type PermissionSeed = {
   key: string;
@@ -96,9 +96,9 @@ export class PermissionSeeder implements Seeder {
   public readonly name: string = PermissionSeeder.name;
   public readonly order: number = 30;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<PermissionEntity> =
-      dataSource.getRepository(PermissionEntity);
+      manager.getRepository(PermissionEntity);
 
     let created = 0;
     let skipped = 0;

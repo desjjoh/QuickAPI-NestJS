@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import {
   Seeder,
@@ -12,26 +12,36 @@ export type ArticleStatusSeed = {
   description: string;
 };
 
+export const ARTICLE_STATUS_KEYS = {
+  DRAFT: 'draft',
+  SUBMITTED: 'submitted',
+  PUBLISHED: 'published',
+  ARCHIVED: 'archived',
+} as const;
+
+export type ArticleStatusKey =
+  (typeof ARTICLE_STATUS_KEYS)[keyof typeof ARTICLE_STATUS_KEYS];
+
 export const ARTICLE_STATUS_SEEDS: ArticleStatusSeed[] = [
   {
-    key: 'draft',
+    key: ARTICLE_STATUS_KEYS.DRAFT,
     label: 'Draft',
     description:
       'The article is being written and has not been submitted for review.',
   },
   {
-    key: 'submitted',
+    key: ARTICLE_STATUS_KEYS.SUBMITTED,
     label: 'Submitted',
     description:
       'The article has been submitted and is waiting to be reviewed.',
   },
   {
-    key: 'published',
+    key: ARTICLE_STATUS_KEYS.PUBLISHED,
     label: 'Published',
     description: 'The article is published and available to readers.',
   },
   {
-    key: 'archived',
+    key: ARTICLE_STATUS_KEYS.ARCHIVED,
     label: 'Archived',
     description:
       'The article has been removed from active publication and retained for historical reference.',
@@ -42,9 +52,9 @@ export class ArticleStatusSeeder implements Seeder {
   public readonly name: string = ArticleStatusSeeder.name;
   public readonly order: number = 50;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<ArticleStatusEntity> =
-      dataSource.getRepository(ArticleStatusEntity);
+      manager.getRepository(ArticleStatusEntity);
 
     let created = 0;
     let skipped = 0;

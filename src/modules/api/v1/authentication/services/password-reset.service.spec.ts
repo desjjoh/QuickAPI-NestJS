@@ -21,16 +21,15 @@ describe('PasswordResetService', () => {
     consumeToken: jest.fn(),
   };
   const emailSvc = { sendEmail: jest.fn() };
-  const userRepo = {
-    findByEmail: jest.fn(),
-    revokeAllSessions: jest.fn(),
-    manager: { find: jest.fn().mockResolvedValue([]) },
-  };
+  const refreshSvc = { revokeAllSessions: jest.fn() };
   const userSvc = {
+    findByEmail: jest.fn(),
+    updateUser: jest.fn(),
+  };
+  const credentials = {
     canAuthenticate: jest.fn(),
     assertCanAuthenticate: jest.fn(),
     hashPassword: jest.fn(),
-    updateUser: jest.fn(),
     recordPasswordChanged: jest.fn(),
   };
   const auditSvc = {
@@ -40,8 +39,8 @@ describe('PasswordResetService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    userRepo.findByEmail.mockResolvedValue(user);
-    userSvc.canAuthenticate.mockReturnValue(true);
+    userSvc.findByEmail.mockResolvedValue(user);
+    credentials.canAuthenticate.mockReturnValue(true);
     tokenSvc.createToken.mockResolvedValue({
       id: 't1',
       token: 'opaque',
@@ -50,8 +49,9 @@ describe('PasswordResetService', () => {
     service = new PasswordResetService(
       tokenSvc as never,
       emailSvc as never,
-      userRepo as never,
       userSvc as never,
+      credentials as never,
+      refreshSvc as never,
       auditSvc as never,
     );
   });
@@ -97,8 +97,8 @@ describe('PasswordResetService', () => {
     ['unknown', null, true],
     ['inactive', user, false],
   ])('silently ignores an %s account', async (_label, found, active) => {
-    userRepo.findByEmail.mockResolvedValue(found);
-    userSvc.canAuthenticate.mockReturnValue(active);
+    userSvc.findByEmail.mockResolvedValue(found);
+    credentials.canAuthenticate.mockReturnValue(active);
     await service.requestPasswordReset('x@test.dev');
     expect(tokenSvc.createToken).not.toHaveBeenCalled();
     expect(emailSvc.sendEmail).not.toHaveBeenCalled();
@@ -126,8 +126,8 @@ describe('PasswordResetService', () => {
     ['missing', null, true],
     ['inactive', user, false],
   ])('rejects verification for a %s account', async (_label, found, active) => {
-    userRepo.findByEmail.mockResolvedValue(found);
-    userSvc.canAuthenticate.mockReturnValue(active);
+    userSvc.findByEmail.mockResolvedValue(found);
+    credentials.canAuthenticate.mockReturnValue(active);
     await expect(
       service.verifyPasswordResetCode('x', '123456'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -135,7 +135,7 @@ describe('PasswordResetService', () => {
 
   it('consumes the authorization, hashes the password, records metadata, and revokes every session', async () => {
     tokenSvc.consumeToken.mockResolvedValue({ user });
-    userSvc.hashPassword.mockResolvedValue('password-hash');
+    credentials.hashPassword.mockResolvedValue('password-hash');
     await service.confirmPasswordReset('t1', 'authorization', 'new-password');
     expect(tokenSvc.consumeToken).toHaveBeenCalledWith(
       't1',
@@ -144,12 +144,12 @@ describe('PasswordResetService', () => {
       { state: 'verified' },
       { state: 'consumed' },
     );
-    expect(userSvc.hashPassword).toHaveBeenCalledWith('new-password');
+    expect(credentials.hashPassword).toHaveBeenCalledWith('new-password');
     expect(userSvc.updateUser).toHaveBeenCalledWith(user, {
       identity: { password: 'password-hash' },
     });
-    expect(userSvc.recordPasswordChanged).toHaveBeenCalledWith(user);
-    expect(userRepo.revokeAllSessions).toHaveBeenCalledWith('u1');
+    expect(credentials.recordPasswordChanged).toHaveBeenCalledWith(user);
+    expect(refreshSvc.revokeAllSessions).toHaveBeenCalledWith('u1');
     expect(emailSvc.sendEmail).toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith({
       event: 'identity.password_reset.completed',
@@ -169,13 +169,13 @@ describe('PasswordResetService', () => {
 
   it('rejects an inactive account without changing a password or revoking sessions', async () => {
     tokenSvc.consumeToken.mockResolvedValue({ user });
-    userSvc.assertCanAuthenticate.mockImplementation(() => {
+    credentials.assertCanAuthenticate.mockImplementation(() => {
       throw new ForbiddenException();
     });
     await expect(
       service.confirmPasswordReset('t1', 'authorization', 'new'),
     ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(userSvc.hashPassword).not.toHaveBeenCalled();
-    expect(userRepo.revokeAllSessions).not.toHaveBeenCalled();
+    expect(credentials.hashPassword).not.toHaveBeenCalled();
+    expect(refreshSvc.revokeAllSessions).not.toHaveBeenCalled();
   });
 });

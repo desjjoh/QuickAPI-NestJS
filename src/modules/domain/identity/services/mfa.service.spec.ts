@@ -14,9 +14,8 @@ describe('MfaService', () => {
     profile: { name: { first: 'Ada', preferred: null } },
   };
   const settingsRepo = {
-    findOne: jest.fn(),
-    create: jest.fn(),
-    save: jest.fn(),
+    findByUser: jest.fn(),
+    manager: { create: jest.fn(), save: jest.fn() },
   };
   const tokenSvc = {
     createToken: jest.fn(),
@@ -27,7 +26,7 @@ describe('MfaService', () => {
   let service: MfaService;
   beforeEach(() => {
     jest.clearAllMocks();
-    settingsRepo.create.mockImplementation((x) => x);
+    settingsRepo.manager.create.mockImplementation((_entity, x) => x);
     tokenSvc.createToken.mockResolvedValue({
       id: 'm1',
       token: 'opaque',
@@ -41,7 +40,7 @@ describe('MfaService', () => {
   });
 
   it('returns null when sign-in MFA is not enabled', async () => {
-    settingsRepo.findOne.mockResolvedValue(null);
+    settingsRepo.findByUser.mockResolvedValue(null);
     await expect(
       service.createSignInChallenge(user as never),
     ).resolves.toBeNull();
@@ -53,7 +52,7 @@ describe('MfaService', () => {
   ])(
     'creates a %s email challenge whose stored code is hashed',
     async (purpose, existing) => {
-      settingsRepo.findOne.mockResolvedValue(
+      settingsRepo.findByUser.mockResolvedValue(
         existing
           ? { enabled: true, primary_method: MfaMethod.EMAIL_OTP }
           : null,
@@ -73,11 +72,11 @@ describe('MfaService', () => {
   );
 
   it('rejects already enabled enrollment and unsupported methods', async () => {
-    settingsRepo.findOne.mockResolvedValue({ enabled: true });
+    settingsRepo.findByUser.mockResolvedValue({ enabled: true });
     await expect(service.requestEnable(user as never)).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    settingsRepo.findOne.mockResolvedValue({
+    settingsRepo.findByUser.mockResolvedValue({
       enabled: true,
       primary_method: 'totp',
     });
@@ -102,29 +101,35 @@ describe('MfaService', () => {
       '123456',
       { purpose: MfaChallengePurpose.SIGN_IN },
       'u1',
+      settingsRepo.manager,
     );
   });
 
   it('enables new or existing settings and rejects duplicate enablement', async () => {
-    settingsRepo.findOne.mockResolvedValueOnce(null);
+    settingsRepo.findByUser.mockResolvedValueOnce(null);
     await service.enable(user as never);
-    expect(settingsRepo.create).toHaveBeenCalled();
-    expect(settingsRepo.save).toHaveBeenCalledWith(
+    expect(settingsRepo.manager.create).toHaveBeenCalled();
+    expect(settingsRepo.manager.save).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         enabled: true,
         last_verified_at: expect.any(Date),
       }),
     );
-    settingsRepo.findOne.mockResolvedValue({ enabled: true });
+    settingsRepo.findByUser.mockResolvedValue({ enabled: true });
     await expect(service.enable(user as never)).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
 
   it('disables MFA and revokes outstanding challenges', async () => {
-    settingsRepo.findOne.mockResolvedValue({ id: 'settings', enabled: true });
+    settingsRepo.findByUser.mockResolvedValue({
+      id: 'settings',
+      enabled: true,
+    });
     await service.disable(user as never);
-    expect(settingsRepo.save).toHaveBeenCalledWith(
+    expect(settingsRepo.manager.save).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         enabled: false,
         disabled_at: expect.any(Date),
@@ -133,8 +138,9 @@ describe('MfaService', () => {
     expect(tokenSvc.revokeActiveTokens).toHaveBeenCalledWith(
       'u1',
       AccountTokenType.EMAIL_MFA,
+      settingsRepo.manager,
     );
-    settingsRepo.findOne.mockResolvedValue(null);
+    settingsRepo.findByUser.mockResolvedValue(null);
     await expect(service.disable(user as never)).rejects.toBeInstanceOf(
       BadRequestException,
     );

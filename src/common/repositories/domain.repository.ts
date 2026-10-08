@@ -51,9 +51,11 @@ export abstract class MutableDomainRepository<
     payload: DeepPartial<Base<TEntity>>,
   ): Promise<TEntity> {
     const repository = this.getRepository(manager);
+    const detachedEntity = repository.create(entity as DeepPartial<TEntity>);
+
     return repository.save(
       repository.merge(
-        entity,
+        detachedEntity,
         omitUndefinedDeep(payload) as DeepPartial<TEntity>,
       ),
     );

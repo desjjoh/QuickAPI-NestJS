@@ -11,11 +11,12 @@ import { ISizeCalculationResult } from 'image-size/types/interface';
 
 import { Base } from '@/common/models/base.model';
 import { useFileManager } from '@/common/handlers/file.handler';
+import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
 
 import { ImageEntity } from '../entities/image.entity';
 import { ImageRepository } from '../repositories/image.repository';
 import { StorageService } from '@/modules/system/storage/types/storage.types';
-import type { EntityManager } from 'typeorm';
+import type { DeepPartial, EntityManager } from 'typeorm';
 
 export type CreateImageInput = {
   file: Express.Multer.File;
@@ -44,8 +45,11 @@ export class ImageService {
     private readonly storageSvc: StorageService,
   ) {}
 
-  public async findById(id: string): Promise<ImageEntity> {
-    const image = await this.imgRepo.findById(id);
+  public async findById(
+    id: string,
+    manager: EntityManager = this.imgRepo.manager,
+  ): Promise<ImageEntity> {
+    const image = await this.imgRepo.findById(manager, id);
 
     if (!image)
       throw new NotFoundException(`Image with ID "${id}" was not found.`);
@@ -55,7 +59,7 @@ export class ImageService {
 
   public async create(
     input: CreateImageInput,
-    manager?: EntityManager,
+    manager: EntityManager = this.imgRepo.manager,
   ): Promise<ImageEntity> {
     this.validateImage(input.file);
 
@@ -75,9 +79,10 @@ export class ImageService {
         alt_text: input.alt_text ?? null,
       };
 
-      return await (manager
-        ? this.imgRepo.createImage(payload, manager)
-        : this.imgRepo.createImage(payload));
+      const image = manager.create(ImageEntity, payload);
+      const created = await manager.save(ImageEntity, image);
+
+      return await manager.findOneByOrFail(ImageEntity, { id: created.id });
     } catch (error) {
       await this.removeStoredFile(storedFile.storage_key);
 
@@ -87,7 +92,7 @@ export class ImageService {
 
   public async update(
     input: UpdateImageInput,
-    manager?: EntityManager,
+    manager: EntityManager = this.imgRepo.manager,
   ): Promise<ImageEntity> {
     this.validateImage(input.file);
 
@@ -109,13 +114,20 @@ export class ImageService {
         alt_text: input.alt_text,
       };
 
-      const updatedImage = manager
-        ? await this.imgRepo.updateImage(input.image, payload, manager)
-        : await this.imgRepo.updateImage(input.image, payload);
+      const detachedImage = manager.create(
+        ImageEntity,
+        input.image as DeepPartial<ImageEntity>,
+      );
+      const updatedImage = manager.merge(
+        ImageEntity,
+        detachedImage,
+        omitUndefinedDeep(payload),
+      );
+      const savedImage = await manager.save(ImageEntity, updatedImage);
 
       await this.removeStoredFile(previousStorageKey);
 
-      return updatedImage;
+      return savedImage;
     } catch (error) {
       await this.removeStoredFile(storedFile.storage_key);
 
@@ -125,13 +137,12 @@ export class ImageService {
 
   public async remove(
     image: ImageEntity,
-    manager?: EntityManager,
+    manager: EntityManager = this.imgRepo.manager,
   ): Promise<ImageEntity> {
     await this.removeStoredFile(image.storage_key);
+    await manager.delete(ImageEntity, { id: image.id });
 
-    return manager
-      ? this.imgRepo.deleteImage(image, manager)
-      : this.imgRepo.deleteImage(image);
+    return image;
   }
 
   private validateImage(file: Express.Multer.File): void {

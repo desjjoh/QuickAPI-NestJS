@@ -21,13 +21,17 @@ describe('AccountTokenService', () => {
     andWhere: jest.fn(),
     execute: jest.fn(),
   };
-  const repo = {
+  const manager = {
     create: jest.fn(),
     save: jest.fn(),
-    findOne: jest.fn(),
     update: jest.fn(),
     createQueryBuilder: jest.fn(),
-    manager: { getRepository: jest.fn(), transaction: jest.fn() },
+    transaction: jest.fn(),
+  };
+  const repo = {
+    findPendingById: jest.fn(),
+    findPendingByUser: jest.fn(),
+    manager,
   };
   let service: AccountTokenService;
 
@@ -36,14 +40,16 @@ describe('AccountTokenService', () => {
     for (const method of ['update', 'set', 'where', 'andWhere'] as const)
       query[method].mockReturnValue(query);
     query.execute.mockResolvedValue({ affected: 1 });
-    repo.createQueryBuilder.mockReturnValue(query);
-    repo.manager.getRepository.mockReturnValue(repo);
-    repo.manager.transaction.mockImplementation(async (callback) =>
-      callback(repo.manager),
+    manager.createQueryBuilder.mockReturnValue(query);
+    manager.transaction.mockImplementation(async (callback) =>
+      callback(manager),
     );
-    repo.create.mockImplementation((value) => value);
-    repo.save.mockImplementation(async (value) => ({ id: 't1', ...value }));
-    repo.update.mockResolvedValue({ affected: 1 });
+    manager.create.mockImplementation((_entity, value) => value);
+    manager.save.mockImplementation(async (_entity, value) => ({
+      id: 't1',
+      ...value,
+    }));
+    manager.update.mockResolvedValue({ affected: 1 });
     service = new AccountTokenService(repo as never);
   });
 
@@ -69,8 +75,8 @@ describe('AccountTokenService', () => {
       metadata: { state: 'pending' },
       mfaCodeHash: hash('123456'),
     });
-    expect(repo.update).toHaveBeenCalledTimes(1);
-    const stored = repo.create.mock.calls[0][0];
+    expect(manager.update).toHaveBeenCalledTimes(1);
+    const stored = manager.create.mock.calls[0][1];
     expect(result.token).toBeTruthy();
     expect(stored.token_hash).toBe(hash(result.token));
     expect(stored.token_hash).not.toBe(result.token);
@@ -79,7 +85,7 @@ describe('AccountTokenService', () => {
 
   it('validates a correctly typed, unconsumed, unexpired token', async () => {
     const value = entity();
-    repo.findOne.mockResolvedValue(value);
+    repo.findPendingById.mockResolvedValue(value);
     await expect(
       service.validateToken(
         't1',
@@ -87,12 +93,10 @@ describe('AccountTokenService', () => {
         'plain-token',
       ),
     ).resolves.toBe(value);
-    expect(repo.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          type: AccountTokenType.PASSWORD_RESET,
-        }),
-      }),
+    expect(repo.findPendingById).toHaveBeenCalledWith(
+      manager,
+      't1',
+      AccountTokenType.PASSWORD_RESET,
     );
   });
 
@@ -101,7 +105,7 @@ describe('AccountTokenService', () => {
     ['expired', entity({ expires_at: new Date(Date.now() - 1) })],
     ['incorrectly hashed', entity({ token_hash: hash('other') })],
   ])('rejects a %s token', async (_label, value) => {
-    repo.findOne.mockResolvedValue(value);
+    repo.findPendingById.mockResolvedValue(value);
     await expect(
       service.validateToken(
         't1',
@@ -112,7 +116,7 @@ describe('AccountTokenService', () => {
   });
 
   it('consumes a token and replaces its metadata atomically', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     const result = await service.consumeToken(
       't1',
       AccountTokenType.PASSWORD_RESET,
@@ -125,7 +129,7 @@ describe('AccountTokenService', () => {
   });
 
   it('rejects incorrectly purposed metadata and token-consumption replay', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     await expect(
       service.consumeToken(
         't1',
@@ -134,7 +138,7 @@ describe('AccountTokenService', () => {
         { state: 'verified' },
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    repo.update.mockResolvedValue({ affected: 0 });
+    manager.update.mockResolvedValue({ affected: 0 });
     await expect(
       service.consumeToken(
         't1',
@@ -145,7 +149,7 @@ describe('AccountTokenService', () => {
   });
 
   it('consumes a valid MFA code for the expected user and purpose', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     const result = await service.consumeMfaCode(
       't1',
       AccountTokenType.PASSWORD_RESET,
@@ -165,7 +169,9 @@ describe('AccountTokenService', () => {
     ['wrong user', { user: { id: 'other' } }],
     ['wrong purpose', { metadata: { purpose: 'enable' } }],
   ])('rejects MFA tokens that are %s', async (_label, override) => {
-    repo.findOne.mockResolvedValue(override === null ? null : entity(override));
+    repo.findPendingById.mockResolvedValue(
+      override === null ? null : entity(override),
+    );
     await expect(
       service.consumeMfaCode(
         't1',
@@ -178,13 +184,13 @@ describe('AccountTokenService', () => {
   });
 
   it('records a failed attempt for malformed and incorrectly hashed MFA codes', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     await expect(
       service.consumeMfaCode('t1', AccountTokenType.PASSWORD_RESET, '654321', {
         purpose: 'sign-in',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(repo.createQueryBuilder).toHaveBeenCalled();
+    expect(manager.createQueryBuilder).toHaveBeenCalled();
     expect(query.set).toHaveBeenNthCalledWith(1, {
       failed_attempts: expect.any(Function),
     });
@@ -194,7 +200,7 @@ describe('AccountTokenService', () => {
   });
 
   it('authorizes a valid MFA challenge and stores a hash, never the returned token', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingByUser.mockResolvedValue(entity());
     const result = await service.authorizeMfaCode({
       userId: 'u1',
       type: AccountTokenType.PASSWORD_RESET,
@@ -203,7 +209,7 @@ describe('AccountTokenService', () => {
       verifiedMetadata: { state: 'verified' },
       expiresInMs: 1000,
     });
-    const update = repo.update.mock.calls.at(-1)?.[1];
+    const update = manager.update.mock.calls.at(-1)?.[2];
     expect(update.token_hash).toBe(hash(result.token));
     expect(update.token_hash).not.toBe(result.token);
     expect(update.mfa_code_hash).toBeNull();
@@ -215,7 +221,7 @@ describe('AccountTokenService', () => {
     ['malformed code', entity()],
     ['incorrect hash', entity()],
   ])('rejects authorization for an %s challenge', async (label, value) => {
-    repo.findOne.mockResolvedValue(value);
+    repo.findPendingByUser.mockResolvedValue(value);
     const code =
       label === 'malformed code'
         ? '12'
@@ -236,7 +242,8 @@ describe('AccountTokenService', () => {
 
   it('revokes active tokens by user and type', async () => {
     await service.revokeActiveTokens('u1', AccountTokenType.EMAIL_MFA);
-    expect(repo.update).toHaveBeenCalledWith(
+    expect(manager.update).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         user: { id: 'u1' },
         type: AccountTokenType.EMAIL_MFA,

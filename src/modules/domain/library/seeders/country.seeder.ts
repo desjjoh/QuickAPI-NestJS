@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import {
@@ -62,9 +62,9 @@ export class CountrySeeder implements Seeder {
   public readonly name: string = CountrySeeder.name;
   public readonly order: number = 20;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<CountryEntity> =
-      dataSource.getRepository(CountryEntity);
+      manager.getRepository(CountryEntity);
 
     let created = 0;
     let skipped = 0;

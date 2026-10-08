@@ -3,8 +3,8 @@ jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
 import type { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
-import type { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import type { UserService } from '@/modules/domain/identity/services/user.service';
+import type { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import { userFixture } from '@/../test/helpers/identity.fixtures';
 import type { RegisterDto } from '../models/register.model';
 import { RegistrationService } from './registration.service';
@@ -35,34 +35,38 @@ describe('RegistrationService', () => {
   };
 
   const setup = () => {
-    const userSvc = { hashPassword: jest.fn().mockResolvedValue('hashed') };
+    const userSvc = {
+      findByEmail: jest.fn().mockResolvedValue(null),
+    };
+    const credentials = {
+      hashPassword: jest.fn().mockResolvedValue('hashed'),
+    };
     const emailSvc = {
       sendRegistrationVerificationEmail: jest
         .fn()
         .mockResolvedValue({ id: 'challenge-1', expires_at: expires }),
       verifyRegistrationToken: jest.fn().mockResolvedValue(userFixture()),
     };
-    const userRepo = { findByEmail: jest.fn().mockResolvedValue(null) };
     const registrationTokenSvc = { findPendingByEmail: jest.fn() };
     const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     return {
       service: new RegistrationService(
         userSvc as unknown as UserService,
+        credentials as unknown as UserCredentialsService,
         emailSvc as unknown as EmailVerificationService,
-        userRepo as unknown as UserRepository,
         registrationTokenSvc as unknown as RegistrationTokenService,
         auditSvc as never,
       ),
       userSvc,
+      credentials,
       emailSvc,
-      userRepo,
       registrationTokenSvc,
       auditSvc,
     };
   };
 
   it('normalizes email, hashes the password, stores pending metadata, and returns its challenge DTO', async () => {
-    const { service, userSvc, emailSvc, userRepo, auditSvc } = setup();
+    const { service, userSvc, credentials, emailSvc, auditSvc } = setup();
     await expect(service.register(dto)).resolves.toEqual({
       message: 'Registration pending. Please verify your email address.',
       email: 'person@example.test',
@@ -70,8 +74,8 @@ describe('RegistrationService', () => {
       method: MfaMethod.EMAIL_OTP,
       expires_at: expires,
     });
-    expect(userRepo.findByEmail).toHaveBeenCalledWith('person@example.test');
-    expect(userSvc.hashPassword).toHaveBeenCalledWith('Password1!');
+    expect(userSvc.findByEmail).toHaveBeenCalledWith('person@example.test');
+    expect(credentials.hashPassword).toHaveBeenCalledWith('Password1!');
     expect(emailSvc.sendRegistrationVerificationEmail).toHaveBeenCalledWith(
       'person@example.test',
       expect.objectContaining(metadata),
@@ -80,10 +84,10 @@ describe('RegistrationService', () => {
   });
 
   it('rejects duplicate users before hashing or sending email', async () => {
-    const { service, userSvc, emailSvc, userRepo } = setup();
-    userRepo.findByEmail.mockResolvedValue(userFixture());
+    const { service, userSvc, credentials, emailSvc } = setup();
+    userSvc.findByEmail.mockResolvedValue(userFixture());
     await expect(service.register(dto)).rejects.toThrow(ConflictException);
-    expect(userSvc.hashPassword).not.toHaveBeenCalled();
+    expect(credentials.hashPassword).not.toHaveBeenCalled();
     expect(emailSvc.sendRegistrationVerificationEmail).not.toHaveBeenCalled();
   });
 
@@ -112,8 +116,8 @@ describe('RegistrationService', () => {
   });
 
   it('rejects resend for an email that already belongs to a user', async () => {
-    const { service, emailSvc, userRepo, registrationTokenSvc } = setup();
-    userRepo.findByEmail.mockResolvedValue(userFixture());
+    const { service, emailSvc, userSvc, registrationTokenSvc } = setup();
+    userSvc.findByEmail.mockResolvedValue(userFixture());
 
     await expect(
       service.resendRegistration(' Person@Example.TEST '),

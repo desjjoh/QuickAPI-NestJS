@@ -17,13 +17,16 @@ describe('RegistrationTokenService', () => {
     andWhere: jest.fn(),
     execute: jest.fn(),
   };
-  const repo = {
+  const manager = {
     create: jest.fn(),
     save: jest.fn(),
-    findOne: jest.fn(),
     update: jest.fn(),
     createQueryBuilder: jest.fn(),
-    manager: { getRepository: jest.fn() },
+  };
+  const repo = {
+    findPendingByEmail: jest.fn(),
+    findPendingById: jest.fn(),
+    manager,
   };
   let service: RegistrationTokenService;
   const metadata = {
@@ -49,11 +52,13 @@ describe('RegistrationTokenService', () => {
     for (const method of ['update', 'set', 'where', 'andWhere'] as const)
       query[method].mockReturnValue(query);
     query.execute.mockResolvedValue({ affected: 1 });
-    repo.createQueryBuilder.mockReturnValue(query);
-    repo.manager.getRepository.mockReturnValue(repo);
-    repo.create.mockImplementation((x) => x);
-    repo.save.mockImplementation(async (x) => ({ id: 'r1', ...x }));
-    repo.update.mockResolvedValue({ affected: 1 });
+    manager.createQueryBuilder.mockReturnValue(query);
+    manager.create.mockImplementation((_entity, x) => x);
+    manager.save.mockImplementation(async (_entity, x) => ({
+      id: 'r1',
+      ...x,
+    }));
+    manager.update.mockResolvedValue({ affected: 1 });
     service = new RegistrationTokenService(repo as never);
   });
 
@@ -64,27 +69,28 @@ describe('RegistrationTokenService', () => {
       metadata: metadata as never,
       mfaCodeHash: hash('123456'),
     });
-    const stored = repo.create.mock.calls[0][0];
+    const stored = manager.create.mock.calls[0][1];
     expect(stored.token_hash).toBe(hash(result.token));
     expect(stored.token_hash).not.toBe(result.token);
     expect(stored.mfa_code_hash).not.toBe('123456');
-    expect(repo.update).toHaveBeenCalled();
+    expect(manager.update).toHaveBeenCalled();
   });
 
   it('finds the newest unconsumed registration', async () => {
     const pendingToken = entity();
-    repo.findOne.mockResolvedValue(pendingToken);
+    repo.findPendingByEmail.mockResolvedValue(pendingToken);
     await expect(service.findPendingByEmail('new@test.dev')).resolves.toEqual(
       pendingToken,
     );
-    expect(repo.findOne).toHaveBeenCalledWith(
-      expect.objectContaining({ order: { createdAt: 'DESC' } }),
+    expect(repo.findPendingByEmail).toHaveBeenCalledWith(
+      manager,
+      'new@test.dev',
     );
   });
 
   it('validates and consumes a valid token', async () => {
     const validToken = entity();
-    repo.findOne.mockResolvedValue(validToken);
+    repo.findPendingById.mockResolvedValue(validToken);
     await expect(service.validateToken('r1', 'plain')).resolves.toEqual(
       validToken,
     );
@@ -98,22 +104,22 @@ describe('RegistrationTokenService', () => {
     ['expired', entity({ expires_at: new Date(0) })],
     ['incorrectly hashed', entity({ token_hash: hash('wrong') })],
   ])('rejects %s tokens', async (_label, value) => {
-    repo.findOne.mockResolvedValue(value);
+    repo.findPendingById.mockResolvedValue(value);
     await expect(service.validateToken('r1', 'plain')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
   it('rejects a consumption replay', async () => {
-    repo.findOne.mockResolvedValue(entity());
-    repo.update.mockResolvedValue({ affected: 0 });
+    repo.findPendingById.mockResolvedValue(entity());
+    manager.update.mockResolvedValue({ affected: 0 });
     await expect(service.consumeToken('r1', 'plain')).rejects.toBeInstanceOf(
       UnauthorizedException,
     );
   });
 
   it('consumes a correctly hashed verification code atomically', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     await expect(
       service.consumeVerificationCode('r1', '123456'),
     ).resolves.toEqual(
@@ -127,14 +133,16 @@ describe('RegistrationTokenService', () => {
     ['locked', { locked_at: new Date() }],
     ['maximum attempts', { failed_attempts: MAX_VERIFICATION_CODE_ATTEMPTS }],
   ])('rejects a %s challenge', async (_label, override) => {
-    repo.findOne.mockResolvedValue(override === null ? null : entity(override));
+    repo.findPendingById.mockResolvedValue(
+      override === null ? null : entity(override),
+    );
     await expect(
       service.consumeVerificationCode('r1', '123456'),
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
   it('records attempts for malformed and incorrectly hashed codes', async () => {
-    repo.findOne.mockResolvedValue(entity());
+    repo.findPendingById.mockResolvedValue(entity());
     await expect(
       service.consumeVerificationCode('r1', '654321'),
     ).rejects.toBeInstanceOf(UnauthorizedException);

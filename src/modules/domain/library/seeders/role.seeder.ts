@@ -6,7 +6,7 @@ import {
 } from '@/config/permissions.config';
 import { PermissionEntity } from '../entities/permission.entity';
 import { RoleEntity } from '../entities/role.entity';
-import { DataSource, In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import {
   Seeder,
   SeederResult,
@@ -60,12 +60,12 @@ export class RoleSeeder implements Seeder {
   public readonly name: string = RoleSeeder.name;
   public readonly order: number = 40;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const roleRepository: Repository<RoleEntity> =
-      dataSource.getRepository(RoleEntity);
+      manager.getRepository(RoleEntity);
 
     const permissionRepository: Repository<PermissionEntity> =
-      dataSource.getRepository(PermissionEntity);
+      manager.getRepository(PermissionEntity);
 
     let created = 0;
     let skipped = 0;

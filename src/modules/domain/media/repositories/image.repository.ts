@@ -1,68 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, DeepPartial, EntityManager, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 
-import { Base } from '@/common/models/base.model';
-import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
+import { DomainRepository } from '@/common/repositories/domain.repository';
 
 import { ImageEntity } from '../entities/image.entity';
 
 @Injectable()
-export class ImageRepository extends Repository<ImageEntity> {
+export class ImageRepository extends DomainRepository<ImageEntity> {
   public constructor(dataSource: DataSource) {
-    super(ImageEntity, dataSource.createEntityManager());
+    super(dataSource.getRepository(ImageEntity));
   }
 
-  public async createImage(
-    payload: DeepPartial<Base<ImageEntity>>,
-    manager?: EntityManager,
-  ): Promise<ImageEntity> {
-    const repository = manager ? manager.getRepository(ImageEntity) : this;
-    const image: ImageEntity = repository.create({
-      ...payload,
-      alt_text: payload.alt_text ?? null,
+  public findAll(manager: EntityManager): Promise<ImageEntity[]> {
+    return this.getRepository(manager).find({
+      order: { createdAt: 'DESC' },
     });
-
-    const created = await repository.save(image);
-
-    return repository.findOneByOrFail({ id: created.id });
   }
 
-  public async findAll(): Promise<ImageEntity[]> {
-    return this.find({ order: { createdAt: 'DESC' } });
-  }
-
-  public async findById(id: string): Promise<ImageEntity | null> {
-    return this.findOne({ where: { id } });
-  }
-
-  public async findByStorageKey(
-    storage_key: string,
+  public findByStorageKey(
+    manager: EntityManager,
+    storageKey: string,
   ): Promise<ImageEntity | null> {
-    return this.findOne({ where: { storage_key } });
-  }
-
-  public async updateImage(
-    image: ImageEntity,
-    payload: DeepPartial<Base<ImageEntity>>,
-    manager?: EntityManager,
-  ): Promise<ImageEntity> {
-    const repository = manager ? manager.getRepository(ImageEntity) : this;
-    const updatedImage: ImageEntity = repository.merge(
-      image,
-      omitUndefinedDeep(payload),
-    );
-
-    return repository.save(updatedImage);
-  }
-
-  public async deleteImage(
-    image: ImageEntity,
-    manager?: EntityManager,
-  ): Promise<ImageEntity> {
-    const repository = manager ? manager.getRepository(ImageEntity) : this;
-
-    await repository.delete({ id: image.id });
-
-    return image;
+    return this.getRepository(manager).findOne({
+      where: { storage_key: storageKey },
+    });
   }
 }

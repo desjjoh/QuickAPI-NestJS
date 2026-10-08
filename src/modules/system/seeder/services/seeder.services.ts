@@ -62,7 +62,7 @@ export class SeederService implements OnApplicationBootstrap {
 
     for (const seeder of seeders) {
       try {
-        const result = await seeder.run(this.dataSource);
+        const result = await seeder.run(this.dataSource.manager);
 
         totals.created += result.created;
         totals.skipped += result.skipped;

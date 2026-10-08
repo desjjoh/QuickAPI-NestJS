@@ -9,7 +9,7 @@ import {
 } from '@/modules/domain/identity/entities/mfa.entity';
 import type { MfaService } from '@/modules/domain/identity/services/mfa.service';
 import type { RefreshService } from '@/modules/domain/identity/services/refresh.service';
-import type { UserService } from '@/modules/domain/identity/services/user.service';
+import type { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import {
   sessionFixture,
   userFixture,
@@ -54,7 +54,7 @@ describe('AuthService', () => {
     const requestContext = { set: jest.fn() };
     return {
       service: new AuthService(
-        userSvc as unknown as UserService,
+        userSvc as unknown as UserCredentialsService,
         refreshSvc as unknown as RefreshService,
         mfaSvc as unknown as MfaService,
         auditSvc as never,

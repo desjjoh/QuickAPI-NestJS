@@ -1,5 +1,4 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { createHash, randomInt } from 'crypto';
 
 import {
   AuditActorType,
@@ -15,8 +14,8 @@ import { minute } from '@/common/constants/milliseconds.constants';
 
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { PasswordResetTemplate } from '@/modules/system/email/templates/password-reset.template';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import {
   AccountTokenService,
   CreatedAccountToken,
@@ -24,6 +23,11 @@ import {
 import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates/password-changed.template';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import {
+  generateVerificationCode,
+  hashIdentityToken,
+} from '@/modules/domain/identity/services/token-security';
 
 const PASSWORD_RESET_CODE_EXPIRES_IN_MINUTES = 10;
 const PASSWORD_RESET_AUTHORIZATION_EXPIRES_IN_MINUTES = 10;
@@ -39,24 +43,25 @@ export class PasswordResetService {
   public constructor(
     private readonly accountTokenSvc: AccountTokenService,
     private readonly emailSvc: EmailService,
-    private readonly userRepo: UserRepository,
     private readonly userSvc: UserService,
+    private readonly credentials: UserCredentialsService,
+    private readonly refreshSvc: RefreshService,
     private readonly auditSvc: AuditService,
   ) {}
 
   public async requestPasswordReset(email: string): Promise<void> {
-    const user = await this.userRepo.findByEmail(email);
+    const user = await this.userSvc.findByEmail(email);
 
     if (!user) return;
-    if (!this.userSvc.canAuthenticate(user)) return;
+    if (!this.credentials.canAuthenticate(user)) return;
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+    const code = generateVerificationCode();
     const reset = await this.accountTokenSvc.createToken({
       user,
       type: AccountTokenType.PASSWORD_RESET,
       expiresInMs: PASSWORD_RESET_CODE_EXPIRES_IN_MINUTES * minute,
       metadata: { state: PasswordResetChallengeState.PENDING },
-      mfaCodeHash: createHash('sha256').update(code).digest('hex'),
+      mfaCodeHash: hashIdentityToken(code),
     });
 
     await this.emailSvc.sendEmail({
@@ -93,9 +98,9 @@ export class PasswordResetService {
     email: string,
     code: string,
   ): Promise<CreatedAccountToken> {
-    const user = await this.userRepo.findByEmail(email);
+    const user = await this.userSvc.findByEmail(email);
 
-    if (!user || !this.userSvc.canAuthenticate(user))
+    if (!user || !this.credentials.canAuthenticate(user))
       throw new UnauthorizedException('Invalid or expired challenge.');
 
     return this.accountTokenSvc.authorizeMfaCode({
@@ -123,14 +128,14 @@ export class PasswordResetService {
 
     const user: UserEntity = accountToken.user;
 
-    this.userSvc.assertCanAuthenticate(user);
+    this.credentials.assertCanAuthenticate(user);
 
-    const hashed: string = await this.userSvc.hashPassword(password);
+    const hashed: string = await this.credentials.hashPassword(password);
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
-    await this.userSvc.recordPasswordChanged(user);
+    await this.credentials.recordPasswordChanged(user);
 
-    await this.userRepo.revokeAllSessions(user.id);
+    await this.refreshSvc.revokeAllSessions(user.id);
 
     await this.auditSvc.record({
       event:

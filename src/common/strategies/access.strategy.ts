@@ -3,11 +3,12 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { env } from '@/config/environment.config';
 import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 
 export interface AccessTokenValidationPayload {
   accessToken: string;
@@ -21,7 +22,10 @@ export interface AccessTokenValidationPayload {
 
 @Injectable()
 class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
-  constructor(private readonly repo: UserRepository) {
+  constructor(
+    private readonly userSvc: UserService,
+    private readonly refreshSvc: RefreshService,
+  ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -41,10 +45,8 @@ class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt-access') {
 
     if (!accessToken) throw new UnauthorizedException('Access token missing');
 
-    const user = await this.repo.findByIdOrFail(payload.sub);
-    const session = await this.repo.manager.findOne(UserSessionEntity, {
-      where: { id: payload.sid, user: { id: user.id } },
-    });
+    const user = await this.userSvc.findByIdOrFail(payload.sub);
+    const session = await this.refreshSvc.findSessionById(user.id, payload.sid);
 
     if (!session?.active || payload.version !== session.token_version)
       throw new UnauthorizedException('Session has been revoked');

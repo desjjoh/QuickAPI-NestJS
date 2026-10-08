@@ -19,7 +19,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { UserAdministrationService } from '@/modules/domain/identity/services/user-administration.service';
 import { UserAdminService } from '@/modules/api/v1/administration/service/users.service';
 import { EmailService } from '@/modules/system/email/services/email.service';
 
@@ -310,10 +310,11 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(AccountStatusEntity)
       .findOneByOrFail({ key: 'disabled' });
     const originalStatus = target.status.id;
-    const repository = app.get(UserRepository);
-    const implementation = repository.updateUserAdministration.bind(repository);
+    const userAdministration = app.get(UserAdministrationService);
+    const implementation =
+      userAdministration.updateAdministration.bind(userAdministration);
     const mutation = jest
-      .spyOn(repository, 'updateUserAdministration')
+      .spyOn(userAdministration, 'updateAdministration')
       .mockImplementation(async (...args) => {
         await implementation(...args);
         throw new Error('failure after domain write');

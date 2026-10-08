@@ -4,8 +4,7 @@ import {
   Injectable,
   PayloadTooLargeException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import type { EntityManager, Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRedactionService, AuditValue } from './audit-redaction.service';
@@ -16,6 +15,7 @@ import {
   AuditSubjectType,
 } from '@/config/audit-events.config';
 import { generateOperationId } from '@/common/helpers/nanoid.helper';
+import { AuditRepository } from '../repositories/audit.repository';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
@@ -60,15 +60,14 @@ const MAX_JSON_BYTES = 64 * 1024;
 @Injectable()
 export class AuditService {
   public constructor(
-    @InjectRepository(AuditEventEntity)
-    private readonly repository: Repository<AuditEventEntity>,
+    private readonly repository: AuditRepository,
     private readonly redaction: AuditRedactionService,
     private readonly requestContext: RequestContext,
   ) {}
 
   public record(
     input: RecordAuditInput,
-    manager?: EntityManager,
+    manager: EntityManager = this.repository.manager,
   ): Promise<AuditEventEntity | null> {
     this.validateBase(input);
     const hasBefore = Object.prototype.hasOwnProperty.call(input, 'before');
@@ -124,7 +123,7 @@ export class AuditService {
   private async persist(
     input: RecordAuditInput,
     data: Pick<AuditEventEntity, 'before' | 'after' | 'changes'>,
-    manager?: EntityManager,
+    manager: EntityManager,
   ): Promise<AuditEventEntity> {
     const context = this.requestContext.getStore();
     const metadata = this.asRecord(
@@ -133,10 +132,7 @@ export class AuditService {
 
     this.enforcePayloadBounds(data.before, data.after, data.changes, metadata);
 
-    const repository = manager
-      ? manager.getRepository(AuditEventEntity)
-      : this.repository;
-    const entity = repository.create({
+    const entity = manager.create(AuditEventEntity, {
       ...data,
       event: input.event,
       actor_type: input.actorType ?? context?.actorType,
@@ -178,7 +174,7 @@ export class AuditService {
       metadata,
     });
 
-    await repository.insert(entity as never);
+    await manager.insert(AuditEventEntity, entity as never);
 
     return entity;
   }

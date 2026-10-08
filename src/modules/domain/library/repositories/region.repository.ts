@@ -1,27 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+
+import { DomainRepository } from '@/common/repositories/domain.repository';
 
 import { RegionEntity } from '../entities/region.entity';
 
 @Injectable()
-export class RegionRepository extends Repository<RegionEntity> {
+export class RegionRepository extends DomainRepository<RegionEntity> {
   public constructor(dataSource: DataSource) {
-    super(RegionEntity, dataSource.createEntityManager());
+    super(dataSource.getRepository(RegionEntity));
   }
 
-  public async findAll(): Promise<RegionEntity[]> {
-    return this.find({ order: { country: { key: 'ASC' }, key: 'ASC' } });
-  }
-
-  public async findById(id: string): Promise<RegionEntity | null> {
-    return this.findOne({ where: { id } });
+  public findAll(manager: EntityManager): Promise<RegionEntity[]> {
+    return this.getRepository(manager).find({
+      order: { country: { key: 'ASC' }, key: 'ASC' },
+    });
   }
 
   public async findByIdAndCountry(
+    manager: EntityManager,
     id: string,
     countryId: string,
   ): Promise<RegionEntity | null> {
-    return this.findOne({
+    return this.getRepository(manager).findOne({
       where: {
         id,
         country: { id: countryId },

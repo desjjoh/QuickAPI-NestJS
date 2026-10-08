@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DataSource, DeepPartial, EntityManager } from 'typeorm';
+import { DeepPartial, EntityManager } from 'typeorm';
 
 import {
   IdentityAuditEvents,
@@ -20,6 +20,7 @@ import { UserSessionEntity } from '@/modules/domain/identity/entities/session.en
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserProfileService } from '@/modules/domain/identity/services/user-profile.service';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
@@ -40,9 +41,9 @@ import {
 export class ProfileApiService {
   public constructor(
     private readonly userSvc: UserService,
+    private readonly userProfileSvc: UserProfileService,
     private readonly imgSvc: ImageService,
     private readonly regionRepo: RegionRepository,
-    private readonly dataSource: DataSource,
     private readonly audit: AuditService,
   ) {}
 
@@ -51,7 +52,7 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdateProfileDto,
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const personalBefore = this.profilePersonal(current);
       const after = await this.userSvc.updateUser(
@@ -124,7 +125,7 @@ export class ProfileApiService {
     session: UserSessionEntity,
     file: Express.Multer.File,
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const existing = current.profile.media.avatar ?? null;
       const metadata: CreateImageInput = {
@@ -164,14 +165,14 @@ export class ProfileApiService {
     user: UserEntity,
     session: UserSessionEntity,
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const avatar = current.profile.media.avatar;
       if (!avatar)
         throw new BadRequestException(
           'User does not have an avatar to remove.',
         );
-      await this.userSvc.clearProfileAvatar(current.profile.id, manager);
+      await this.userProfileSvc.clearAvatar(current.profile.id, manager);
       await this.imgSvc.remove(avatar, manager);
       await this.record(
         manager,
@@ -194,12 +195,16 @@ export class ProfileApiService {
     dto: UpdateAddressDto,
   ): Promise<UserDto> {
     const region: RegionEntity | null =
-      await this.regionRepo.findByIdAndCountry(dto.region_id, dto.country_id);
+      await this.regionRepo.findByIdAndCountry(
+        this.regionRepo.manager,
+        dto.region_id,
+        dto.country_id,
+      );
     if (!region)
       throw new BadRequestException(
         'Region must belong to the selected country.',
       );
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const address = current.profile.contact.address;
       const payload: DeepPartial<AddressEntity> = {
@@ -247,7 +252,7 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdatePhoneDto,
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const phone = current.profile.contact.phone;
       const after = await this.userSvc.updateUser(
@@ -290,7 +295,7 @@ export class ProfileApiService {
     payload: DeepPartial<UserEntity>,
     field: 'country_id' | 'timezone_id',
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const after = await this.userSvc.updateUser(
         current,
@@ -323,7 +328,7 @@ export class ProfileApiService {
     session: UserSessionEntity,
     kind: 'phone' | 'address',
   ): Promise<UserDto> {
-    const updated = await this.dataSource.transaction(async (manager) => {
+    const updated = await this.userSvc.transaction(async (manager) => {
       const current = await this.lockUser(manager, user.id);
       const contact = current.profile.contact[kind];
 
@@ -333,8 +338,15 @@ export class ProfileApiService {
         );
 
       if (kind === 'address')
-        await this.userSvc.deleteAddress(contact as UserAddressEntity, manager);
-      else await this.userSvc.deletePhone(contact as UserPhoneEntity, manager);
+        await this.userProfileSvc.deleteAddress(
+          contact as UserAddressEntity,
+          manager,
+        );
+      else
+        await this.userProfileSvc.deletePhone(
+          contact as UserPhoneEntity,
+          manager,
+        );
 
       await this.record(
         manager,

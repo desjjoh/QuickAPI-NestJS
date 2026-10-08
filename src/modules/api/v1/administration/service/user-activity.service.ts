@@ -1,5 +1,5 @@
 import { AuditSubjectType } from '@/config/audit-events.config';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { IpLocationService } from '@/modules/system/geolocation/services/ip-location.service';
 import {
@@ -19,13 +19,6 @@ export class UserActivityAdminService {
     userId: string,
     query: UserActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
-    if (
-      query.occurredFrom &&
-      query.occurredTo &&
-      query.occurredFrom > query.occurredTo
-    )
-      throw new BadRequestException('occurredFrom must not follow occurredTo');
-
     const result = await this.auditQueries.query({
       subjectType: AuditSubjectType.USER,
       subjectId: userId,

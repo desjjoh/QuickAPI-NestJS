@@ -22,6 +22,15 @@ import { UserMfaSettingsEntity } from './entities/mfa.entity';
 import { MfaService } from './services/mfa.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 import { EmailVerificationService } from './services/email-verification.service';
+import { SessionRepository } from './repositories/session.repository';
+import { AccountTokenRepository } from './repositories/account-token.repository';
+import { RegistrationTokenRepository } from './repositories/registration-token.repository';
+import { MfaSettingsRepository } from './repositories/mfa-settings.repository';
+import { IdentityReferenceService } from './services/identity-reference.service';
+import { UserAdministrationService } from './services/user-administration.service';
+import { UserCredentialsService } from './services/user-credentials.service';
+import { UserLifecycleService } from './services/user-lifecycle.service';
+import { UserProfileService } from './services/user-profile.service';
 
 @Module({
   imports: [
@@ -42,7 +51,16 @@ import { EmailVerificationService } from './services/email-verification.service'
   ],
   providers: [
     UserRepository,
+    SessionRepository,
+    AccountTokenRepository,
+    RegistrationTokenRepository,
+    MfaSettingsRepository,
+    IdentityReferenceService,
     UserService,
+    UserCredentialsService,
+    UserLifecycleService,
+    UserAdministrationService,
+    UserProfileService,
     RefreshService,
     AccountTokenService,
     RegistrationTokenService,
@@ -50,8 +68,11 @@ import { EmailVerificationService } from './services/email-verification.service'
     EmailVerificationService,
   ],
   exports: [
-    UserRepository,
     UserService,
+    UserCredentialsService,
+    UserLifecycleService,
+    UserAdministrationService,
+    UserProfileService,
     RefreshService,
     AccountTokenService,
     RegistrationTokenService,

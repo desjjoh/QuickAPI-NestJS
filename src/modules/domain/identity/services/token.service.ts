@@ -1,7 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { randomBytes, createHash, timingSafeEqual } from 'crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { AccountTokenEntity } from '../entities/account-token.entity';
@@ -10,6 +8,14 @@ import {
   AccountTokenType,
   MAX_VERIFICATION_CODE_ATTEMPTS,
 } from '@/config/token.config';
+import { AccountTokenRepository } from '../repositories/account-token.repository';
+import {
+  compareIdentityTokenHashes,
+  generateIdentityToken,
+  hashIdentityToken,
+  isVerificationCode,
+  metadataMatches,
+} from './token-security';
 
 export type AccountTokenMetadata = Record<string, unknown>;
 
@@ -38,25 +44,25 @@ export type AuthorizeAccountTokenOptions = {
 
 @Injectable()
 export class AccountTokenService {
-  public constructor(
-    @InjectRepository(AccountTokenEntity)
-    private readonly tokenRepo: Repository<AccountTokenEntity>,
-  ) {}
+  public constructor(private readonly tokenRepo: AccountTokenRepository) {}
 
-  public async createToken({
-    user,
-    type,
-    expiresInMs,
-    metadata = null,
-    mfaCodeHash = null,
-  }: CreateAccountTokenOptions): Promise<CreatedAccountToken> {
-    await this.revokeActiveTokens(user.id, type);
+  public async createToken(
+    {
+      user,
+      type,
+      expiresInMs,
+      metadata = null,
+      mfaCodeHash = null,
+    }: CreateAccountTokenOptions,
+    manager: EntityManager = this.tokenRepo.manager,
+  ): Promise<CreatedAccountToken> {
+    await this.revokeActiveTokens(user.id, type, manager);
 
-    const token = this.generateToken();
-    const tokenHash = this.hashToken(token);
+    const token = generateIdentityToken();
+    const tokenHash = hashIdentityToken(token);
     const expiresAt = new Date(Date.now() + expiresInMs);
 
-    const entity = this.tokenRepo.create({
+    const entity = manager.create(AccountTokenEntity, {
       user: { id: user.id },
       type,
       token_hash: tokenHash,
@@ -68,7 +74,7 @@ export class AccountTokenService {
       metadata,
     });
 
-    const saved = await this.tokenRepo.save(entity);
+    const saved = await manager.save(AccountTokenEntity, entity);
 
     return {
       id: saved.id,
@@ -81,17 +87,9 @@ export class AccountTokenService {
     tokenId: string,
     type: AccountTokenType,
     token: string,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<AccountTokenEntity> {
-    const entity = await this.tokenRepo.findOne({
-      where: {
-        id: tokenId,
-        type,
-        consumed_at: IsNull(),
-      },
-      relations: {
-        user: true,
-      },
-    });
+    const entity = await this.tokenRepo.findPendingById(manager, tokenId, type);
 
     if (!entity) throw new UnauthorizedException('Invalid or expired token.');
 
@@ -99,8 +97,8 @@ export class AccountTokenService {
 
     if (isExpired) throw new UnauthorizedException('Invalid or expired token.');
 
-    const tokenHash = this.hashToken(token);
-    const isMatch = this.compareTokenHashes(entity.token_hash, tokenHash);
+    const tokenHash = hashIdentityToken(token);
+    const isMatch = compareIdentityTokenHashes(entity.token_hash, tokenHash);
 
     if (!isMatch) throw new UnauthorizedException('Invalid or expired token.');
 
@@ -113,18 +111,17 @@ export class AccountTokenService {
     token: string,
     expectedMetadata?: AccountTokenMetadata,
     consumedMetadata?: AccountTokenMetadata,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<AccountTokenEntity> {
-    const entity = await this.validateToken(tokenId, type, token);
+    const entity = await this.validateToken(tokenId, type, token, manager);
 
-    if (
-      expectedMetadata &&
-      !this.matchesMetadata(entity.metadata, expectedMetadata)
-    )
+    if (expectedMetadata && !metadataMatches(entity.metadata, expectedMetadata))
       throw new UnauthorizedException('Invalid or expired token.');
 
     const consumedAt = new Date();
     const metadata = consumedMetadata ?? entity.metadata;
-    const result = await this.tokenRepo.update(
+    const result = await manager.update(
+      AccountTokenEntity,
       { id: entity.id, consumed_at: IsNull() },
       {
         consumed_at: consumedAt,
@@ -146,11 +143,7 @@ export class AccountTokenService {
     userId?: string,
     manager: EntityManager = this.tokenRepo.manager,
   ): Promise<AccountTokenEntity> {
-    const repo = manager.getRepository(AccountTokenEntity);
-    const entity = await repo.findOne({
-      where: { id: tokenId, type, consumed_at: IsNull() },
-      relations: { user: true },
-    });
+    const entity = await this.tokenRepo.findPendingById(manager, tokenId, type);
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired token.');
@@ -164,20 +157,20 @@ export class AccountTokenService {
     if (userId && entity.user.id !== userId)
       throw new UnauthorizedException('Invalid or expired token.');
 
-    if (!this.matchesMetadata(entity.metadata, expectedMetadata))
+    if (!metadataMatches(entity.metadata, expectedMetadata))
       throw new UnauthorizedException('Invalid or expired token.');
 
     if (
       !entity.mfa_code_hash ||
-      !/^\d{6}$/.test(code) ||
-      !this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code))
+      !isVerificationCode(code) ||
+      !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
     ) {
-      await this.recordFailedAttempt(entity.id);
+      await this.recordFailedAttempt(entity.id, manager);
       throw new UnauthorizedException('Invalid or expired token.');
     }
 
     const consumedAt = new Date();
-    const result = await repo
+    const result = await manager
       .createQueryBuilder()
       .update(AccountTokenEntity)
       .set({ consumed_at: consumedAt })
@@ -200,11 +193,12 @@ export class AccountTokenService {
     return { ...entity, consumed_at: consumedAt };
   }
 
-  private async recordFailedAttempt(id: string): Promise<void> {
-    await this.tokenRepo.manager.transaction(async (manager) => {
-      const repo = manager.getRepository(AccountTokenEntity);
-
-      await repo
+  private async recordFailedAttempt(
+    id: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.transaction(async (transactionManager) => {
+      await transactionManager
         .createQueryBuilder()
         .update(AccountTokenEntity)
         .set({ failed_attempts: () => '`failed_attempts` + 1' })
@@ -216,7 +210,7 @@ export class AccountTokenService {
         })
         .execute();
 
-      await repo
+      await transactionManager
         .createQueryBuilder()
         .update(AccountTokenEntity)
         .set({ locked_at: () => 'CURRENT_TIMESTAMP' })
@@ -230,23 +224,27 @@ export class AccountTokenService {
     });
   }
 
-  public async authorizeMfaCode({
-    userId,
-    type,
-    code,
-    pendingMetadata,
-    verifiedMetadata,
-    expiresInMs,
-  }: AuthorizeAccountTokenOptions): Promise<CreatedAccountToken> {
-    const entity: AccountTokenEntity | null = await this.tokenRepo.findOne({
-      where: { user: { id: userId }, type, consumed_at: IsNull() },
-      relations: { user: true },
-    });
+  public async authorizeMfaCode(
+    {
+      userId,
+      type,
+      code,
+      pendingMetadata,
+      verifiedMetadata,
+      expiresInMs,
+    }: AuthorizeAccountTokenOptions,
+    manager: EntityManager = this.tokenRepo.manager,
+  ): Promise<CreatedAccountToken> {
+    const entity = await this.tokenRepo.findPendingByUser(
+      manager,
+      userId,
+      type,
+    );
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired challenge.');
 
-    if (!this.matchesMetadata(entity.metadata, pendingMetadata))
+    if (!metadataMatches(entity.metadata, pendingMetadata))
       throw new UnauthorizedException('Invalid or expired challenge.');
 
     if (
@@ -255,20 +253,23 @@ export class AccountTokenService {
     )
       throw new UnauthorizedException('Invalid or expired challenge.');
 
-    if (!entity.mfa_code_hash || !/^\d{6}$/.test(code)) {
-      await this.recordFailedAttempt(entity.id);
+    if (!entity.mfa_code_hash || !isVerificationCode(code)) {
+      await this.recordFailedAttempt(entity.id, manager);
       throw new UnauthorizedException('Invalid verification code.');
     }
 
-    if (!this.compareTokenHashes(entity.mfa_code_hash, this.hashToken(code))) {
-      await this.recordFailedAttempt(entity.id);
+    if (
+      !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
+    ) {
+      await this.recordFailedAttempt(entity.id, manager);
       throw new UnauthorizedException('Invalid verification code.');
     }
 
-    const token = this.generateToken();
+    const token = generateIdentityToken();
     const expiresAt = new Date(Date.now() + expiresInMs);
-    const tokenHash = this.hashToken(token);
-    const result = await this.tokenRepo.update(
+    const tokenHash = hashIdentityToken(token);
+    const result = await manager.update(
+      AccountTokenEntity,
       {
         id: entity.id,
         consumed_at: IsNull(),
@@ -292,8 +293,10 @@ export class AccountTokenService {
   public async revokeActiveTokens(
     userId: string,
     type: AccountTokenType,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<void> {
-    await this.tokenRepo.update(
+    await manager.update(
+      AccountTokenEntity,
       {
         user: { id: userId },
         type,
@@ -302,32 +305,6 @@ export class AccountTokenService {
       {
         consumed_at: new Date(),
       },
-    );
-  }
-
-  private generateToken(): string {
-    return randomBytes(32).toString('base64url');
-  }
-
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
-  }
-
-  private compareTokenHashes(expected: string, actual: string): boolean {
-    const expectedBuffer = Buffer.from(expected, 'hex');
-    const actualBuffer = Buffer.from(actual, 'hex');
-
-    if (expectedBuffer.length !== actualBuffer.length) return false;
-
-    return timingSafeEqual(expectedBuffer, actualBuffer);
-  }
-
-  private matchesMetadata(
-    metadata: AccountTokenMetadata | null,
-    expectedMetadata: AccountTokenMetadata,
-  ): boolean {
-    return Object.entries(expectedMetadata).every(
-      ([key, value]) => metadata?.[key] === value,
     );
   }
 }

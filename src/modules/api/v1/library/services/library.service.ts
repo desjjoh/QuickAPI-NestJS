@@ -27,27 +27,37 @@ export class LibraryService {
   ) {}
 
   public async getCountries(): Promise<BaseCountryDto[]> {
-    const countries: CountryEntity[] = await this.countryRepo.findAll();
+    const countries: CountryEntity[] = await this.countryRepo.findAll(
+      this.countryRepo.manager,
+    );
     return countries.map((e: CountryEntity) => new BaseCountryDto(e));
   }
 
   public async getTimezones(): Promise<BaseTimezoneDto[]> {
-    const timezones: TimezoneEntity[] = await this.timezoneRepo.findAll();
+    const timezones: TimezoneEntity[] = await this.timezoneRepo.findAll(
+      this.timezoneRepo.manager,
+    );
     return timezones.map((e: TimezoneEntity) => new BaseTimezoneDto(e));
   }
 
   public async getGenders(): Promise<BaseGenderDto[]> {
-    const genders: GenderEntity[] = await this.genderRepo.findAll();
+    const genders: GenderEntity[] = await this.genderRepo.findAll(
+      this.genderRepo.manager,
+    );
     return genders.map((e: GenderEntity) => new BaseGenderDto(e));
   }
 
   public async getRoles(): Promise<BaseRoleDto[]> {
-    const roles: RoleEntity[] = await this.roleRepo.findAll();
+    const roles: RoleEntity[] = await this.roleRepo.findAll(
+      this.roleRepo.manager,
+    );
     return roles.map((role: RoleEntity) => new BaseRoleDto(role));
   }
 
   public async getAccountStatuses(): Promise<BaseAccountStatusDto[]> {
-    const statuses: AccountStatusEntity[] = await this.statusRepo.findAll();
+    const statuses: AccountStatusEntity[] = await this.statusRepo.findAll(
+      this.statusRepo.manager,
+    );
     return statuses.map(
       (role: AccountStatusEntity) => new BaseAccountStatusDto(role),
     );

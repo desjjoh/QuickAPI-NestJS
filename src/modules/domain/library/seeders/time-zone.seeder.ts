@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import {
@@ -64,9 +64,9 @@ export class TimezoneSeeder implements Seeder {
   public readonly name: string = TimezoneSeeder.name;
   public readonly order: number = 25;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<TimezoneEntity> =
-      dataSource.getRepository(TimezoneEntity);
+      manager.getRepository(TimezoneEntity);
 
     let created = 0;
     let skipped = 0;

@@ -4,7 +4,7 @@ import {
   Seeder,
   SeederResult,
 } from '@/modules/system/seeder/types/seeder.types';
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 type RegionSeed = {
   key: string;
@@ -96,11 +96,11 @@ export class RegionSeeder implements Seeder {
   public readonly name: string = RegionSeeder.name;
   public readonly order: number = 25;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const regionRepository: Repository<RegionEntity> =
-      dataSource.getRepository(RegionEntity);
+      manager.getRepository(RegionEntity);
     const countryRepository: Repository<CountryEntity> =
-      dataSource.getRepository(CountryEntity);
+      manager.getRepository(CountryEntity);
 
     let created = 0;
     let skipped = 0;

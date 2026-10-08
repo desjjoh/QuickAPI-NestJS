@@ -1,7 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { EntityManager, IsNull, Repository } from 'typeorm';
+import { EntityManager, IsNull } from 'typeorm';
 
 import {
   RegistrationTokenEntity,
@@ -9,6 +7,13 @@ import {
 } from '../entities/registration-token.entity';
 import { CreatedAccountToken } from './token.service';
 import { MAX_VERIFICATION_CODE_ATTEMPTS } from '@/config/token.config';
+import { RegistrationTokenRepository } from '../repositories/registration-token.repository';
+import {
+  compareIdentityTokenHashes,
+  generateIdentityToken,
+  hashIdentityToken,
+  isVerificationCode,
+} from './token-security';
 
 export type CreateRegistrationTokenOptions = {
   email: string;
@@ -19,24 +24,24 @@ export type CreateRegistrationTokenOptions = {
 
 @Injectable()
 export class RegistrationTokenService {
-  public constructor(
-    @InjectRepository(RegistrationTokenEntity)
-    private readonly tokenRepo: Repository<RegistrationTokenEntity>,
-  ) {}
+  public constructor(private readonly tokenRepo: RegistrationTokenRepository) {}
 
-  public async createToken({
-    email,
-    expiresInMs,
-    metadata,
-    mfaCodeHash = null,
-  }: CreateRegistrationTokenOptions): Promise<CreatedAccountToken> {
-    await this.revokeActiveTokens(email);
+  public async createToken(
+    {
+      email,
+      expiresInMs,
+      metadata,
+      mfaCodeHash = null,
+    }: CreateRegistrationTokenOptions,
+    manager: EntityManager = this.tokenRepo.manager,
+  ): Promise<CreatedAccountToken> {
+    await this.revokeActiveTokens(email, manager);
 
-    const token = this.generateToken();
-    const tokenHash = this.hashToken(token);
+    const token = generateIdentityToken();
+    const tokenHash = hashIdentityToken(token);
     const expiresAt = new Date(Date.now() + expiresInMs);
 
-    const entity = this.tokenRepo.create({
+    const entity = manager.create(RegistrationTokenEntity, {
       email,
       token_hash: tokenHash,
       expires_at: expiresAt,
@@ -45,7 +50,7 @@ export class RegistrationTokenService {
       metadata,
     });
 
-    const saved = await this.tokenRepo.save(entity);
+    const saved = await manager.save(RegistrationTokenEntity, entity);
 
     return {
       id: saved.id,
@@ -56,26 +61,17 @@ export class RegistrationTokenService {
 
   public async findPendingByEmail(
     email: string,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<RegistrationTokenEntity | null> {
-    return this.tokenRepo.findOne({
-      where: {
-        email,
-        consumed_at: IsNull(),
-      },
-      order: { createdAt: 'DESC' },
-    });
+    return this.tokenRepo.findPendingByEmail(manager, email);
   }
 
   public async validateToken(
     tokenId: string,
     token: string,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<RegistrationTokenEntity> {
-    const entity = await this.tokenRepo.findOne({
-      where: {
-        id: tokenId,
-        consumed_at: IsNull(),
-      },
-    });
+    const entity = await this.tokenRepo.findPendingById(manager, tokenId);
 
     if (!entity) throw new UnauthorizedException('Invalid or expired token.');
 
@@ -83,8 +79,8 @@ export class RegistrationTokenService {
 
     if (isExpired) throw new UnauthorizedException('Invalid or expired token.');
 
-    const tokenHash = this.hashToken(token);
-    const isMatch = this.compareTokenHashes(entity.token_hash, tokenHash);
+    const tokenHash = hashIdentityToken(token);
+    const isMatch = compareIdentityTokenHashes(entity.token_hash, tokenHash);
 
     if (!isMatch) throw new UnauthorizedException('Invalid or expired token.');
 
@@ -94,11 +90,13 @@ export class RegistrationTokenService {
   public async consumeToken(
     tokenId: string,
     token: string,
+    manager: EntityManager = this.tokenRepo.manager,
   ): Promise<RegistrationTokenEntity> {
-    const entity = await this.validateToken(tokenId, token);
+    const entity = await this.validateToken(tokenId, token, manager);
 
     const consumedAt = new Date();
-    const result = await this.tokenRepo.update(
+    const result = await manager.update(
+      RegistrationTokenEntity,
       { id: entity.id, consumed_at: IsNull() },
       { consumed_at: consumedAt },
     );
@@ -114,10 +112,7 @@ export class RegistrationTokenService {
     code: string,
     manager: EntityManager = this.tokenRepo.manager,
   ): Promise<RegistrationTokenEntity> {
-    const repo = manager.getRepository(RegistrationTokenEntity);
-    const entity = await repo.findOne({
-      where: { id: challengeId, consumed_at: IsNull() },
-    });
+    const entity = await this.tokenRepo.findPendingById(manager, challengeId);
 
     if (!entity || entity.expires_at.getTime() <= Date.now())
       throw new UnauthorizedException('Invalid or expired challenge.');
@@ -128,19 +123,19 @@ export class RegistrationTokenService {
     )
       throw new UnauthorizedException('Invalid or expired challenge.');
 
-    const codeHash = this.hashToken(code);
+    const codeHash = hashIdentityToken(code);
 
     if (
       !entity.mfa_code_hash ||
-      !/^\d{6}$/.test(code) ||
-      !this.compareTokenHashes(entity.mfa_code_hash, codeHash)
+      !isVerificationCode(code) ||
+      !compareIdentityTokenHashes(entity.mfa_code_hash, codeHash)
     ) {
-      await this.recordFailedAttempt(entity.id);
+      await this.recordFailedAttempt(entity.id, manager);
       throw new UnauthorizedException('Invalid or expired challenge.');
     }
 
     const consumedAt = new Date();
-    const result = await repo
+    const result = await manager
       .createQueryBuilder()
       .update(RegistrationTokenEntity)
       .set({ consumed_at: consumedAt })
@@ -160,8 +155,11 @@ export class RegistrationTokenService {
     return { ...entity, consumed_at: consumedAt };
   }
 
-  private async recordFailedAttempt(id: string): Promise<void> {
-    await this.tokenRepo
+  private async recordFailedAttempt(
+    id: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager
       .createQueryBuilder()
       .update(RegistrationTokenEntity)
       .set({
@@ -178,8 +176,12 @@ export class RegistrationTokenService {
       .execute();
   }
 
-  private async revokeActiveTokens(email: string): Promise<void> {
-    await this.tokenRepo.update(
+  private async revokeActiveTokens(
+    email: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager.update(
+      RegistrationTokenEntity,
       {
         email,
         consumed_at: IsNull(),
@@ -188,22 +190,5 @@ export class RegistrationTokenService {
         consumed_at: new Date(),
       },
     );
-  }
-
-  private generateToken(): string {
-    return randomBytes(32).toString('base64url');
-  }
-
-  private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
-  }
-
-  private compareTokenHashes(expected: string, actual: string): boolean {
-    const expectedBuffer = Buffer.from(expected, 'hex');
-    const actualBuffer = Buffer.from(actual, 'hex');
-
-    if (expectedBuffer.length !== actualBuffer.length) return false;
-
-    return timingSafeEqual(expectedBuffer, actualBuffer);
   }
 }

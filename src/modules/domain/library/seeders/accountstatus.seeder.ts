@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import {
   Seeder,
@@ -37,9 +37,9 @@ export class AccountStatusSeeder implements Seeder {
   public readonly name: string = AccountStatusSeeder.name;
   public readonly order: number = 15;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<AccountStatusEntity> =
-      dataSource.getRepository(AccountStatusEntity);
+      manager.getRepository(AccountStatusEntity);
 
     let created = 0;
     let skipped = 0;

@@ -1,48 +1,58 @@
-import { DataSource } from 'typeorm';
-import { ImageEntity } from '../entities/image.entity';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
+
 import { ImageRepository } from './image.repository';
 
-describe('ImageRepository behavior', () => {
+const setup = () => {
+  const persistence = {
+    target: class Image {},
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+  };
+  const manager = {
+    getRepository: jest.fn().mockReturnValue(persistence),
+  } as unknown as EntityManager;
+  Object.assign(persistence, { manager });
+
   const dataSource = {
-    createEntityManager: jest.fn().mockReturnValue({}),
+    getRepository: jest.fn().mockReturnValue(persistence),
   } as unknown as DataSource;
 
-  it('normalizes alt text, saves, and reloads the created row', async () => {
-    const repo = new ImageRepository(dataSource);
-    const image = { id: 'image-id', alt_text: null } as ImageEntity;
-    jest.spyOn(repo, 'create').mockReturnValue(image);
-    jest.spyOn(repo, 'save').mockResolvedValue(image);
-    jest.spyOn(repo, 'findOneByOrFail').mockResolvedValue(image);
-    await expect(repo.createImage({ filename: 'a.png' })).resolves.toBe(image);
-    expect(repo.create).toHaveBeenCalledWith({
-      filename: 'a.png',
-      alt_text: null,
+  return {
+    manager,
+    persistence: persistence as unknown as jest.Mocked<Repository<never>>,
+    repository: new ImageRepository(dataSource),
+  };
+};
+
+describe('ImageRepository behavior', () => {
+  it('orders newest images first using the supplied manager', async () => {
+    const { manager, persistence, repository } = setup();
+
+    await repository.findAll(manager);
+
+    expect(manager.getRepository).toHaveBeenCalled();
+    expect(persistence.find).toHaveBeenCalledWith({
+      order: { createdAt: 'DESC' },
     });
-    expect(repo.findOneByOrFail).toHaveBeenCalledWith({ id: 'image-id' });
   });
 
-  it('omits undefined values when merging an update', async () => {
-    const repo = new ImageRepository(dataSource);
-    const image = { id: '1', alt_text: 'old' } as ImageEntity;
-    jest.spyOn(repo, 'merge').mockReturnValue(image);
-    jest.spyOn(repo, 'save').mockResolvedValue(image);
-    await repo.updateImage(image, { alt_text: undefined, filename: 'new.png' });
-    expect(repo.merge).toHaveBeenCalledWith(image, { filename: 'new.png' });
+  it('finds an image by its storage key', async () => {
+    const { manager, persistence, repository } = setup();
+
+    await expect(
+      repository.findByStorageKey(manager, 'avatars/image.png'),
+    ).resolves.toBeNull();
+
+    expect(persistence.findOne).toHaveBeenCalledWith({
+      where: { storage_key: 'avatars/image.png' },
+    });
   });
 
-  it('orders newest images first', async () => {
-    const repo = new ImageRepository(dataSource);
-    jest.spyOn(repo, 'find').mockResolvedValue([]);
-    await repo.findAll();
-    expect(repo.find).toHaveBeenCalledWith({ order: { createdAt: 'DESC' } });
-  });
+  it('does not expose persistence mutation methods', () => {
+    const { repository } = setup();
 
-  it('deletes an image by id without resaving its loaded relations', async () => {
-    const repo = new ImageRepository(dataSource);
-    const image = { id: 'image-id' } as ImageEntity;
-    jest.spyOn(repo, 'delete').mockResolvedValue({ raw: [], affected: 1 });
-
-    await expect(repo.deleteImage(image)).resolves.toBe(image);
-    expect(repo.delete).toHaveBeenCalledWith({ id: image.id });
+    expect(repository).not.toHaveProperty('create');
+    expect(repository).not.toHaveProperty('update');
+    expect(repository).not.toHaveProperty('remove');
   });
 });

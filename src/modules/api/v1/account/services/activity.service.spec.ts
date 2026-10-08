@@ -129,16 +129,20 @@ describe('ActivityApiService', () => {
     });
   });
 
-  it('rejects an inverted occurred-at range before querying', async () => {
+  it('delegates date-range validation to the audit query service', async () => {
     const { service, auditQueries } = setup();
-    await expect(
-      service.findForUser(user, {
-        occurredFrom: new Date('2026-02-01T00:00:00.000Z'),
-        occurredTo: new Date('2026-01-01T00:00:00.000Z'),
-        page: 1,
-        take: 25,
-      }),
-    ).rejects.toThrow('occurredFrom must not follow occurredTo');
-    expect(auditQueries.query).not.toHaveBeenCalled();
+    const occurredFrom = new Date('2026-02-01T00:00:00.000Z');
+    const occurredTo = new Date('2026-01-01T00:00:00.000Z');
+
+    await service.findForUser(user, {
+      occurredFrom,
+      occurredTo,
+      page: 1,
+      take: 25,
+    });
+
+    expect(auditQueries.query).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredFrom, occurredTo }),
+    );
   });
 });

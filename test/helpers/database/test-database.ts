@@ -79,7 +79,8 @@ export async function migrateAndSeedEmptyTestSchema(): Promise<void> {
   try {
     await dataSource.dropDatabase();
     await dataSource.runMigrations({ transaction: 'all' });
-    for (const seeder of REFERENCE_SEEDERS) await seeder.run(dataSource);
+    for (const seeder of REFERENCE_SEEDERS)
+      await seeder.run(dataSource.manager);
   } finally {
     await closeTestDataSource(dataSource);
   }

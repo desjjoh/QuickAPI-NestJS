@@ -1,5 +1,5 @@
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-local';
@@ -12,7 +12,7 @@ export interface ValidationPayload {
 
 @Injectable()
 class LocalStrategy extends PassportStrategy(Strategy) {
-  constructor(private svc: UserService) {
+  constructor(private readonly credentials: UserCredentialsService) {
     super({
       usernameField: 'email',
       passwordField: 'password',
@@ -20,8 +20,8 @@ class LocalStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(email: string, password: string): Promise<ValidationPayload> {
-    const user = await this.svc.validateUser(email, password);
-    this.svc.assertCanAuthenticate(user);
+    const user = await this.credentials.validateUser(email, password);
+    this.credentials.assertCanAuthenticate(user);
 
     return { userEntity: user, email: user.identity.email, sub: user.id };
   }

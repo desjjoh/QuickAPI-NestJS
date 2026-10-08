@@ -9,6 +9,8 @@ import {
 import type { MfaService } from '@/modules/domain/identity/services/mfa.service';
 import type { RefreshService } from '@/modules/domain/identity/services/refresh.service';
 import type { UserService } from '@/modules/domain/identity/services/user.service';
+import type { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
+import type { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
 import type { EmailService } from '@/modules/system/email/services/email.service';
 import {
   sessionFixture,
@@ -29,15 +31,19 @@ describe('MeApiService', () => {
     clearCookie: jest.fn(),
   } as unknown as Response;
   const setup = () => {
+    const manager = { getRepository: jest.fn() };
     const userSvc = {
+      transaction: jest.fn((work) => work(manager)),
+      updateUser: jest.fn().mockResolvedValue(user),
+    };
+    const credentials = {
       validateUser: jest.fn().mockResolvedValue(user),
-      deleteUser: jest.fn(),
       updateMetadata: jest.fn().mockResolvedValue(user),
       recordMfaChanged: jest.fn().mockResolvedValue(user),
       hashPassword: jest.fn().mockResolvedValue('new-hash'),
-      updateUser: jest.fn().mockResolvedValue(user),
       recordPasswordChanged: jest.fn().mockResolvedValue(user),
     };
+    const lifecycle = { deleteUser: jest.fn() };
     const refreshSvc = {
       revokeOtherSessions: jest.fn(),
       issueTokens: jest.fn().mockResolvedValue({ access_token: 'new-token' }),
@@ -62,41 +68,37 @@ describe('MeApiService', () => {
     const auditSvc = {
       record: jest.fn().mockResolvedValue({}),
     };
-    const dataSource = {
-      transaction: jest.fn((work) => work({ getRepository: jest.fn() })),
-    };
     return {
       service: new MeApiService(
         userSvc as unknown as UserService,
+        credentials as unknown as UserCredentialsService,
+        lifecycle as unknown as UserLifecycleService,
         refreshSvc as unknown as RefreshService,
         evSvc as unknown as EmailVerificationService,
         emailSvc as unknown as EmailService,
         mfaSvc as unknown as MfaService,
         auditSvc as never,
-        dataSource as never,
       ),
       userSvc,
+      credentials,
+      lifecycle,
       refreshSvc,
       evSvc,
       emailSvc,
       mfaSvc,
       auditSvc,
-      dataSource,
+      manager,
     };
   };
 
   it('validates the password and deletes the account with cookie response', async () => {
-    const { service, userSvc, auditSvc } = setup();
+    const { service, credentials, lifecycle, auditSvc } = setup();
     await service.deleteMe(user, { password: 'old' }, res);
-    expect(userSvc.validateUser).toHaveBeenCalledWith(
+    expect(credentials.validateUser).toHaveBeenCalledWith(
       user.identity.email,
       'old',
     );
-    expect(userSvc.deleteUser).toHaveBeenCalledWith(
-      user,
-      res,
-      expect.any(Object),
-    );
+    expect(lifecycle.deleteUser).toHaveBeenCalledWith(user, expect.any(Object));
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.account.deleted',
@@ -110,15 +112,15 @@ describe('MeApiService', () => {
   });
 
   it('does not commit deletion when the subject-preserving audit fails', async () => {
-    const { service, userSvc, auditSvc, dataSource } = setup();
+    const { service, userSvc, lifecycle, auditSvc } = setup();
     auditSvc.record.mockRejectedValue(new Error('audit unavailable'));
 
     await expect(
       service.deleteMe(user, { password: 'old' }, res),
     ).rejects.toThrow('audit unavailable');
 
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
-    expect(userSvc.deleteUser).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
+    expect(lifecycle.deleteUser).toHaveBeenCalledTimes(1);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.account.deleted',
@@ -130,12 +132,12 @@ describe('MeApiService', () => {
   });
 
   it('disables MFA and synchronizes user metadata', async () => {
-    const { service, userSvc, mfaSvc, auditSvc } = setup();
+    const { service, credentials, mfaSvc, auditSvc } = setup();
     await expect(
       service.updateMfa(user, { password: 'old', enabled: false }),
     ).resolves.toBeUndefined();
     expect(mfaSvc.disable).toHaveBeenCalledWith(user);
-    expect(userSvc.recordMfaChanged).toHaveBeenCalledWith(user, false);
+    expect(credentials.recordMfaChanged).toHaveBeenCalledWith(user, false);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.mfa.disabled',
@@ -160,7 +162,7 @@ describe('MeApiService', () => {
   });
 
   it('confirms MFA and protects the current session while revoking others', async () => {
-    const { service, userSvc, refreshSvc, mfaSvc, auditSvc } = setup();
+    const { service, credentials, refreshSvc, mfaSvc, auditSvc } = setup();
     await service.confirmMfa(user, session, {
       challenge_id: 'mfa-challenge',
       code: '123456',
@@ -172,7 +174,7 @@ describe('MeApiService', () => {
       user.id,
     );
     expect(mfaSvc.enable).toHaveBeenCalledWith(user);
-    expect(userSvc.recordMfaChanged).toHaveBeenCalledWith(user, true);
+    expect(credentials.recordMfaChanged).toHaveBeenCalledWith(user, true);
     expect(refreshSvc.revokeOtherSessions).toHaveBeenCalledWith(
       user.id,
       session.id,
@@ -201,7 +203,7 @@ describe('MeApiService', () => {
   });
 
   it('validates an email change and returns its verification DTO', async () => {
-    const { service, userSvc, evSvc, auditSvc } = setup();
+    const { service, credentials, evSvc, auditSvc } = setup();
     const currentUser = userFixture({
       identity: { ...user.identity, email: 'current@example.test' },
     });
@@ -215,7 +217,7 @@ describe('MeApiService', () => {
       method: MfaMethod.EMAIL_OTP,
       expires_at: new Date('2026-02-01'),
     });
-    expect(userSvc.validateUser).toHaveBeenCalledWith(
+    expect(credentials.validateUser).toHaveBeenCalledWith(
       'current@example.test',
       'old',
     );
@@ -227,7 +229,7 @@ describe('MeApiService', () => {
   });
 
   it('rejects requesting the current email without validating or sending', async () => {
-    const { service, userSvc, evSvc } = setup();
+    const { service, credentials, evSvc } = setup();
     const currentUser = userFixture({
       identity: { ...user.identity, email: 'current@example.test' },
     });
@@ -239,7 +241,7 @@ describe('MeApiService', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
 
-    expect(userSvc.validateUser).not.toHaveBeenCalled();
+    expect(credentials.validateUser).not.toHaveBeenCalled();
     expect(evSvc.sendEmailChangeVerification).not.toHaveBeenCalled();
   });
 
@@ -292,7 +294,8 @@ describe('MeApiService', () => {
   });
 
   it('changes password, revokes other sessions, emails the user, and reissues tokens', async () => {
-    const { service, userSvc, refreshSvc, emailSvc, auditSvc } = setup();
+    const { service, userSvc, credentials, refreshSvc, emailSvc, auditSvc } =
+      setup();
     const tokenDto = await service.updatePassword(
       user,
       session,
@@ -304,11 +307,11 @@ describe('MeApiService', () => {
       res,
     );
     expect(tokenDto).toEqual({ access_token: 'new-token' });
-    expect(userSvc.hashPassword).toHaveBeenCalledWith('NewPassword1!');
+    expect(credentials.hashPassword).toHaveBeenCalledWith('NewPassword1!');
     expect(userSvc.updateUser).toHaveBeenCalledWith(user, {
       identity: { password: 'new-hash' },
     });
-    expect(userSvc.recordPasswordChanged).toHaveBeenCalledWith(user);
+    expect(credentials.recordPasswordChanged).toHaveBeenCalledWith(user);
     expect(refreshSvc.revokeOtherSessions).toHaveBeenCalledWith(
       user.id,
       session.id,

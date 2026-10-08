@@ -1,6 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-import type { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
   UserDto,
   type UserPaginationOptions,
@@ -11,19 +10,16 @@ import { UserAdminService } from './users.service';
 
 describe('UserAdminService', () => {
   const setup = () => {
-    const repo = {
-      paginate: jest.fn(),
-      findByIdOrFail: jest.fn(),
-      removeUser: jest.fn(),
-      updateUserAdministration: jest.fn(),
-    };
-
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(userFixture()),
     };
     const audit = { record: jest.fn().mockResolvedValue({}) };
-    const dataSource = {
+    const userSvc = {
       transaction: jest.fn(async (callback) => callback(manager)),
+      paginate: jest.fn(),
+      findByIdOrFail: jest.fn(),
+      deleteUser: jest.fn(),
+      updateAdministration: jest.fn(),
     };
     const context = {
       get: jest.fn((key: string) =>
@@ -32,14 +28,14 @@ describe('UserAdminService', () => {
     };
 
     return {
-      repo,
       manager,
       audit,
-      dataSource,
+      userSvc,
       context,
       service: new UserAdminService(
-        repo as unknown as UserRepository,
-        dataSource as never,
+        userSvc as never,
+        userSvc as never,
+        userSvc as never,
         audit as never,
         context as never,
       ),
@@ -47,7 +43,7 @@ describe('UserAdminService', () => {
   };
 
   it('converts paginated entities to DTOs and calculates pagination metadata', async () => {
-    const { repo, service } = setup();
+    const { userSvc, service } = setup();
     const users = [
       userFixture(),
       userFixture({
@@ -63,12 +59,12 @@ describe('UserAdminService', () => {
       sort: 'user.createdAt',
       skip: 2,
     } as UserPaginationOptions;
-    repo.paginate.mockResolvedValue([users, 5]);
+    userSvc.paginate.mockResolvedValue([users, 5]);
 
     const result = await service.paginateUsers(pageOptions);
 
-    expect(repo.paginate).toHaveBeenCalledTimes(1);
-    expect(repo.paginate).toHaveBeenCalledWith(pageOptions);
+    expect(userSvc.paginate).toHaveBeenCalledTimes(1);
+    expect(userSvc.paginate).toHaveBeenCalledWith(pageOptions);
     expect(result.data).toHaveLength(2);
     expect(result.data.every((user) => user instanceof UserDto)).toBe(true);
     expect(result.data.map((user) => user.id)).toEqual(['user-1', 'user-2']);
@@ -83,7 +79,7 @@ describe('UserAdminService', () => {
   });
 
   it('finds a user by id and converts the entity to a DTO', async () => {
-    const { repo, service } = setup();
+    const { userSvc, service } = setup();
     const lastChangedMfa = new Date('2026-01-02T03:04:05.000Z');
     const user = userFixture({
       metadata: {
@@ -92,28 +88,28 @@ describe('UserAdminService', () => {
       },
     });
 
-    repo.findByIdOrFail.mockResolvedValue(user);
+    userSvc.findByIdOrFail.mockResolvedValue(user);
 
     const result = await service.findUser('user-1');
 
-    expect(repo.findByIdOrFail).toHaveBeenCalledTimes(1);
-    expect(repo.findByIdOrFail).toHaveBeenCalledWith('user-1');
+    expect(userSvc.findByIdOrFail).toHaveBeenCalledTimes(1);
+    expect(userSvc.findByIdOrFail).toHaveBeenCalledWith('user-1');
     expect(result).toBeInstanceOf(UserDto);
     expect(result.id).toBe(user.id);
     expect(result.metadata.lastChangedMfa).toBe(lastChangedMfa.toISOString());
   });
 
   it('propagates repository not-found errors when finding a user', async () => {
-    const { repo, service } = setup();
+    const { userSvc, service } = setup();
     const error = new NotFoundException('User not found.');
-    repo.findByIdOrFail.mockRejectedValue(error);
+    userSvc.findByIdOrFail.mockRejectedValue(error);
 
     await expect(service.findUser('missing-user')).rejects.toBe(error);
   });
 
   it('delegates user removal exactly once with the requested id', async () => {
-    const { repo, service, audit, manager } = setup();
-    repo.removeUser.mockResolvedValue(undefined);
+    const { userSvc, service, audit, manager } = setup();
+    userSvc.deleteUser.mockResolvedValue(undefined);
 
     await expect(
       service.removeUser('user-1', {
@@ -121,8 +117,11 @@ describe('UserAdminService', () => {
       }),
     ).resolves.toBeUndefined();
 
-    expect(repo.removeUser).toHaveBeenCalledTimes(1);
-    expect(repo.removeUser).toHaveBeenCalledWith('user-1', expect.any(Object));
+    expect(userSvc.deleteUser).toHaveBeenCalledTimes(1);
+    expect(userSvc.deleteUser).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
+      manager,
+    );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.admin.user_deleted',
@@ -147,7 +146,7 @@ describe('UserAdminService', () => {
   });
 
   it('delegates an administration update and converts the entity to a DTO', async () => {
-    const { repo, service, audit, manager } = setup();
+    const { userSvc, service, audit, manager } = setup();
     const dto = {
       status_id: 'status-id-000001',
       role_ids: ['role-id-0000001'],
@@ -156,15 +155,15 @@ describe('UserAdminService', () => {
     const user = userFixture({
       status: { key: 'disabled', label: 'Disabled' },
     });
-    repo.updateUserAdministration.mockResolvedValue(user);
+    userSvc.updateAdministration.mockResolvedValue(user);
 
     const result = await service.updateUser('user-1', dto);
 
-    expect(repo.updateUserAdministration).toHaveBeenCalledTimes(1);
-    expect(repo.updateUserAdministration).toHaveBeenCalledWith(
-      'user-1',
+    expect(userSvc.updateAdministration).toHaveBeenCalledTimes(1);
+    expect(userSvc.updateAdministration).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
       dto,
-      expect.any(Object),
+      manager,
     );
     expect(result).toBeInstanceOf(UserDto);
     expect(result.status.key).toBe('disabled');
@@ -192,7 +191,7 @@ describe('UserAdminService', () => {
   ])(
     'records ID-only snapshots when an administrator %s user roles',
     async (_operation, beforeIds, afterIds) => {
-      const { repo, service, audit, manager } = setup();
+      const { userSvc, service, audit, manager } = setup();
       const before = userFixture({
         roles: beforeIds.map((id) => ({ id, key: id })),
       });
@@ -200,7 +199,7 @@ describe('UserAdminService', () => {
         roles: afterIds.map((id) => ({ id, key: id })),
       });
       manager.findOneOrFail.mockResolvedValue(before);
-      repo.updateUserAdministration.mockResolvedValue(after);
+      userSvc.updateAdministration.mockResolvedValue(after);
 
       await service.updateUser('user-1', {
         role_ids: afterIds,
@@ -227,9 +226,9 @@ describe('UserAdminService', () => {
   );
 
   it('keeps duplicate role inputs out of the audit snapshots', async () => {
-    const { repo, service, audit, manager } = setup();
+    const { userSvc, service, audit, manager } = setup();
     manager.findOneOrFail.mockResolvedValue(userFixture({ roles: [] }));
-    repo.updateUserAdministration.mockResolvedValue(
+    userSvc.updateAdministration.mockResolvedValue(
       userFixture({ roles: [{ id: 'role-1', key: 'role-1' }] }),
     );
 
@@ -247,8 +246,8 @@ describe('UserAdminService', () => {
   });
 
   it('never reverses the administrator actor and affected-user subject', async () => {
-    const { repo, service, audit } = setup();
-    repo.updateUserAdministration.mockResolvedValue(userFixture());
+    const { userSvc, service, audit } = setup();
+    userSvc.updateAdministration.mockResolvedValue(userFixture());
 
     await service.updateUser('affected-user', {
       status_id: 'status-id-000001',
@@ -270,8 +269,8 @@ describe('UserAdminService', () => {
   });
 
   it('rejects the role mutation transaction when its audit fails', async () => {
-    const { repo, service, audit, dataSource } = setup();
-    repo.updateUserAdministration.mockResolvedValue(
+    const { userSvc, service, audit } = setup();
+    userSvc.updateAdministration.mockResolvedValue(
       userFixture({ roles: [{ id: 'role-1', key: 'role-1' }] }),
     );
     audit.record.mockRejectedValue(new Error('audit unavailable'));
@@ -282,21 +281,21 @@ describe('UserAdminService', () => {
         reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
       }),
     ).rejects.toThrow('audit unavailable');
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
   });
 
   it('propagates repository validation errors when updating a user', async () => {
-    const { repo, service, audit } = setup();
+    const { userSvc, service, audit } = setup();
     const dto = {
       role_ids: ['missing-role-id'],
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     };
     const error = new BadRequestException('One or more roles were not found.');
-    repo.updateUserAdministration.mockRejectedValue(error);
+    userSvc.updateAdministration.mockRejectedValue(error);
 
     await expect(service.updateUser('user-1', dto)).rejects.toBe(error);
-    expect(repo.updateUserAdministration).toHaveBeenCalledWith(
-      'user-1',
+    expect(userSvc.updateAdministration).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
       dto,
       expect.any(Object),
     );

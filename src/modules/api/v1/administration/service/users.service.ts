@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import {
   AuditActorType,
@@ -17,12 +17,14 @@ import {
 } from '@/common/models/pagination.model';
 
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
   UserDto,
   UserPaginationOptions,
 } from '@/modules/domain/identity/models/user.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserAdministrationService } from '@/modules/domain/identity/services/user-administration.service';
+import { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
 
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
 import { AdministrationActionDto } from '../models/administration-action.model';
@@ -30,8 +32,9 @@ import { AdministrationActionDto } from '../models/administration-action.model';
 @Injectable()
 export class UserAdminService {
   public constructor(
-    private readonly repo: UserRepository,
-    private readonly dataSource: DataSource,
+    private readonly userSvc: UserService,
+    private readonly userAdministration: UserAdministrationService,
+    private readonly lifecycle: UserLifecycleService,
     private readonly audit: AuditService,
     private readonly context: RequestContext,
   ) {}
@@ -39,7 +42,7 @@ export class UserAdminService {
   public async paginateUsers(
     pageOptions: UserPaginationOptions,
   ): Promise<PaginationDto<UserDto>> {
-    const [response, itemCount] = await this.repo.paginate(pageOptions);
+    const [response, itemCount] = await this.userSvc.paginate(pageOptions);
 
     return new PaginationDto(
       response.map((e: UserEntity) => new UserDto(e)),
@@ -48,16 +51,16 @@ export class UserAdminService {
   }
 
   public async findUser(id: string): Promise<UserDto> {
-    return new UserDto(await this.repo.findByIdOrFail(id));
+    return new UserDto(await this.userSvc.findByIdOrFail(id));
   }
 
   public async removeUser(
     id: string,
     dto: AdministrationActionDto,
   ): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+    await this.userSvc.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
-      await this.repo.removeUser(id, manager);
+      await this.lifecycle.deleteUser(before, manager);
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,
@@ -75,9 +78,13 @@ export class UserAdminService {
     id: string,
     dto: UpdateUserAdministrationDto,
   ): Promise<UserDto> {
-    const user = await this.dataSource.transaction(async (manager) => {
+    const user = await this.userSvc.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
-      const after = await this.repo.updateUserAdministration(id, dto, manager);
+      const after = await this.userAdministration.updateAdministration(
+        before,
+        dto,
+        manager,
+      );
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_UPDATED,
