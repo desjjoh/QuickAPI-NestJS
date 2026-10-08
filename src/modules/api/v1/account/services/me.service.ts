@@ -70,6 +70,9 @@ export class MeApiService {
   ): Promise<void> {
     await this.credentials.validateUser(user.identity.email, dto.password);
 
+    const userId = user.id;
+    const before = identityUserSnapshot(user);
+
     await this.userSvc.transaction(async (manager) => {
       await this.lifecycle.deleteUser(user, manager);
       await this.auditSvc.record(
@@ -77,14 +80,14 @@ export class MeApiService {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
           domain: AuditEventDomain.IDENTITY,
           actorType: AuditActorType.USER,
-          actorId: user.id,
+          actorId: userId,
           subjectType: AuditSubjectType.USER,
-          subjectId: user.id,
+          subjectId: userId,
           resourceType: AuditResourceType.IDENTITY_USER,
-          resourceId: user.id,
+          resourceId: userId,
           source: AuditSource.HTTP,
           metadata: {},
-          before: identityUserSnapshot(user),
+          before,
           after: null,
         },
         manager,

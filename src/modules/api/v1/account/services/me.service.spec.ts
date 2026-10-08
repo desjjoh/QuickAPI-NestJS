@@ -11,6 +11,7 @@ import type { RefreshService } from '@/modules/domain/identity/services/refresh.
 import type { UserService } from '@/modules/domain/identity/services/user.service';
 import type { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import type { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
+import type { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import type { EmailService } from '@/modules/system/email/services/email.service';
 import {
   sessionFixture,
@@ -126,6 +127,26 @@ describe('MeApiService', () => {
         event: 'identity.account.deleted',
         subjectId: user.id,
         resourceId: user.id,
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it('preserves the audit identity when deletion clears the entity id', async () => {
+    const { service, lifecycle, auditSvc } = setup();
+    const currentUser = userFixture({ id: 'deleted-user' });
+    lifecycle.deleteUser.mockImplementation(async (target: UserEntity) => {
+      Object.assign(target, { id: undefined });
+    });
+
+    await service.deleteMe(currentUser, { password: 'old' }, res);
+
+    expect(auditSvc.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'deleted-user',
+        subjectId: 'deleted-user',
+        resourceId: 'deleted-user',
+        before: expect.objectContaining({ id: 'deleted-user' }),
       }),
       expect.any(Object),
     );
