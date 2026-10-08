@@ -1,26 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
+
+import { ReferenceRepository } from '@/common/repositories/reference.repository';
 
 import { CountryEntity } from '../entities/country.entity';
 
 @Injectable()
-export class CountryRepository extends Repository<CountryEntity> {
+export class CountryRepository extends ReferenceRepository<CountryEntity> {
   public constructor(dataSource: DataSource) {
-    super(CountryEntity, dataSource.createEntityManager());
+    super(dataSource.getRepository(CountryEntity));
   }
 
-  public async findAll(): Promise<CountryEntity[]> {
-    return this.find({
+  public findAll(manager: EntityManager): Promise<CountryEntity[]> {
+    return this.getRepository(manager).find({
       relations: { regions: true },
       order: { key: 'ASC', regions: { key: 'ASC' } },
     });
-  }
-
-  public async findById(id: string): Promise<CountryEntity | null> {
-    return this.findOneBy({ id });
-  }
-
-  public async findByKey(key: string): Promise<CountryEntity | null> {
-    return this.findOneBy({ key });
   }
 }

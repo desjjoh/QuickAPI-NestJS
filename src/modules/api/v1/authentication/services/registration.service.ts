@@ -14,8 +14,8 @@ import {
 } from '@/config/audit-events.config';
 
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { MfaMethod } from '@/modules/domain/identity/entities/mfa.entity';
@@ -34,8 +34,8 @@ import {
 export class RegistrationService {
   public constructor(
     private readonly userSvc: UserService,
+    private readonly credentials: UserCredentialsService,
     private readonly emailSvc: EmailVerificationService,
-    private readonly userRepo: UserRepository,
     private readonly registrationTokenSvc: RegistrationTokenService,
     private readonly auditSvc: AuditService,
   ) {}
@@ -43,12 +43,12 @@ export class RegistrationService {
   public async register(dto: RegisterDto): Promise<RegistrationPendingDto> {
     const normalizedEmail: string = dto.email.trim().toLowerCase();
     const existingUser: UserEntity | null =
-      await this.userRepo.findByEmail(normalizedEmail);
+      await this.userSvc.findByEmail(normalizedEmail);
 
     if (existingUser)
       throw new ConflictException('A user with this email already exists.');
 
-    const password: string = await this.userSvc.hashPassword(dto.password);
+    const password: string = await this.credentials.hashPassword(dto.password);
 
     const challenge = await this.emailSvc.sendRegistrationVerificationEmail(
       normalizedEmail,
@@ -72,7 +72,7 @@ export class RegistrationService {
   ): Promise<RegistrationPendingDto> {
     const normalizedEmail: string = email.trim().toLowerCase();
     const existingUser: UserEntity | null =
-      await this.userRepo.findByEmail(normalizedEmail);
+      await this.userSvc.findByEmail(normalizedEmail);
 
     if (existingUser)
       throw new ConflictException('A user with this email already exists.');

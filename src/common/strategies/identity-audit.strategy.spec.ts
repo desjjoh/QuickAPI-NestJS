@@ -21,6 +21,7 @@ describe('authentication strategy audit events', () => {
     const strategy = new RefreshTokenStrategy(
       repository as never,
       users as never,
+      users as never,
     );
     const payload = {
       sub: 'user-1',

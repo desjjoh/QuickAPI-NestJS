@@ -38,7 +38,11 @@ describe('RefreshService', () => {
     findOne: jest.fn(),
     createQueryBuilder: jest.fn(),
   };
-  const userRepo = { manager, revokeAllSessions: jest.fn() };
+  const sessionRepo = {
+    manager,
+    findByUser: jest.fn(),
+    findActiveByUser: jest.fn(),
+  };
   const requestContext = { get: jest.fn() };
   const ipLocation = { resolve: jest.fn() };
   const res = { cookie: jest.fn(), clearCookie: jest.fn() };
@@ -94,7 +98,7 @@ describe('RefreshService', () => {
     );
     service = new RefreshService(
       tokenSvc as never,
-      userRepo as never,
+      sessionRepo as never,
       requestContext as never,
       ipLocation as never,
     );
@@ -131,7 +135,7 @@ describe('RefreshService', () => {
 
   it('rotates the session obtained from RequestContext', async () => {
     requestContext.get.mockReturnValue('s1');
-    manager.findOne.mockResolvedValue(session);
+    sessionRepo.findByUser.mockResolvedValue(session);
 
     await service.issueTokens(user as never, res as never);
 
@@ -291,11 +295,7 @@ describe('RefreshService', () => {
     );
   });
 
-  it('revokes one session, all sessions, and all other sessions', async () => {
-    await service.revokeSession(session as never);
-    await service.revokeAllSessions('u1', res as never);
-    expect(userRepo.revokeAllSessions).toHaveBeenCalledWith('u1');
-    expect(res.clearCookie).toHaveBeenCalled();
+  it('revokes sessions and increments active session token versions', async () => {
     const query = {
       update: jest.fn(),
       set: jest.fn(),
@@ -307,27 +307,37 @@ describe('RefreshService', () => {
     query.where.mockReturnValue(query);
     query.execute.mockResolvedValue({ affected: 1 });
     manager.createQueryBuilder.mockReturnValue(query);
+    await service.revokeSession(session as never);
+    await service.revokeAllSessions('u1', res as never);
+    expect(res.clearCookie).toHaveBeenCalled();
     await service.revokeOtherSessions('u1', 's1');
     expect(query.where).toHaveBeenCalledWith(
       expect.stringContaining('id != :currentSessionId'),
       { userId: 'u1', currentSessionId: 's1' },
     );
+    await service.incrementTokenVersion('u1');
+    const tokenVersionUpdate = query.set.mock.calls.at(-1)?.[0];
+    expect(tokenVersionUpdate.token_version()).toBe('`token_version` + 1');
+    expect(query.where).toHaveBeenLastCalledWith(
+      'userId = :userId AND active = true',
+      { userId: 'u1' },
+    );
   });
 
   it('lists only active, non-revoked, non-expired refresh sessions', async () => {
-    manager.find.mockResolvedValue([session]);
+    sessionRepo.findActiveByUser.mockResolvedValue([session]);
     await expect(service.findSessions('u1')).resolves.toEqual([session]);
-    expect(manager.find).toHaveBeenCalledWith(
-      UserSessionEntity,
-      expect.objectContaining({
-        where: expect.objectContaining({ active: true }),
-        order: { createdAt: 'DESC' },
-      }),
+    expect(sessionRepo.findActiveByUser).toHaveBeenCalledWith(
+      manager,
+      'u1',
+      expect.any(Date),
     );
   });
 
   it('revokes an owned session by id and rejects missing or foreign sessions', async () => {
-    manager.findOne.mockResolvedValueOnce(session).mockResolvedValueOnce(null);
+    sessionRepo.findByUser
+      .mockResolvedValueOnce(session)
+      .mockResolvedValueOnce(null);
     await service.revokeSessionById('u1', 's1');
     expect(manager.update).toHaveBeenCalled();
     await expect(

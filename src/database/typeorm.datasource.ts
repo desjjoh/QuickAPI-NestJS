@@ -5,9 +5,15 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 
 import { env } from '@/config/environment.config';
 
+// PUBLIC LIBRARY
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
+import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
+
+// USER IDENTITY
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
 import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
@@ -15,13 +21,18 @@ import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.en
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
-import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
-import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
-import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
-import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
+
+// MEDIA
+import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+
+// AUDIT EVENTS
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+
+// ARTICLES
+import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
+import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 
 const sourceMigrationDirectory = path.resolve(
   process.cwd(),
@@ -64,6 +75,9 @@ const dataSourceOptions: DataSourceOptions = {
     RegistrationTokenEntity,
     // AUDIT MODULE
     AuditEventEntity,
+    // ARTICLE MODULE
+    ArticleEntity,
+    ArticleStatusEntity,
   ],
   migrations: [path.join(migrationDirectory, '*{.ts,.js}')],
   ssl: env.DB_SSL

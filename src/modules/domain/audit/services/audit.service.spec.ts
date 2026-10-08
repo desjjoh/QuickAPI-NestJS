@@ -4,7 +4,7 @@ import {
   AuditSubjectType,
 } from '@/config/audit-events.config';
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
-import type { EntityManager, Repository } from 'typeorm';
+import type { EntityManager } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
 import * as nanoidHelper from '@/common/helpers/nanoid.helper';
@@ -34,7 +34,7 @@ describe(AuditService.name, () => {
 
   beforeEach(() => {
     repository = {
-      create: jest.fn((value) => value as AuditEventEntity),
+      create: jest.fn((_entity, value) => value as AuditEventEntity),
       insert: jest
         .fn()
         .mockResolvedValue({ identifiers: [], generatedMaps: [], raw: [] }),
@@ -42,7 +42,7 @@ describe(AuditService.name, () => {
     redaction = new AuditRedactionService();
     context = new RequestContext();
     service = new AuditService(
-      repository as unknown as Repository<AuditEventEntity>,
+      { manager: repository } as never,
       redaction,
       context,
     );
@@ -52,6 +52,7 @@ describe(AuditService.name, () => {
     const result = await service.record(activity);
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         event: activity.event,
         domain: AuditEventDomain.IDENTITY,
@@ -66,7 +67,7 @@ describe(AuditService.name, () => {
       }),
     );
     expect(result).not.toHaveProperty('category');
-    expect(repository.insert).toHaveBeenCalledWith(result);
+    expect(repository.insert).toHaveBeenCalledWith(AuditEventEntity, result);
   });
 
   it('generates a unique operation ID instead of reusing the request ID', async () => {
@@ -86,7 +87,7 @@ describe(AuditService.name, () => {
     );
 
     const [first, second] = repository.create.mock.calls.map(
-      ([entity]) => entity as AuditEventEntity,
+      ([, value]) => value as AuditEventEntity,
     );
     expect(first.request_id).toBe('shared-request');
     expect(second.request_id).toBe('shared-request');
@@ -119,6 +120,7 @@ describe(AuditService.name, () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         before: { name: { first: 'Old' } },
         after: { name: { first: 'New' } },
@@ -185,7 +187,10 @@ describe(AuditService.name, () => {
       },
     });
 
-    const [stored] = repository.insert.mock.calls[0] as [AuditEventEntity];
+    const [, stored] = repository.insert.mock.calls[0] as [
+      typeof AuditEventEntity,
+      AuditEventEntity,
+    ];
     for (const column of [
       stored.before,
       stored.after,
@@ -238,6 +243,7 @@ describe(AuditService.name, () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         operation_id: 'operation-1',
         before: {},
@@ -323,6 +329,7 @@ describe(AuditService.name, () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         actor_id: 'context-user',
         session_id: 'session-1',
@@ -335,7 +342,7 @@ describe(AuditService.name, () => {
       }),
     );
 
-    expect(repository.create.mock.calls[0][0].operation_id).not.toBe(
+    expect(repository.create.mock.calls[0][1].operation_id).not.toBe(
       'request-1',
     );
   });
@@ -363,6 +370,7 @@ describe(AuditService.name, () => {
     );
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         request_id: 'explicit-request',
         session_id: 'explicit-session',
@@ -393,6 +401,7 @@ describe(AuditService.name, () => {
     );
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         actor_type: 'service',
         actor_id: null,
@@ -414,6 +423,7 @@ describe(AuditService.name, () => {
     });
 
     expect(repository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
       expect.objectContaining({
         before: { roles: ['role-a', 'role-b'] },
         after: { roles: ['role-a', 'role-c'] },
@@ -423,16 +433,17 @@ describe(AuditService.name, () => {
 
   it('uses the transaction manager repository when supplied', async () => {
     const transactionRepository = {
-      create: jest.fn((value) => value as AuditEventEntity),
+      create: jest.fn((_entity, value) => value as AuditEventEntity),
       insert: jest.fn().mockResolvedValue({}),
     };
-    const manager = {
-      getRepository: jest.fn().mockReturnValue(transactionRepository),
-    } as unknown as EntityManager;
+    const manager = transactionRepository as unknown as EntityManager;
 
     await service.record(activity, manager);
 
-    expect(manager.getRepository).toHaveBeenCalledWith(AuditEventEntity);
+    expect(transactionRepository.create).toHaveBeenCalledWith(
+      AuditEventEntity,
+      expect.any(Object),
+    );
     expect(transactionRepository.insert).toHaveBeenCalledTimes(1);
     expect(repository.insert).not.toHaveBeenCalled();
   });

@@ -5,7 +5,8 @@ import { SeederService } from './seeder.services';
 
 describe('SeederService', () => {
   const original = env.DB_SEED;
-  const dataSource = {} as DataSource;
+  const manager = {};
+  const dataSource = { manager } as DataSource;
   afterEach(() => {
     Object.assign(env, { DB_SEED: original });
     jest.restoreAllMocks();
@@ -26,8 +27,8 @@ describe('SeederService', () => {
     const make = (name: string, order: number): Seeder => ({
       name,
       order,
-      run: jest.fn(async (ds) => {
-        expect(ds).toBe(dataSource);
+      run: jest.fn(async (receivedManager) => {
+        expect(receivedManager).toBe(manager);
         calls.push(name);
         return { created: 1, skipped: 2 };
       }),

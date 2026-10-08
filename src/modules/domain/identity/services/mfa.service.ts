@@ -1,7 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { createHash, randomInt } from 'crypto';
-import { Repository } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import { minute } from '@/common/constants/milliseconds.constants';
 import { AccountTokenType } from '@/config/token.config';
@@ -17,35 +15,39 @@ import {
 import { UserEntity } from '../entities/user.entity';
 import { AccountTokenService, CreatedAccountToken } from './token.service';
 import { MfaEnrollmentCodeTemplate } from '@/modules/system/email/templates/mfa-enrollment-code.template';
+import { MfaSettingsRepository } from '../repositories/mfa-settings.repository';
+import { generateVerificationCode, hashIdentityToken } from './token-security';
 
 const MFA_CODE_EXPIRES_IN_MINUTES = 10;
 
 @Injectable()
 export class MfaService {
   public constructor(
-    @InjectRepository(UserMfaSettingsEntity)
-    private readonly settingsRepo: Repository<UserMfaSettingsEntity>,
+    private readonly settingsRepo: MfaSettingsRepository,
     private readonly accountTokenSvc: AccountTokenService,
     private readonly emailSvc: EmailService,
   ) {}
 
   public async createSignInChallenge(
     user: UserEntity,
+    manager: EntityManager = this.settingsRepo.manager,
   ): Promise<CreatedAccountToken | null> {
-    const settings = await this.settingsRepo.findOne({
-      where: { user: { id: user.id }, enabled: true },
-    });
+    const settings = await this.settingsRepo.findByUser(manager, user.id, true);
     if (!settings) return null;
 
     return this.createChallenge(
       user,
       settings.primary_method,
       MfaChallengePurpose.SIGN_IN,
+      manager,
     );
   }
 
-  public async requestEnable(user: UserEntity): Promise<CreatedAccountToken> {
-    const current = await this.findSettings(user.id);
+  public async requestEnable(
+    user: UserEntity,
+    manager: EntityManager = this.settingsRepo.manager,
+  ): Promise<CreatedAccountToken> {
+    const current = await this.findSettings(user.id, manager);
 
     if (current?.enabled)
       throw new BadRequestException('MFA is already enabled.');
@@ -54,6 +56,7 @@ export class MfaService {
       user,
       MfaMethod.EMAIL_OTP,
       MfaChallengePurpose.ENABLE,
+      manager,
     );
   }
 
@@ -62,6 +65,7 @@ export class MfaService {
     code: string,
     purpose: MfaChallengePurpose,
     userId?: string,
+    manager: EntityManager = this.settingsRepo.manager,
   ): Promise<UserEntity> {
     const token: AccountTokenEntity = await this.accountTokenSvc.consumeMfaCode(
       challengeId,
@@ -69,19 +73,24 @@ export class MfaService {
       code,
       { purpose },
       userId,
+      manager,
     );
 
     return token.user;
   }
 
-  public async enable(user: UserEntity): Promise<void> {
+  public async enable(
+    user: UserEntity,
+    manager: EntityManager = this.settingsRepo.manager,
+  ): Promise<void> {
     const now = new Date();
-    const current = await this.findSettings(user.id);
+    const current = await this.findSettings(user.id, manager);
 
     if (current?.enabled)
       throw new BadRequestException('MFA is already enabled.');
 
-    await this.settingsRepo.save(
+    await manager.save(
+      UserMfaSettingsEntity,
       current
         ? {
             ...current,
@@ -91,7 +100,7 @@ export class MfaService {
             disabled_at: null,
             last_verified_at: now,
           }
-        : this.settingsRepo.create({
+        : manager.create(UserMfaSettingsEntity, {
             user: { id: user.id },
             enabled: true,
             primary_method: MfaMethod.EMAIL_OTP,
@@ -102,13 +111,16 @@ export class MfaService {
     );
   }
 
-  public async disable(user: UserEntity): Promise<void> {
-    const current = await this.findSettings(user.id);
+  public async disable(
+    user: UserEntity,
+    manager: EntityManager = this.settingsRepo.manager,
+  ): Promise<void> {
+    const current = await this.findSettings(user.id, manager);
 
     if (!current?.enabled)
       throw new BadRequestException('MFA is already disabled.');
 
-    await this.settingsRepo.save({
+    await manager.save(UserMfaSettingsEntity, {
       ...current,
       enabled: false,
       disabled_at: new Date(),
@@ -116,6 +128,7 @@ export class MfaService {
     await this.accountTokenSvc.revokeActiveTokens(
       user.id,
       AccountTokenType.EMAIL_MFA,
+      manager,
     );
   }
 
@@ -123,18 +136,22 @@ export class MfaService {
     user: UserEntity,
     method: MfaMethod,
     purpose: MfaChallengePurpose,
+    manager: EntityManager,
   ): Promise<CreatedAccountToken> {
     if (method !== MfaMethod.EMAIL_OTP)
       throw new BadRequestException('Unsupported MFA method.');
 
-    const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
-    const token = await this.accountTokenSvc.createToken({
-      user,
-      type: AccountTokenType.EMAIL_MFA,
-      expiresInMs: MFA_CODE_EXPIRES_IN_MINUTES * minute,
-      metadata: { purpose },
-      mfaCodeHash: this.hashCode(code),
-    });
+    const code = generateVerificationCode();
+    const token = await this.accountTokenSvc.createToken(
+      {
+        user,
+        type: AccountTokenType.EMAIL_MFA,
+        expiresInMs: MFA_CODE_EXPIRES_IN_MINUTES * minute,
+        metadata: { purpose },
+        mfaCodeHash: hashIdentityToken(code),
+      },
+      manager,
+    );
 
     await this.emailSvc.sendEmail({
       to: user.identity.email,
@@ -153,13 +170,10 @@ export class MfaService {
     return token;
   }
 
-  private findSettings(userId: string): Promise<UserMfaSettingsEntity | null> {
-    return this.settingsRepo.findOne({
-      where: { user: { id: userId } },
-    });
-  }
-
-  private hashCode(code: string): string {
-    return createHash('sha256').update(code).digest('hex');
+  private findSettings(
+    userId: string,
+    manager: EntityManager,
+  ): Promise<UserMfaSettingsEntity | null> {
+    return this.settingsRepo.findByUser(manager, userId);
   }
 }

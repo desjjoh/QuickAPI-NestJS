@@ -11,15 +11,17 @@ import { RefreshPayload } from '@/modules/system/tokens/types/token.types';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { env } from '@/config/environment.config';
-import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import { getRefreshCookieName } from '@/config/cookie.config';
 
 @Injectable()
 class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
   constructor(
-    private readonly repo: UserRepository,
-    private readonly svc: UserService,
+    private readonly userSvc: UserService,
+    private readonly refreshSvc: RefreshService,
+    private readonly credentials: UserCredentialsService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -61,15 +63,13 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
 
     if (!refresh) throw new UnauthorizedException('Refresh token missing');
 
-    const user = await this.repo.findByIdOrFail(payload.sub);
+    const user = await this.userSvc.findByIdOrFail(payload.sub);
 
     if (!user) throw new NotFoundException('User was not found');
 
-    this.svc.assertCanAuthenticate(user);
+    this.credentials.assertCanAuthenticate(user);
 
-    const session = await this.repo.manager.findOne(UserSessionEntity, {
-      where: { id: payload.sid, user: { id: user.id } },
-    });
+    const session = await this.refreshSvc.findSessionById(user.id, payload.sid);
 
     if (!session?.active || !session.refresh)
       throw new UnauthorizedException('Session has been revoked');

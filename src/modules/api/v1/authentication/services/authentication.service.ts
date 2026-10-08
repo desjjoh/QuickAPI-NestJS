@@ -13,7 +13,7 @@ import {
 } from '@/config/audit-events.config';
 
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
@@ -35,7 +35,7 @@ interface CompleteSignInOptions {
 @Injectable()
 export class AuthService {
   public constructor(
-    private readonly userSvc: UserService,
+    private readonly credentials: UserCredentialsService,
     private readonly refreshSvc: RefreshService,
     private readonly mfaSvc: MfaService,
     private readonly auditSvc: AuditService,
@@ -66,7 +66,7 @@ export class AuthService {
     options: CompleteSignInOptions = {},
   ): Promise<JWTDto> {
     const before = identityUserSnapshot(user);
-    const updated = await this.userSvc.recordSignIn(user);
+    const updated = await this.credentials.recordSignIn(user);
     const after = identityUserSnapshot(updated);
     const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
@@ -108,7 +108,7 @@ export class AuthService {
       MfaChallengePurpose.SIGN_IN,
     );
 
-    this.userSvc.assertCanAuthenticate(user);
+    this.credentials.assertCanAuthenticate(user);
 
     return this.completeSignIn(user, res, req);
   }

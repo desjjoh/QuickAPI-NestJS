@@ -1,19 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource } from 'typeorm';
+
+import { ReferenceRepository } from '@/common/repositories/reference.repository';
 
 import { TimezoneEntity } from '../entities/time-zone.entity';
 
 @Injectable()
-export class TimezoneRepository extends Repository<TimezoneEntity> {
+export class TimezoneRepository extends ReferenceRepository<TimezoneEntity> {
   public constructor(dataSource: DataSource) {
-    super(TimezoneEntity, dataSource.createEntityManager());
-  }
-
-  public async findAll(): Promise<TimezoneEntity[]> {
-    return this.find({ order: { key: 'ASC' } });
-  }
-
-  public async findById(id: string): Promise<TimezoneEntity | null> {
-    return this.findOneBy({ id });
+    super(dataSource.getRepository(TimezoneEntity));
   }
 }

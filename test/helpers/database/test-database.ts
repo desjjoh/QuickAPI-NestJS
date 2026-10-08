@@ -11,6 +11,7 @@ import { TimezoneSeeder } from '@/modules/domain/library/seeders/time-zone.seede
 import type { Seeder } from '@/modules/system/seeder/types/seeder.types';
 
 import { assertSafeTestDatabase } from './safety';
+import { ArticleStatusSeeder } from '@/modules/domain/articles/seeders/status.seeder';
 
 const REFERENCE_SEEDERS: Seeder[] = [
   new GenderSeeder(),
@@ -20,11 +21,13 @@ const REFERENCE_SEEDERS: Seeder[] = [
   new TimezoneSeeder(),
   new PermissionSeeder(),
   new RoleSeeder(),
+  new ArticleStatusSeeder(),
 ].sort((left, right) => left.order - right.order);
 
 // Children precede parents. Reference tables and TypeORM's migration ledger
 // are intentionally absent: reset preserves the known baseline data.
 export const MUTABLE_TABLE_DELETE_ORDER = [
+  'articles',
   'user_mfa_settings',
   'user_sessions',
   'account_tokens',
@@ -76,7 +79,8 @@ export async function migrateAndSeedEmptyTestSchema(): Promise<void> {
   try {
     await dataSource.dropDatabase();
     await dataSource.runMigrations({ transaction: 'all' });
-    for (const seeder of REFERENCE_SEEDERS) await seeder.run(dataSource);
+    for (const seeder of REFERENCE_SEEDERS)
+      await seeder.run(dataSource.manager);
   } finally {
     await closeTestDataSource(dataSource);
   }

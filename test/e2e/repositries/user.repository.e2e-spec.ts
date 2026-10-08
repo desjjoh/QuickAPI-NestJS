@@ -12,10 +12,19 @@ import {
   UserEntity,
 } from '@/modules/domain/identity/entities/user.entity';
 import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import { IdentityReferenceService } from '@/modules/domain/identity/services/identity-reference.service';
+import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import { UserAdministrationService } from '@/modules/domain/identity/services/user-administration.service';
+import { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
+import { UserProfileService } from '@/modules/domain/identity/services/user-profile.service';
+import { SessionRepository } from '@/modules/domain/identity/repositories/session.repository';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
+import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import {
   closeTestDataSource,
@@ -26,6 +35,11 @@ import {
 describe('UserRepository (disposable MySQL)', () => {
   let dataSource: DataSource;
   let repository: UserRepository;
+  let userService: UserService;
+  let lifecycle: UserLifecycleService;
+  let userProfile: UserProfileService;
+  let administration: UserAdministrationService;
+  let refresh: RefreshService;
   let imageService: {
     remove: jest.Mock<(image: ImageEntity) => Promise<ImageEntity>>;
   };
@@ -38,9 +52,30 @@ describe('UserRepository (disposable MySQL)', () => {
   beforeEach(async () => {
     await resetMutableTables(dataSource);
     imageService = { remove: jest.fn(async (image) => image) };
-    repository = new UserRepository(
+    repository = new UserRepository(dataSource);
+    userService = new UserService(repository);
+    const references = new IdentityReferenceService(
+      new RoleRepository(dataSource),
+      new AccountStatusRepository(dataSource),
+    );
+    lifecycle = new UserLifecycleService(
+      userService,
+      repository,
+      references,
       imageService as unknown as ImageService,
-      dataSource,
+    );
+    userProfile = new UserProfileService(repository);
+    refresh = new RefreshService(
+      {} as never,
+      new SessionRepository(dataSource),
+      {} as never,
+      {} as never,
+    );
+    administration = new UserAdministrationService(
+      userService,
+      repository,
+      references,
+      refresh,
     );
   });
 
@@ -70,7 +105,7 @@ describe('UserRepository (disposable MySQL)', () => {
   ): Promise<UserEntity> {
     const refs = await referenceData();
     sequence += 1;
-    return repository.createUser({
+    return lifecycle.createUser({
       identity: {
         email: `repository-${sequence}@example.test`,
         password: 'hash',
@@ -109,7 +144,7 @@ describe('UserRepository (disposable MySQL)', () => {
     );
   }
 
-  it('increments only active sessions and revokes all active sessions', async () => {
+  it('increments only active sessions', async () => {
     const user = await createUser();
     const sessions = dataSource.getRepository(UserSessionEntity);
     const active = await sessions.save(
@@ -129,7 +164,7 @@ describe('UserRepository (disposable MySQL)', () => {
       }),
     );
 
-    await repository.incrementTokenVersion(user.id);
+    await refresh.incrementTokenVersion(user.id);
     expect(await sessions.findOneByOrFail({ id: active.id })).toMatchObject({
       token_version: 3,
       active: true,
@@ -137,16 +172,6 @@ describe('UserRepository (disposable MySQL)', () => {
     expect(await sessions.findOneByOrFail({ id: inactive.id })).toMatchObject({
       token_version: 7,
       active: false,
-    });
-
-    await repository.revokeAllSessions(user.id);
-    expect(await sessions.findOneByOrFail({ id: active.id })).toMatchObject({
-      active: false,
-      refresh: null,
-    });
-    expect(await sessions.findOneByOrFail({ id: inactive.id })).toMatchObject({
-      active: false,
-      refresh: 'inactive',
     });
   });
 
@@ -165,20 +190,22 @@ describe('UserRepository (disposable MySQL)', () => {
     );
 
     await expect(
-      repository.findByEmail(user.identity.email),
+      repository.findByEmail(dataSource.manager, user.identity.email),
     ).resolves.toMatchObject({ id: user.id });
     await expect(
-      repository.findByEmail('missing@example.test'),
+      repository.findByEmail(dataSource.manager, 'missing@example.test'),
     ).resolves.toBeNull();
-    await expect(repository.findByPhone('+16135550199')).resolves.toMatchObject(
-      { id: user.id },
-    );
-    await expect(repository.findByPhone('+19999999999')).resolves.toBeNull();
-    await expect(repository.findByIdOrFail(user.id)).resolves.toMatchObject({
+    await expect(
+      repository.findByPhone(dataSource.manager, '+16135550199'),
+    ).resolves.toMatchObject({ id: user.id });
+    await expect(
+      repository.findByPhone(dataSource.manager, '+19999999999'),
+    ).resolves.toBeNull();
+    await expect(userService.findByIdOrFail(user.id)).resolves.toMatchObject({
       id: user.id,
     });
     await expect(
-      repository.findByIdOrFail('missing-user'),
+      userService.findByIdOrFail('missing-user'),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -200,7 +227,7 @@ describe('UserRepository (disposable MySQL)', () => {
     const image = await createImage('avatars/test.png');
     const user = await createUser(image);
 
-    await repository.clearProfileAvatar(user.profile.id);
+    await userProfile.clearAvatar(user.profile.id);
 
     const profile = await dataSource
       .getRepository(UserProfileEntity)
@@ -218,7 +245,7 @@ describe('UserRepository (disposable MySQL)', () => {
       const user = await createUser(image);
       const profileId = user.profile.id;
 
-      await repository.removeUser(user.id);
+      await lifecycle.deleteUser(user);
 
       await expect(
         dataSource.getRepository(UserEntity).findOneBy({ id: user.id }),
@@ -232,6 +259,7 @@ describe('UserRepository (disposable MySQL)', () => {
       if (image)
         expect(imageService.remove).toHaveBeenCalledWith(
           expect.objectContaining({ id: image.id }),
+          dataSource.manager,
         );
     },
   );
@@ -243,7 +271,7 @@ describe('UserRepository (disposable MySQL)', () => {
         .getRepository(AccountStatusEntity)
         .findOneByOrFail({ key: 'disabled' });
       await expect(
-        repository.updateUserAdministration(user.id, {
+        administration.updateAdministration(user, {
           status_id: disabled.id,
         }),
       ).resolves.toMatchObject({ status: { key: 'disabled' } });
@@ -252,11 +280,11 @@ describe('UserRepository (disposable MySQL)', () => {
     it('rejects an unknown status without changing existing data', async () => {
       const user = await createUser();
       await expect(
-        repository.updateUserAdministration(user.id, {
+        administration.updateAdministration(user, {
           status_id: 'unknown-status',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      await expect(repository.findByIdOrFail(user.id)).resolves.toMatchObject({
+      await expect(userService.findByIdOrFail(user.id)).resolves.toMatchObject({
         status: { key: 'active' },
         roles: [expect.objectContaining({ key: 'user' })],
       });
@@ -267,7 +295,7 @@ describe('UserRepository (disposable MySQL)', () => {
       const administrator = await dataSource
         .getRepository(RoleEntity)
         .findOneByOrFail({ key: 'system-administrator' });
-      const updated = await repository.updateUserAdministration(user.id, {
+      const updated = await administration.updateAdministration(user, {
         role_ids: [administrator.id],
       });
       expect(updated.roles?.map(({ key }) => key)).toEqual([
@@ -284,19 +312,19 @@ describe('UserRepository (disposable MySQL)', () => {
         .getRepository(RoleEntity)
         .findOneByOrFail({ key: 'system-administrator' });
       await expect(
-        repository.updateUserAdministration(user.id, {
+        administration.updateAdministration(user, {
           status_id: disabled.id,
           role_ids: [administrator.id, 'unknown-role'],
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      const unchanged = await repository.findByIdOrFail(user.id);
+      const unchanged = await userService.findByIdOrFail(user.id);
       expect(unchanged.status.key).toBe('active');
       expect(unchanged.roles?.map(({ key }) => key)).toEqual(['user']);
     });
 
     it('supports removing every role with an empty replacement', async () => {
       const user = await createUser();
-      const updated = await repository.updateUserAdministration(user.id, {
+      const updated = await administration.updateAdministration(user, {
         role_ids: [],
       });
       expect(updated.roles).toEqual([]);

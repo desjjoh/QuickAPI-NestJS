@@ -11,9 +11,10 @@ export function omitUndefined<T extends Record<string, unknown>>(
 }
 
 export function omitUndefinedDeep<T>(value: T): T {
-  if (Array.isArray(value)) {
+  if (value instanceof Date) return value;
+
+  if (Array.isArray(value))
     return value.map((item) => omitUndefinedDeep(item)) as T;
-  }
 
   if (value !== null && typeof value === 'object') {
     return Object.fromEntries(

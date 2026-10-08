@@ -1,11 +1,12 @@
 import { LibraryService } from './library.service';
 
 describe('LibraryService', () => {
-  const countryRepo = { findAll: jest.fn() };
-  const genderRepo = { findAll: jest.fn() };
-  const roleRepo = { findAll: jest.fn() };
-  const statusRepo = { findAll: jest.fn() };
-  const timezoneRepo = { findAll: jest.fn() };
+  const manager = {};
+  const countryRepo = { findAll: jest.fn(), manager };
+  const genderRepo = { findAll: jest.fn(), manager };
+  const roleRepo = { findAll: jest.fn(), manager };
+  const statusRepo = { findAll: jest.fn(), manager };
+  const timezoneRepo = { findAll: jest.fn(), manager };
   const service = new LibraryService(
     countryRepo as never,
     genderRepo as never,
@@ -53,6 +54,7 @@ describe('LibraryService', () => {
 
       const result = await service[method]();
 
+      expect(repo.findAll).toHaveBeenCalledWith(manager);
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual(
         expect.objectContaining({ key: entity.key, label: entity.label }),

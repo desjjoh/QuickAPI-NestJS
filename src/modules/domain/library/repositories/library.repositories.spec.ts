@@ -1,4 +1,5 @@
-import { DataSource } from 'typeorm';
+import type { DataSource, EntityManager, Repository } from 'typeorm';
+
 import { AccountStatusRepository } from './accountstatus.repository';
 import { CountryRepository } from './country.repository';
 import { GenderRepository } from './gender.repository';
@@ -7,11 +8,38 @@ import { RegionRepository } from './region.repository';
 import { RoleRepository } from './role.repository';
 import { TimezoneRepository } from './time-zone.repository';
 
-describe('library repository query behavior', () => {
+type LibraryRepository = {
+  findAll(manager: EntityManager): Promise<unknown[]>;
+};
+
+type LibraryRepositoryConstructor = new (
+  dataSource: DataSource,
+) => LibraryRepository;
+
+const setup = () => {
+  const persistence = {
+    target: class ReferenceEntity {},
+    find: jest.fn().mockResolvedValue([]),
+    findOne: jest.fn().mockResolvedValue(null),
+  };
+  const manager = {
+    getRepository: jest.fn().mockReturnValue(persistence),
+  } as unknown as EntityManager;
+  Object.assign(persistence, { manager });
+
   const dataSource = {
-    createEntityManager: jest.fn().mockReturnValue({}),
+    getRepository: jest.fn().mockReturnValue(persistence),
   } as unknown as DataSource;
-  it.each([
+
+  return {
+    dataSource,
+    manager,
+    persistence: persistence as unknown as jest.Mocked<Repository<never>>,
+  };
+};
+
+describe('library repository query behavior', () => {
+  it.each<[LibraryRepositoryConstructor, Record<string, unknown>]>([
     [AccountStatusRepository, { order: { key: 'ASC' } }],
     [GenderRepository, { order: { key: 'ASC' } }],
     [PermissionRepository, { order: { key: 'ASC' } }],
@@ -28,25 +56,35 @@ describe('library repository query behavior', () => {
   ])(
     '%p applies its deterministic listing shape',
     async (RepositoryType, options) => {
-      const repo = new RepositoryType(dataSource);
-      jest.spyOn(repo, 'find').mockResolvedValue([]);
+      const { dataSource, manager, persistence } = setup();
+      const repository = new RepositoryType(dataSource);
 
-      await repo.findAll();
+      await repository.findAll(manager);
 
-      expect(repo.find).toHaveBeenCalledWith(options);
+      expect(manager.getRepository).toHaveBeenCalled();
+      expect(persistence.find).toHaveBeenCalledWith(options);
     },
   );
 
   it('scopes region lookup to both region and country references', async () => {
-    const repo = new RegionRepository(dataSource);
-    jest.spyOn(repo, 'findOne').mockResolvedValue(null);
+    const { dataSource, manager, persistence } = setup();
+    const repository = new RegionRepository(dataSource);
 
     await expect(
-      repo.findByIdAndCountry('region-id', 'country-id'),
+      repository.findByIdAndCountry(manager, 'region-id', 'country-id'),
     ).resolves.toBeNull();
 
-    expect(repo.findOne).toHaveBeenCalledWith({
+    expect(persistence.findOne).toHaveBeenCalledWith({
       where: { id: 'region-id', country: { id: 'country-id' } },
     });
+  });
+
+  it('does not expose persistence mutation methods', () => {
+    const { dataSource } = setup();
+    const repository = new GenderRepository(dataSource);
+
+    expect(repository).not.toHaveProperty('create');
+    expect(repository).not.toHaveProperty('update');
+    expect(repository).not.toHaveProperty('remove');
   });
 });

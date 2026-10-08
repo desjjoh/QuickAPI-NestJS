@@ -1,4 +1,4 @@
-import { DataSource, Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 
 import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
 import {
@@ -23,9 +23,9 @@ export class GenderSeeder implements Seeder {
   public readonly name: string = GenderSeeder.name;
   public readonly order: number = 10;
 
-  public async run(dataSource: DataSource): Promise<SeederResult> {
+  public async run(manager: EntityManager): Promise<SeederResult> {
     const repository: Repository<GenderEntity> =
-      dataSource.getRepository(GenderEntity);
+      manager.getRepository(GenderEntity);
 
     let created = 0;
     let skipped = 0;

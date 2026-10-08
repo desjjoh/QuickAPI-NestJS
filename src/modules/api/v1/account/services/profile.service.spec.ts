@@ -1,7 +1,6 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { BadRequestException } from '@nestjs/common';
-import type { DataSource } from 'typeorm';
 import type { AuditService } from '@/modules/domain/audit/services/audit.service';
 import type { ImageService } from '@/modules/domain/media/services/image.service';
 import type { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
@@ -20,31 +19,32 @@ describe('ProfileApiService audit mutations', () => {
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(current),
     };
-    const dataSource = {
-      transaction: jest.fn((work) => work(manager)),
-    };
     const userSvc = {
+      transaction: jest.fn((work) => work(manager)),
       updateUser: jest.fn().mockResolvedValue(after),
-      clearProfileAvatar: jest.fn(),
+    };
+    const userProfileSvc = {
+      clearAvatar: jest.fn(),
       deleteAddress: jest.fn(),
       deletePhone: jest.fn(),
     };
     const imgSvc = { create: jest.fn(), update: jest.fn(), remove: jest.fn() };
     const regionRepo = {
       findByIdAndCountry: jest.fn().mockResolvedValue({ id: 'region-1' }),
+      manager,
     };
     const audit = { record: jest.fn().mockResolvedValue({}) };
     return {
       service: new ProfileApiService(
         userSvc as unknown as UserService,
+        userProfileSvc as never,
         imgSvc as unknown as ImageService,
         regionRepo as unknown as RegionRepository,
-        dataSource as unknown as DataSource,
         audit as unknown as AuditService,
       ),
       manager,
-      dataSource,
       userSvc,
+      userProfileSvc,
       imgSvc,
       regionRepo,
       audit,
@@ -65,10 +65,7 @@ describe('ProfileApiService audit mutations', () => {
         },
       },
     });
-    const { service, audit, manager, dataSource, userSvc } = setup(
-      current,
-      after,
-    );
+    const { service, audit, manager, userSvc } = setup(current, after);
     userSvc.updateUser.mockImplementation(async () => {
       Object.assign(current.profile.name, after.profile.name);
       Object.assign(current.profile.personal, after.profile.personal);
@@ -82,7 +79,7 @@ describe('ProfileApiService audit mutations', () => {
       dob: '1991-02-03',
       gender_id: 'gender-2',
     });
-    expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,9 +155,9 @@ describe('ProfileApiService audit mutations', () => {
     const current = userFixture({
       profile: { ...userFixture().profile, contact: { phone: null, address } },
     });
-    const { service, audit, manager, userSvc } = setup(current);
+    const { service, audit, manager, userProfileSvc } = setup(current);
     await service.removeAddress(current, session);
-    expect(userSvc.deleteAddress).toHaveBeenCalledWith(address, manager);
+    expect(userProfileSvc.deleteAddress).toHaveBeenCalledWith(address, manager);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: IdentityAuditEvents.PROFILE_ADDRESS_REMOVED,
@@ -342,7 +339,7 @@ describe('ProfileApiService audit mutations', () => {
 
   it('rejects an address whose region does not belong to its country', async () => {
     const current = userFixture();
-    const { service, regionRepo, dataSource } = setup(current);
+    const { service, regionRepo, userSvc } = setup(current);
     regionRepo.findByIdAndCountry.mockResolvedValue(null);
 
     await expect(
@@ -355,7 +352,7 @@ describe('ProfileApiService audit mutations', () => {
         country_id: 'country-2',
       }),
     ).rejects.toThrow('Region must belong to the selected country.');
-    expect(dataSource.transaction).not.toHaveBeenCalled();
+    expect(userSvc.transaction).not.toHaveBeenCalled();
   });
 
   it('removes an existing phone and records its safe document', async () => {
@@ -373,11 +370,11 @@ describe('ProfileApiService audit mutations', () => {
         contact: { ...base.profile.contact, phone },
       },
     });
-    const { service, userSvc, audit, manager } = setup(current);
+    const { service, userProfileSvc, audit, manager } = setup(current);
 
     await service.removePhone(current, session);
 
-    expect(userSvc.deletePhone).toHaveBeenCalledWith(phone, manager);
+    expect(userProfileSvc.deletePhone).toHaveBeenCalledWith(phone, manager);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: IdentityAuditEvents.PROFILE_PHONE_REMOVED,

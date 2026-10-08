@@ -1,5 +1,4 @@
 import { Response } from 'express';
-import { DataSource } from 'typeorm';
 
 import {
   BadRequestException,
@@ -18,6 +17,8 @@ import {
 
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
+import { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { JWTDto } from '@/modules/domain/identity/models/jwt.model';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
@@ -31,6 +32,10 @@ import {
 } from '@/modules/domain/identity/entities/mfa.entity';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
+import {
+  getClearRefreshCookieOptions,
+  getRefreshCookieName,
+} from '@/config/cookie.config';
 
 import { UpdateEmailDto } from '../models/updateEmail.model';
 import { UpdatePasswordDto } from '../models/updatePassword.model';
@@ -49,12 +54,13 @@ import {
 export class MeApiService {
   public constructor(
     private readonly userSvc: UserService,
+    private readonly credentials: UserCredentialsService,
+    private readonly lifecycle: UserLifecycleService,
     private readonly refreshSvc: RefreshService,
     private readonly evSvc: EmailVerificationService,
     private readonly emailSvc: EmailService,
     private readonly mfaSvc: MfaService,
     private readonly auditSvc: AuditService,
-    private readonly dataSource: DataSource,
   ) {}
 
   public async deleteMe(
@@ -62,39 +68,44 @@ export class MeApiService {
     dto: DeleteAccountDto,
     res: Response,
   ): Promise<void> {
-    await this.userSvc.validateUser(user.identity.email, dto.password);
+    await this.credentials.validateUser(user.identity.email, dto.password);
 
-    await this.dataSource.transaction(async (manager) => {
-      await this.userSvc.deleteUser(user, res, manager);
+    const userId = user.id;
+    const before = identityUserSnapshot(user);
+
+    await this.userSvc.transaction(async (manager) => {
+      await this.lifecycle.deleteUser(user, manager);
       await this.auditSvc.record(
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
           domain: AuditEventDomain.IDENTITY,
           actorType: AuditActorType.USER,
-          actorId: user.id,
+          actorId: userId,
           subjectType: AuditSubjectType.USER,
-          subjectId: user.id,
+          subjectId: userId,
           resourceType: AuditResourceType.IDENTITY_USER,
-          resourceId: user.id,
+          resourceId: userId,
           source: AuditSource.HTTP,
           metadata: {},
-          before: identityUserSnapshot(user),
+          before,
           after: null,
         },
         manager,
       );
     });
+
+    res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
 
   public async updateMfa(
     user: UserEntity,
     dto: UpdateMfaDto,
   ): Promise<MfaChallengeResponseDto | void> {
-    await this.userSvc.validateUser(user.identity.email, dto.password);
+    await this.credentials.validateUser(user.identity.email, dto.password);
 
     if (!dto.enabled) {
       await this.mfaSvc.disable(user);
-      await this.userSvc.recordMfaChanged(user, false);
+      await this.credentials.recordMfaChanged(user, false);
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
@@ -137,7 +148,7 @@ export class MeApiService {
       throw new UnauthorizedException('Invalid MFA challenge.');
 
     await this.mfaSvc.enable(user);
-    await this.userSvc.recordMfaChanged(user, true);
+    await this.credentials.recordMfaChanged(user, true);
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,
@@ -169,7 +180,7 @@ export class MeApiService {
         'New email address must be different from the current email address.',
       );
 
-    await this.userSvc.validateUser(user.identity.email, dto.password);
+    await this.credentials.validateUser(user.identity.email, dto.password);
     const challenge = await this.evSvc.sendEmailChangeVerification(
       user,
       dto.email,
@@ -230,15 +241,15 @@ export class MeApiService {
     dto: UpdatePasswordDto,
     res: Response,
   ): Promise<JWTDto> {
-    await this.userSvc.validateUser(user.identity.email, dto.password);
+    await this.credentials.validateUser(user.identity.email, dto.password);
 
-    const hashed = await this.userSvc.hashPassword(dto.confirm);
+    const hashed = await this.credentials.hashPassword(dto.confirm);
 
     await this.userSvc.updateUser(user, {
       identity: { password: hashed },
     });
 
-    const updated = await this.userSvc.recordPasswordChanged(user);
+    const updated = await this.credentials.recordPasswordChanged(user);
 
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].PASSWORD_CHANGED,

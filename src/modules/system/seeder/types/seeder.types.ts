@@ -1,4 +1,4 @@
-import { DataSource } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 export type SeederResult = {
   created: number;
@@ -9,5 +9,5 @@ export interface Seeder {
   readonly name: string;
   readonly order: number;
 
-  run(dataSource: DataSource): Promise<SeederResult>;
+  run(manager: EntityManager): Promise<SeederResult>;
 }

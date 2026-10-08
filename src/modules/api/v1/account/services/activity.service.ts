@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditActorType } from '@/config/audit-events.config';
 import { AuditQueryService } from '@/modules/domain/audit/services/audit-query.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -20,13 +20,6 @@ export class ActivityApiService {
     user: UserEntity,
     query: AccountActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
-    if (
-      query.occurredFrom &&
-      query.occurredTo &&
-      query.occurredFrom > query.occurredTo
-    )
-      throw new BadRequestException('occurredFrom must not follow occurredTo');
-
     const result = await this.auditQueries.query({
       actorType: AuditActorType.USER,
       actorId: user.id,
