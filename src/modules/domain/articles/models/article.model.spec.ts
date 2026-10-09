@@ -81,6 +81,7 @@ describe('article outbound models', () => {
       width: 1600,
       height: 900,
       altText: 'Article hero',
+      decorative: false,
     });
     expect(model).not.toHaveProperty('storage_key');
     expect(model).not.toHaveProperty('filename');
@@ -101,6 +102,19 @@ describe('article outbound models', () => {
     expect(model).not.toHaveProperty('identity');
     expect(model).not.toHaveProperty('roles');
     expect(model).not.toHaveProperty('metadata');
+  });
+
+  it('distinguishes decorative images from legacy missing descriptions', () => {
+    expect(
+      new ArticleImageDto({
+        ...image,
+        alt_text: null,
+        decorative: true,
+      } as never),
+    ).toEqual(expect.objectContaining({ altText: null, decorative: true }));
+    expect(new ArticleImageDto({ ...image, alt_text: null } as never)).toEqual(
+      expect.objectContaining({ altText: null, decorative: false }),
+    );
   });
 
   it('falls back to the full name and supports a missing avatar', () => {

@@ -10,6 +10,7 @@ import {
 export const ARTICLE_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
   [AuditResourceType.ARTICLES_ARTICLE]: {
     id: scalar,
+    version: scalar,
     content: nestedObject({
       title: scalar,
       summary: scalar,

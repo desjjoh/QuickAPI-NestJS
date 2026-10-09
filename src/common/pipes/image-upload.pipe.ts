@@ -1,35 +1,36 @@
 import { Injectable, ParseFilePipe, PipeTransform } from '@nestjs/common';
-import { MaxFileSizeValidator } from '@nestjs/common';
 
-import { megabyte } from '../constants/bytes.constants';
-import { CustomFileTypeValidator } from '../validators/filetype.validator';
+import { imageUploadPolicy } from '@/config/image-upload.config';
+import { readValidatedImage } from '@/modules/domain/media/policies/image-upload.policy';
+import { removeTemporaryUpload } from '@/common/helpers/upload-cleanup.helper';
 
 @Injectable()
 export class ImageUploadValidationPipe implements PipeTransform {
   private readonly pipe: ParseFilePipe;
+  private readonly maxSize: number;
 
   constructor({
-    maxSize = 10 * megabyte,
+    maxSize = imageUploadPolicy.maxBytes,
     fileIsRequired = false,
   }: {
     maxSize?: number;
     fileIsRequired?: boolean;
   }) {
+    this.maxSize = maxSize;
     this.pipe = new ParseFilePipe({
       fileIsRequired,
-      validators: [
-        new MaxFileSizeValidator({ maxSize: maxSize }),
-        new CustomFileTypeValidator([
-          'image/png',
-          'image/jpeg',
-          'image/jpg',
-          'image/gif',
-        ]),
-      ],
     });
   }
 
   async transform(value: unknown) {
-    return this.pipe.transform(value);
+    const file = value as Express.Multer.File | undefined;
+    try {
+      await this.pipe.transform(value);
+      if (file) await readValidatedImage(file, this.maxSize);
+      return file;
+    } catch (error) {
+      await removeTemporaryUpload(file).catch(() => undefined);
+      throw error;
+    }
   }
 }

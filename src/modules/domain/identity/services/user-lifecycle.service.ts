@@ -8,6 +8,10 @@ import { DeepPartial, EntityManager } from 'typeorm';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
 import { ImageService } from '@/modules/domain/media/services/image.service';
+import {
+  runInTransaction,
+  TransactionLifecycle,
+} from '@/common/helpers/transaction.helper';
 
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { UserProfileEntity } from '../entities/profile.entity';
@@ -56,12 +60,20 @@ export class UserLifecycleService {
   public async deleteUser(
     user: UserEntity,
     manager: EntityManager = this.userRepo.manager,
+    lifecycle?: TransactionLifecycle,
   ): Promise<void> {
+    if (!lifecycle)
+      return runInTransaction(
+        manager,
+        (transactionManager, transactionLifecycle) =>
+          this.deleteUser(user, transactionManager, transactionLifecycle),
+      );
+
     const avatar = user.profile.media.avatar;
 
     await manager.remove(UserEntity, user);
     await manager.delete(UserProfileEntity, { id: user.profile.id });
 
-    if (avatar) await this.images.remove(avatar, manager);
+    if (avatar) await this.images.remove(avatar, manager, lifecycle);
   }
 }

@@ -1,6 +1,7 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { NotFoundException } from '@nestjs/common';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserService } from './user.service';
@@ -47,8 +48,11 @@ describe('UserService', () => {
 
     await expect(service.transaction(work)).resolves.toBe('complete');
 
-    expect(manager.transaction).toHaveBeenCalledWith(work);
-    expect(work).toHaveBeenCalledWith(manager);
+    expect(manager.transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(work).toHaveBeenCalledWith(
+      manager,
+      expect.any(TransactionLifecycle),
+    );
   });
 
   it('delegates paginated, email, and id reads through the selected manager', async () => {

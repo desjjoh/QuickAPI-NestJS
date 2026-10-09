@@ -1,11 +1,18 @@
 import {
   Injectable,
+  ConflictException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
+import {
+  runInTransaction,
+  TransactionLifecycle,
+  type TransactionWork,
+} from '@/common/helpers/transaction.helper';
 import { PaginationOptions } from '@/common/models/pagination.model';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { ImageService } from '@/modules/domain/media/services/image.service';
@@ -15,6 +22,8 @@ import { ArticleStatusEntity } from '../entities/articleStatus.entity';
 import { ArticleRepository } from '../repositories/article.repository';
 import { ArticleStatusRepository } from '../repositories/status.repository';
 import { ArticleStatusTransitionPolicy } from '../policies/article-status-transition.policy';
+import { resolveHeroAccessibility } from '../policies/hero-accessibility.policy';
+import { assertArticleVersion } from '../policies/article-version.policy';
 import {
   ArticleAdministrationQuery,
   ArticleSearchQuery,
@@ -42,6 +51,7 @@ export type CreateArticleWithHeroInput = Omit<CreateArticleInput, 'heroId'> & {
     file: Express.Multer.File;
     folder: string;
     altText?: string | null;
+    decorative?: boolean;
   };
 };
 
@@ -55,6 +65,7 @@ export type UpdateArticleHeroInput = {
   file: Express.Multer.File;
   folder: string;
   altText?: string | null;
+  decorative?: boolean;
 };
 
 @Injectable()
@@ -67,10 +78,8 @@ export class ArticleService {
     private readonly transitionPolicy: ArticleStatusTransitionPolicy,
   ) {}
 
-  public transaction<T>(
-    work: (manager: EntityManager) => Promise<T>,
-  ): Promise<T> {
-    return this.articleRepo.manager.transaction(work);
+  public transaction<T>(work: TransactionWork<T>): Promise<T> {
+    return runInTransaction(this.articleRepo.manager, work);
   }
 
   public findAll(
@@ -248,14 +257,28 @@ export class ArticleService {
   public async createWithHero(
     input: CreateArticleWithHeroInput,
     manager: EntityManager = this.articleRepo.manager,
+    lifecycle?: TransactionLifecycle,
   ): Promise<ArticleEntity> {
+    if (!lifecycle)
+      return runInTransaction(
+        manager,
+        (transactionManager, transactionLifecycle) =>
+          this.createWithHero(input, transactionManager, transactionLifecycle),
+      );
+
+    const accessibility = resolveHeroAccessibility(
+      input.hero.altText,
+      input.hero.decorative,
+    );
     const image = await this.imageSvc.create(
       {
         file: input.hero.file,
         folder: input.hero.folder,
-        alt_text: input.hero.altText,
+        alt_text: accessibility.altText,
+        decorative: accessibility.decorative,
       },
       manager,
+      lifecycle,
     );
 
     return this.create(
@@ -302,17 +325,38 @@ export class ArticleService {
     article: ArticleEntity,
     input: UpdateArticleHeroInput,
     manager: EntityManager = this.articleRepo.manager,
+    lifecycle?: TransactionLifecycle,
   ): Promise<ArticleEntity> {
+    if (!lifecycle)
+      return runInTransaction(
+        manager,
+        (transactionManager, transactionLifecycle) =>
+          this.updateHero(
+            article,
+            input,
+            transactionManager,
+            transactionLifecycle,
+          ),
+      );
+
     this.transitionPolicy.assertEditable(article.publication.status.key);
 
+    const accessibility = resolveHeroAccessibility(
+      input.altText,
+      input.decorative,
+    );
+    // Claim the article revision before touching storage; failures roll it back.
+    await this.saveDetached(article, {}, manager);
     await this.imageSvc.update(
       {
         image: article.media.hero,
         file: input.file,
         folder: input.folder,
-        alt_text: input.altText,
+        alt_text: accessibility.altText,
+        decorative: accessibility.decorative,
       },
       manager,
+      lifecycle,
     );
 
     return this.findByIdOrFail(article.id, manager);
@@ -356,6 +400,10 @@ export class ArticleService {
       { publishedAt },
     );
 
+    resolveHeroAccessibility(
+      article.media.hero?.alt_text,
+      article.media.hero?.decorative,
+    );
     const publisher = await this.userSvc.findByIdOrFail(publisherId, manager);
 
     return this.applyTransition(
@@ -450,24 +498,20 @@ export class ArticleService {
     input: DeepPartial<ArticleEntity>,
     manager: EntityManager,
   ): Promise<ArticleEntity> {
-    const detached = manager.create(
+    // Compare and increment in a single SQL statement, including no-op edits.
+    assertArticleVersion(article, article.version);
+    const result = await manager.update(
       ArticleEntity,
-      article as DeepPartial<ArticleEntity>,
+      { id: article.id, version: article.version },
+      {
+        ...omitUndefinedDeep(input),
+        version: () => '`version` + 1',
+      } as QueryDeepPartialEntity<ArticleEntity>,
     );
-    const updated = manager.merge(
-      ArticleEntity,
-      detached,
-      omitUndefinedDeep(input),
-    );
-
-    if (input.attribution?.author === null)
-      Object.assign(updated.attribution, { author: null });
-    if (input.publication?.publisher === null)
-      Object.assign(updated.publication, { publisher: null });
-    if (input.publication?.publishedAt === null)
-      Object.assign(updated.publication, { publishedAt: null });
-
-    await manager.save(ArticleEntity, updated);
+    if (result.affected !== 1)
+      throw new ConflictException(
+        'Article has changed. Reload it before retrying.',
+      );
 
     return this.findByIdOrFail(article.id, manager);
   }

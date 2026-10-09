@@ -58,9 +58,9 @@ export class UserAdminService {
     id: string,
     dto: AdministrationActionDto,
   ): Promise<void> {
-    await this.userSvc.transaction(async (manager) => {
+    await this.userSvc.transaction(async (manager, lifecycle) => {
       const before = await this.lockUser(manager, id);
-      await this.lifecycle.deleteUser(before, manager);
+      await this.lifecycle.deleteUser(before, manager, lifecycle);
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,

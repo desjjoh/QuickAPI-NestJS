@@ -17,7 +17,10 @@ describe(ArticleAdministrationController.name, () => {
   };
   const controller = new ArticleAdministrationController(articles as never);
   const administrator = { id: 'administrator-1' };
-  const reason = { reason_code: 'policy_enforcement' as const };
+  const reason = {
+    expected_version: 1,
+    reason_code: 'policy_enforcement' as const,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -39,12 +42,16 @@ describe(ArticleAdministrationController.name, () => {
   });
 
   it('delegates administration lifecycle actions and their reasons', async () => {
-    await controller.publish(administrator as never, 'article-1');
+    await controller.publish(administrator as never, 'article-1', {
+      expected_version: 1,
+    });
     await controller.returnToDraft(administrator as never, 'article-1', reason);
     await controller.archive(administrator as never, 'article-1', reason);
     await controller.restore(administrator as never, 'article-1', reason);
 
-    expect(articles.publish).toHaveBeenCalledWith(administrator, 'article-1');
+    expect(articles.publish).toHaveBeenCalledWith(administrator, 'article-1', {
+      expected_version: 1,
+    });
     expect(articles.returnToDraft).toHaveBeenCalledWith(
       administrator,
       'article-1',

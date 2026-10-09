@@ -17,13 +17,12 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
 
 import {
   PERMISSION_MATRIX,
   PermissionDomain,
 } from '@/config/permissions.config';
-import { storage } from '@/config/storage.config';
 
 import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -38,7 +37,7 @@ import {
 } from '@/common/decorators/current-user.decorator';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
-import { megabyte } from '@/common/constants/bytes.constants';
+import { imageUploadPolicy } from '@/config/image-upload.config';
 import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
 
 import { ProfileApiService } from '../services/profile.service';
@@ -156,14 +155,16 @@ export class ProfileApiController {
   @ApiFileUpload({
     fieldName: 'avatar',
     description:
-      'Image file to use as the authenticated user’s profile avatar. The file must pass image validation and size restrictions.',
+      'PNG, JPEG, or GIF avatar no larger than 1 MB, 8192 pixels per side, and 40 million pixels across all frames.',
   })
   @ApiOkResponse({
     description:
       'Profile avatar updated successfully. Returns the updated authenticated user payload.',
     type: UserDto,
   })
-  @UseInterceptors(FileInterceptor('avatar', { storage }))
+  @UseInterceptors(
+    ImageFileInterceptor('avatar', imageUploadPolicy.avatarMaxBytes),
+  )
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
@@ -172,7 +173,7 @@ export class ProfileApiController {
     @CurrentSession() session: UserSessionEntity,
     @UploadedFile(
       new ImageUploadValidationPipe({
-        maxSize: 1 * megabyte,
+        maxSize: imageUploadPolicy.avatarMaxBytes,
         fileIsRequired: true,
       }),
     )

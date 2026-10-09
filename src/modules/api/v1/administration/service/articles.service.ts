@@ -12,16 +12,18 @@ import {
 } from '@/config/audit-events.config';
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import {
-  ArticleDto,
-  ArticleListItemDto,
-  ArticlePageDto,
-} from '@/modules/domain/articles/models/article.model';
+  ArticleManagementDto,
+  ArticleManagementListItemDto,
+  ArticleManagementPageDto,
+} from '@/modules/domain/articles/models/article-management.model';
 import { ArticleService } from '@/modules/domain/articles/services/article.service';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { articleAuditSnapshot } from '@/modules/domain/audit/snapshots/article-audit.snapshot';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { ArticleVersionDto } from '@/modules/domain/articles/models/article-version.model';
+import { assertArticleVersion } from '@/modules/domain/articles/policies/article-version.policy';
 
-import { AdministrationActionDto } from '../models/administration-action.model';
+import { ArticleAdministrationActionDto } from '../models/article-action.model';
 import { AdministrationArticleQueryDto } from '../models/article-query.model';
 
 type AdministrationArticleAction =
@@ -39,7 +41,7 @@ export class ArticleAdministrationApiService {
 
   public async list(
     query: AdministrationArticleQueryDto,
-  ): Promise<ArticlePageDto> {
+  ): Promise<ArticleManagementPageDto> {
     const [articles, itemCount] = await this.articles.paginateForAdministration(
       query,
       {
@@ -49,55 +51,79 @@ export class ArticleAdministrationApiService {
       },
     );
     const data = articles.map(
-      (article: ArticleEntity) => new ArticleListItemDto(article),
+      (article: ArticleEntity) => new ArticleManagementListItemDto(article),
     );
 
-    return new ArticlePageDto(
+    return new ArticleManagementPageDto(
       data,
       new PaginationMeta({ pageOptions: query, itemCount }),
     );
   }
 
-  public async find(id: string): Promise<ArticleDto> {
-    return new ArticleDto(await this.articles.findByIdOrFail(id));
+  public async find(id: string): Promise<ArticleManagementDto> {
+    return new ArticleManagementDto(await this.articles.findByIdOrFail(id));
   }
 
-  public publish(user: UserEntity, id: string): Promise<ArticleDto> {
-    return this.transition(user, id, 'publish');
+  public publish(
+    user: UserEntity,
+    id: string,
+    dto: ArticleVersionDto,
+  ): Promise<ArticleManagementDto> {
+    return this.transition(user, id, 'publish', dto.expected_version);
   }
 
   public returnToDraft(
     user: UserEntity,
     id: string,
-    dto: AdministrationActionDto,
-  ): Promise<ArticleDto> {
-    return this.transition(user, id, 'returnToDraft', dto.reason_code);
+    dto: ArticleAdministrationActionDto,
+  ): Promise<ArticleManagementDto> {
+    return this.transition(
+      user,
+      id,
+      'returnToDraft',
+      dto.expected_version,
+      dto.reason_code,
+    );
   }
 
   public archive(
     user: UserEntity,
     id: string,
-    dto: AdministrationActionDto,
-  ): Promise<ArticleDto> {
-    return this.transition(user, id, 'archive', dto.reason_code);
+    dto: ArticleAdministrationActionDto,
+  ): Promise<ArticleManagementDto> {
+    return this.transition(
+      user,
+      id,
+      'archive',
+      dto.expected_version,
+      dto.reason_code,
+    );
   }
 
   public restore(
     user: UserEntity,
     id: string,
-    dto: AdministrationActionDto,
-  ): Promise<ArticleDto> {
-    return this.transition(user, id, 'restore', dto.reason_code);
+    dto: ArticleAdministrationActionDto,
+  ): Promise<ArticleManagementDto> {
+    return this.transition(
+      user,
+      id,
+      'restore',
+      dto.expected_version,
+      dto.reason_code,
+    );
   }
 
   private async transition(
     user: UserEntity,
     id: string,
     action: AdministrationArticleAction,
+    expectedVersion: number,
     reasonCode?: string,
-  ): Promise<ArticleDto> {
+  ): Promise<ArticleManagementDto> {
     const article = await this.articles.transaction(async (manager) => {
       const current = await this.articles.findByIdForUpdateOrFail(id, manager);
+      assertArticleVersion(current, expectedVersion);
       const updated = await this.applyAction(action, current, user.id, manager);
       await this.audit.record(
         {
@@ -119,7 +145,7 @@ export class ArticleAdministrationApiService {
       return updated;
     });
 
-    return new ArticleDto(article);
+    return new ArticleManagementDto(article);
   }
 
   private applyAction(

@@ -1,4 +1,5 @@
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
+import { ConflictException } from '@nestjs/common';
 import { ADMINISTRATION_REASON_CODES } from '@/config/administration.config';
 
 import { AdministrationArticleQueryDto } from '../models/article-query.model';
@@ -7,6 +8,7 @@ import { ArticleAdministrationApiService } from './articles.service';
 function article(status = 'submitted'): ArticleEntity {
   return {
     id: 'article-1',
+    version: 1,
     createdAt: new Date('2026-10-01T12:00:00.000Z'),
     updatedAt: new Date('2026-10-02T12:00:00.000Z'),
     content: { title: 'Title', summary: 'Summary', body: 'Body' },
@@ -50,6 +52,7 @@ describe('ArticleAdministrationApiService', () => {
   );
   const administrator = { id: 'administrator-1' };
   const actionDto = {
+    expected_version: 1,
     reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
   };
 
@@ -136,12 +139,28 @@ describe('ArticleAdministrationApiService', () => {
     },
   );
 
+  it.each(['publish', 'returnToDraft', 'archive', 'restore'] as const)(
+    'rejects stale %s without mutation or audit',
+    async (action) => {
+      const current = article();
+      Object.assign(current, { version: 2 });
+      articles.findByIdForUpdateOrFail.mockResolvedValue(current);
+      await expect(
+        service[action](administrator as never, 'article-1', actionDto),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(articles[action]).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    },
+  );
+
   it('publishes with the authenticated administrator and server time', async () => {
     const current = article();
     articles.findByIdForUpdateOrFail.mockResolvedValue(current);
     articles.publish.mockResolvedValue(article('published'));
 
-    await service.publish(administrator as never, 'article-1');
+    await service.publish(administrator as never, 'article-1', {
+      expected_version: 1,
+    });
 
     expect(articles.publish).toHaveBeenCalledWith(
       current,
@@ -167,7 +186,9 @@ describe('ArticleAdministrationApiService', () => {
     audit.record.mockRejectedValue(new Error('audit unavailable'));
 
     await expect(
-      service.publish(administrator as never, 'article-1'),
+      service.publish(administrator as never, 'article-1', {
+        expected_version: 1,
+      }),
     ).rejects.toThrow('audit unavailable');
   });
 });

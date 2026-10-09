@@ -6,6 +6,7 @@ import { articleAuditSnapshot } from './article-audit.snapshot';
 const article = (): ArticleEntity =>
   ({
     id: 'article-1',
+    version: 1,
     createdAt: new Date('2026-10-01T12:00:00.000Z'),
     updatedAt: new Date('2026-10-02T12:00:00.000Z'),
     content: {
@@ -31,6 +32,7 @@ describe(articleAuditSnapshot.name, () => {
 
     expect(snapshot).toEqual({
       id: 'article-1',
+      version: 1,
       content: {
         title: 'Title',
         summary: 'Summary',

@@ -3,24 +3,28 @@ import multer, { diskStorage } from 'multer';
 import { extname, isAbsolute, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { env } from './environment.config';
+import { trackUpload } from '@/common/helpers/upload-tracking.helper';
 
-const rootPath = isAbsolute(env.UPLOAD_TMP_DIR)
+export const uploadTempRoot = isAbsolute(env.UPLOAD_TMP_DIR)
   ? env.UPLOAD_TMP_DIR
   : join(process.cwd(), env.UPLOAD_TMP_DIR);
 
 const storage: multer.StorageEngine = diskStorage({
-  destination: rootPath,
+  destination: uploadTempRoot,
   filename: (
-    _req: Request,
+    req: Request,
     file: Express.Multer.File,
     callback: (error: Error | null, filename: string) => void,
   ) => {
-    callback(null, generateFilename(file));
+    const filename = generateFilename(file);
+    trackUpload(req, join(uploadTempRoot, filename));
+    callback(null, filename);
   },
 });
 
 function generateFilename(file: Express.Multer.File) {
-  return `${uuidv4()}${extname(file.originalname)}`;
+  const extension = extname(file.originalname).toLowerCase();
+  return `quickapi-upload-${uuidv4()}${/^\.[a-z0-9]{1,10}$/.test(extension) ? extension : ''}`;
 }
 
 export { storage };

@@ -2,6 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
+import {
+  runInTransaction,
+  type TransactionWork,
+} from '@/common/helpers/transaction.helper';
 
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
@@ -16,10 +20,8 @@ type UpdateUserOptions = {
 export class UserService {
   public constructor(private readonly userRepo: UserRepository) {}
 
-  public transaction<T>(
-    work: (manager: EntityManager) => Promise<T>,
-  ): Promise<T> {
-    return this.userRepo.manager.transaction(work);
+  public transaction<T>(work: TransactionWork<T>): Promise<T> {
+    return runInTransaction(this.userRepo.manager, work);
   }
 
   public paginate(

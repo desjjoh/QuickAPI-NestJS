@@ -8,7 +8,7 @@ An opinionated NestJS application foundation developed for my own projects and p
 
 - **NestJS 11 + TypeScript-first architecture** with decorators, modules, dependency injection, and path aliases
 - **Layered module structure** split into System, Domain, and API boundaries
-- **Versioned REST API** under `/api/v1` with dedicated security, authentication, account, administration, and library modules
+- **Versioned REST API** under `/api/v1` with public, creator, and administration audience areas alongside security, authentication, account, and library modules
 - **TypeORM (MySQL)** as the primary database layer with auto-loaded entities
 - **Zod-backed environment validation** with strict SemVer enforcement for `APP_VERSION`
 - **Class Validator / Class Transformer** request DTO validation through a global validation pipe
@@ -61,7 +61,9 @@ src/
 │   │       ├── account/        # Authenticated account/profile management endpoints
 │   │       ├── administration/ # Platform/admin endpoints
 │   │       ├── authentication/ # Register, sign-in, sign-out, and refresh endpoints
+│   │       ├── creator/        # Creator-facing controllers, services, and request models
 │   │       ├── library/        # Reference-data endpoints
+│   │       ├── public/         # Public-facing controllers, services, and request models
 │   │       └── security/       # CSRF/security endpoints
 │   ├── domain/                 # Business/domain modules
 │   │   ├── identity/           # Users, credentials, profiles, addresses, auth models, repository, service
@@ -82,6 +84,30 @@ test/
 ```
 
 ---
+
+## Article API audiences
+
+Article API controllers, services, and audience-specific request models are grouped under `src/modules/api/v1/public/articles`, `creator/articles`, and `administration`. Each audience module is routed independently. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
+
+- Public reads: `/api/v1/public/articles` and `/api/v1/public/articles/:id`.
+- Creator reads and creation: `/api/v1/creator/articles`; detail and updates: `/api/v1/creator/articles/:id`; hero replacement, submission, and withdrawal: `/:id/hero`, `/:id/submit`, and `/:id/withdraw` beneath that creator collection.
+- Administration: `/api/v1/administration/articles`, including `/:id/publish` and the other review/lifecycle actions.
+
+This is a breaking route change: the former `/api/v1/articles` public routes and `/api/v1/articles/creator` creator routes are no longer mounted. Clients must update their URLs when adopting this release; no temporary aliases are provided. Swagger groups article operations as Public Articles, Creator Articles, and Article Administration.
+
+Creator and administration article list/detail and mutation responses include a numeric `version`. Send that value as `expected_version` for content updates, hero replacements (a multipart field), submission/withdrawal, and administration lifecycle actions. A successful mutation increments the article version, including hero-only and unchanged-content edits. Missing or invalid versions fail request validation; stale versions return `409 Conflict` without mutation or an audit event. On conflict, reload and reconcile the article before retrying rather than blindly retrying the stale edit. Public article responses do not expose the version. Apply the article-version migration before deploying this contract; existing articles start at version 1.
+
+---
+
+### Request idempotency
+
+Article creation, creator hero replacement, and administration publish/archive/restore accept an optional `Idempotency-Key`. Generate a fresh key for each intended action, then keep the same key and payload (including `expected_version` and identical image bytes/client filename) for network retries. Keys must contain 1–128 printable, non-whitespace ASCII characters and no commas. Requests without a key retain their existing behavior.
+
+Keys are scoped to the authenticated actor, operation, and HTTP method/resource path. For 24 hours, identical retries return the original JSON body and HTTP status, even if the article has since changed. A different payload using the same key returns `409 Conflict`; an overlapping request also returns `409` and can be retried with backoff after the first finishes. Authentication, permissions, CSRF protection, and rate limits still apply to retries. Validation and transaction failures roll back the claim so the action can be retried safely.
+
+The reusable `Idempotent` decorator/interceptor and system idempotency service own this concern; article controllers only opt in. When adding another operation, import `IdempotencyModule`, apply the decorator above any multipart interceptor, and use `runInTransaction` for all database mutations so they share the request transaction and lifecycle. Nontransactional external effects still need lifecycle compensation or an outbox; this is not a general guarantee of exactly-once delivery to external systems.
+
+Apply `1791720000000-request-idempotency` before deployment. The MySQL implementation uses non-waiting connection-scoped advisory locks across API replicas and commits the action, audit events, and replay record together. Original response snapshots are stored in `request_idempotency` for 24 hours and expired records are swept hourly; account for this content in database access and backup-retention policies. After expiry a reused key is a new action. Existing browser deployments must add `Idempotency-Key` to `CORS_ALLOWED_HEADERS`.
 
 ## API Structure
 
@@ -228,7 +254,7 @@ LOG_LEVEL="silent"
 
 CORS_ORIGINS="http://localhost:5173"
 CORS_METHODS="GET,POST,PUT,PATCH,DELETE"
-CORS_ALLOWED_HEADERS="Content-Type,Authorization,X-CSRF-Token"
+CORS_ALLOWED_HEADERS="Content-Type,Authorization,X-CSRF-Token,Idempotency-Key"
 CORS_EXPOSED_HEADERS="Authorization,Set-Cookie"
 CORS_CREDENTIALS="true"
 CORS_MAX_AGE_SECONDS="86400"

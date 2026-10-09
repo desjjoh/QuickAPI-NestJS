@@ -41,12 +41,20 @@ export class ArticleImageDto {
   })
   public readonly altText: string | null;
 
+  @ApiProperty({
+    description:
+      'Explicit decorative choice. When true, render alt="". Null altText alone does not indicate a decorative image.',
+    default: false,
+  })
+  public readonly decorative: boolean;
+
   public constructor(image: ImageEntity) {
     this.id = image.id;
     this.url = new ImageDto(image).url;
     this.width = image.width;
     this.height = image.height;
     this.altText = image.alt_text ?? null;
+    this.decorative = image.decorative ?? false;
   }
 }
 

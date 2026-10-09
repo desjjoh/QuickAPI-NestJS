@@ -18,6 +18,7 @@ import {
   userFixture,
 } from '@/../test/helpers/identity.fixtures';
 import { MeApiService } from './me.service';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import {
   AUDIT_EVENT_MATRIX,
@@ -33,8 +34,9 @@ describe('MeApiService', () => {
   } as unknown as Response;
   const setup = () => {
     const manager = { getRepository: jest.fn() };
+    const transactionLifecycle = new TransactionLifecycle();
     const userSvc = {
-      transaction: jest.fn((work) => work(manager)),
+      transaction: jest.fn((work) => work(manager, transactionLifecycle)),
       updateUser: jest.fn().mockResolvedValue(user),
     };
     const credentials = {
@@ -89,17 +91,23 @@ describe('MeApiService', () => {
       mfaSvc,
       auditSvc,
       manager,
+      transactionLifecycle,
     };
   };
 
   it('validates the password and deletes the account with cookie response', async () => {
-    const { service, credentials, lifecycle, auditSvc } = setup();
+    const { service, credentials, lifecycle, auditSvc, transactionLifecycle } =
+      setup();
     await service.deleteMe(user, { password: 'old' }, res);
     expect(credentials.validateUser).toHaveBeenCalledWith(
       user.identity.email,
       'old',
     );
-    expect(lifecycle.deleteUser).toHaveBeenCalledWith(user, expect.any(Object));
+    expect(lifecycle.deleteUser).toHaveBeenCalledWith(
+      user,
+      expect.any(Object),
+      transactionLifecycle,
+    );
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
         event: 'identity.account.deleted',

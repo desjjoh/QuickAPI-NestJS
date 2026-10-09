@@ -243,7 +243,7 @@ describe('authenticated account profile lifecycle', () => {
         filename: 'huge.png',
         contentType: 'image/png',
       })
-      .expect(400);
+      .expect(413);
     expect(storage.objects.size).toBe(0);
   });
 

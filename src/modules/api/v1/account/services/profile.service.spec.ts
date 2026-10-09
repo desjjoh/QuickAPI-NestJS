@@ -11,6 +11,7 @@ import {
   userFixture,
 } from '@/../test/helpers/identity.fixtures';
 import { ProfileApiService } from './profile.service';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('ProfileApiService audit mutations', () => {
   const session = sessionFixture();
@@ -19,8 +20,9 @@ describe('ProfileApiService audit mutations', () => {
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(current),
     };
+    const lifecycle = new TransactionLifecycle();
     const userSvc = {
-      transaction: jest.fn((work) => work(manager)),
+      transaction: jest.fn((work) => work(manager, lifecycle)),
       updateUser: jest.fn().mockResolvedValue(after),
     };
     const userProfileSvc = {
@@ -43,6 +45,7 @@ describe('ProfileApiService audit mutations', () => {
         audit as unknown as AuditService,
       ),
       manager,
+      lifecycle,
       userSvc,
       userProfileSvc,
       imgSvc,
@@ -266,14 +269,36 @@ describe('ProfileApiService audit mutations', () => {
           media: { ...current.profile.media, avatar: image },
         },
       });
-      const { service, imgSvc, audit, manager } = setup(current, after);
+      const { service, imgSvc, audit, manager, lifecycle } = setup(
+        current,
+        after,
+      );
       imgSvc.create.mockResolvedValue(image);
       imgSvc.update.mockResolvedValue(image);
       const file = { originalname: 'new.png' } as Express.Multer.File;
 
       await service.uploadAvatar(current, session, file);
 
-      expect(hasAvatar ? imgSvc.update : imgSvc.create).toHaveBeenCalled();
+      const metadata = expect.objectContaining({
+        file,
+        folder: 'users/avatars',
+      });
+      if (hasAvatar)
+        expect(imgSvc.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            file,
+            folder: 'users/avatars',
+            image: current.profile.media.avatar,
+          }),
+          manager,
+          lifecycle,
+        );
+      else
+        expect(imgSvc.create).toHaveBeenCalledWith(
+          metadata,
+          manager,
+          lifecycle,
+        );
       expect(audit.record).toHaveBeenCalledWith(
         expect.objectContaining({
           event: hasAvatar
@@ -288,6 +313,29 @@ describe('ProfileApiService audit mutations', () => {
       );
     },
   );
+
+  it('defers avatar storage removal through the transaction lifecycle', async () => {
+    const avatar = {
+      id: 'avatar-old',
+      storage_key: 'avatars/old.png',
+      filename: 'old.png',
+      mime_type: 'image/png',
+      size_bytes: 100,
+      width: 10,
+      height: 10,
+    };
+    const current = userFixture({
+      profile: {
+        ...userFixture().profile,
+        media: { avatar },
+      },
+    });
+    const { service, imgSvc, manager, lifecycle } = setup(current, current);
+
+    await service.removeAvatar(current, session);
+
+    expect(imgSvc.remove).toHaveBeenCalledWith(avatar, manager, lifecycle);
+  });
 
   it('creates an address without an optional second line', async () => {
     const current = userFixture();

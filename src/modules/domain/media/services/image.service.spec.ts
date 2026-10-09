@@ -5,6 +5,8 @@ import { ImageRepository } from '../repositories/image.repository';
 import { StorageService } from '@/modules/system/storage/types/storage.types';
 import { ImageEntity } from '../entities/image.entity';
 import { ImageService } from './image.service';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
+import { InvalidOperationError } from '@/common/errors/operation.error';
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -126,6 +128,56 @@ describe('ImageService', () => {
       key: 'images/generated.png',
     });
   });
+
+  it('removes malformed uploads even for direct domain calls', async () => {
+    const file = await fixture();
+    await writeFile(file.path, 'not an image');
+    await expect(service().create({ file, folder: 'images' })).rejects.toThrow(
+      'Only PNG',
+    );
+    expect(storage.putObject).not.toHaveBeenCalled();
+    await expect(access(file.path)).rejects.toBeDefined();
+  });
+
+  it('uses detected type and actual bytes instead of supplied filename extension and size', async () => {
+    const file = await fixture();
+    file.filename = 'generated.exe';
+    file.size = 1;
+    storage.putObject.mockResolvedValue({});
+    await service().create({ file, folder: 'images' });
+    expect(storage.putObject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'images/generated.png',
+        contentType: 'image/png',
+      }),
+    );
+    expect(manager.save).toHaveBeenCalledWith(
+      ImageEntity,
+      expect.objectContaining({
+        filename: 'generated.png',
+        mime_type: 'image/png',
+        size_bytes: png.length,
+      }),
+    );
+  });
+  it('removes a newly created object when the surrounding transaction rolls back', async () => {
+    const file = await fixture();
+    const lifecycle = new TransactionLifecycle();
+    storage.putObject.mockResolvedValue({});
+    storage.deleteObject.mockResolvedValue(undefined);
+
+    await service().create(
+      { file, folder: 'images' },
+      manager as never,
+      lifecycle,
+    );
+
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    await lifecycle.rollback();
+    expect(storage.deleteObject).toHaveBeenCalledWith({
+      key: 'images/generated.png',
+    });
+  });
   it('keeps the old object on update failure and removes the replacement', async () => {
     const file = await fixture();
     const image = { storage_key: 'old/key.png' } as ImageEntity;
@@ -183,6 +235,138 @@ describe('ImageService', () => {
     });
   });
 
+  it('persists decorative metadata and clears descriptive text on a detached replacement', async () => {
+    const image = {
+      id: 'hero-1',
+      storage_key: 'old.png',
+      alt_text: 'Old description',
+      decorative: false,
+    } as ImageEntity;
+    const file = await fixture();
+    const updated = await service().update({
+      image,
+      file,
+      folder: 'heroes',
+      alt_text: null,
+      decorative: true,
+    });
+    expect(updated).toEqual(
+      expect.objectContaining({ alt_text: null, decorative: true }),
+    );
+    expect(image.alt_text).toBe('Old description');
+    expect(image.decorative).toBe(false);
+  });
+
+  it('stores explicit decorative metadata on creation', async () => {
+    const file = await fixture();
+    await service().create({
+      file,
+      folder: 'heroes',
+      alt_text: null,
+      decorative: true,
+    });
+    expect(manager.create).toHaveBeenCalledWith(
+      ImageEntity,
+      expect.objectContaining({ alt_text: null, decorative: true }),
+    );
+  });
+
+  it('deletes the previous object only after an image update commits', async () => {
+    const file = await fixture();
+    const lifecycle = new TransactionLifecycle();
+    const image = {
+      id: 'image-id',
+      storage_key: 'old/key.png',
+    } as ImageEntity;
+    storage.putObject.mockResolvedValue({});
+    storage.deleteObject.mockResolvedValue(undefined);
+
+    await service().update(
+      { image, file, folder: 'new' },
+      manager as never,
+      lifecycle,
+    );
+
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    await lifecycle.commit();
+    expect(storage.deleteObject).toHaveBeenCalledWith({ key: 'old/key.png' });
+  });
+
+  it('retries a failed post-commit object deletion', async () => {
+    const file = await fixture();
+    const lifecycle = new TransactionLifecycle();
+    const image = {
+      id: 'image-id',
+      storage_key: 'old/key.png',
+    } as ImageEntity;
+    storage.putObject.mockResolvedValue({});
+    storage.deleteObject
+      .mockRejectedValueOnce(new Error('temporary storage failure'))
+      .mockResolvedValue(undefined);
+
+    await service().update(
+      { image, file, folder: 'new' },
+      manager as never,
+      lifecycle,
+    );
+    await expect(lifecycle.commit()).resolves.toBeUndefined();
+
+    expect(storage.deleteObject).toHaveBeenCalledTimes(2);
+    expect(storage.deleteObject).toHaveBeenNthCalledWith(1, {
+      key: 'old/key.png',
+    });
+    expect(storage.deleteObject).toHaveBeenNthCalledWith(2, {
+      key: 'old/key.png',
+    });
+  });
+
+  it('surfaces a post-commit deletion after exhausting retries', async () => {
+    const file = await fixture();
+    const lifecycle = new TransactionLifecycle();
+    const failure = new Error('storage unavailable');
+    const image = {
+      id: 'image-id',
+      storage_key: 'old/key.png',
+    } as ImageEntity;
+    storage.putObject.mockResolvedValue({});
+    storage.deleteObject.mockRejectedValue(failure);
+
+    await service().update(
+      { image, file, folder: 'new' },
+      manager as never,
+      lifecycle,
+    );
+
+    await expect(lifecycle.commit()).rejects.toBe(failure);
+    expect(storage.deleteObject).toHaveBeenCalledTimes(3);
+  });
+
+  it('preserves the previous object and removes its replacement on rollback', async () => {
+    const file = await fixture();
+    const lifecycle = new TransactionLifecycle();
+    const image = {
+      id: 'image-id',
+      storage_key: 'old/key.png',
+    } as ImageEntity;
+    storage.putObject.mockResolvedValue({});
+    storage.deleteObject.mockResolvedValue(undefined);
+
+    await service().update(
+      { image, file, folder: 'new' },
+      manager as never,
+      lifecycle,
+    );
+    await lifecycle.rollback();
+
+    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
+    expect(storage.deleteObject).toHaveBeenCalledWith({
+      key: 'new/generated.png',
+    });
+    expect(storage.deleteObject).not.toHaveBeenCalledWith({
+      key: 'old/key.png',
+    });
+  });
+
   it('removes storage and database records through the supplied manager', async () => {
     const image = {
       id: 'image-id',
@@ -198,5 +382,40 @@ describe('ImageService', () => {
     expect(manager.delete).toHaveBeenCalledWith(ImageEntity, {
       id: image.id,
     });
+  });
+
+  it('defers storage removal until the database transaction commits', async () => {
+    const lifecycle = new TransactionLifecycle();
+    const image = {
+      id: 'image-id',
+      storage_key: 'images/image.png',
+    } as ImageEntity;
+    storage.deleteObject.mockResolvedValue(undefined);
+
+    await service().remove(image, manager as never, lifecycle);
+
+    expect(manager.delete).toHaveBeenCalledWith(ImageEntity, { id: image.id });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    await lifecycle.commit();
+    expect(storage.deleteObject).toHaveBeenCalledWith({
+      key: image.storage_key,
+    });
+  });
+
+  it('requires lifecycle coordination for mutations in an active transaction', async () => {
+    const transactionalManager = {
+      ...manager,
+      queryRunner: { isTransactionActive: true },
+    };
+    const image = {
+      id: 'image-id',
+      storage_key: 'images/image.png',
+    } as ImageEntity;
+
+    await expect(
+      service().remove(image, transactionalManager as never),
+    ).rejects.toBeInstanceOf(InvalidOperationError);
+    expect(manager.delete).not.toHaveBeenCalled();
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
 });

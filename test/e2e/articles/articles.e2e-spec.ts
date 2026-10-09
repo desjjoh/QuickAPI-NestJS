@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, readdir } from 'node:fs/promises';
 import request from 'supertest';
 import { jest } from '@jest/globals';
 
@@ -10,6 +10,7 @@ import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
 import { EmailService } from '@/modules/system/email/services/email.service';
@@ -31,8 +32,8 @@ import {
   TestSuite,
 } from '../../helpers/test-app';
 
-const PUBLIC_ROOT = '/api/v1/articles';
-const CREATOR_ROOT = `${PUBLIC_ROOT}/creator`;
+const PUBLIC_ROOT = '/api/v1/public/articles';
+const CREATOR_ROOT = '/api/v1/creator/articles';
 const ADMINISTRATION_ROOT = '/api/v1/administration/articles';
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -175,10 +176,18 @@ describe('article API lifecycle', () => {
     return { user, ...(await signIn(address)) };
   }
 
-  async function createDraft(auth: AuthenticatedAgent) {
+  async function currentVersion(id: string): Promise<number> {
+    return (
+      await suite.dataSource
+        .getRepository(ArticleEntity)
+        .findOneByOrFail({ id })
+    ).version;
+  }
+
+  async function createDraft(auth: AuthenticatedAgent, key?: string) {
     return auth.agent
       .post(CREATOR_ROOT)
-      .set(auth.headers)
+      .set({ ...auth.headers, ...(key ? { 'Idempotency-Key': key } : {}) })
       .field('title', 'Maintainable NestJS Articles')
       .field('summary', 'A complete article API lifecycle test.')
       .field('body', 'Confidential draft body that must not enter audit logs.')
@@ -201,6 +210,209 @@ describe('article API lifecycle', () => {
     await auth.agent.get(ADMINISTRATION_ROOT).set(auth.headers).expect(403);
   });
 
+  it('isolates creator routing from public article ID matching and retires the old paths', async () => {
+    const author = await creator();
+    const response = await author.agent
+      .get(CREATOR_ROOT)
+      .set(author.headers)
+      .expect(200);
+    expect(response.body.data).toEqual([]);
+    await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
+    await request(app.getHttpServer())
+      .get('/api/v1/articles/creator')
+      .expect(404);
+    await request(app.getHttpServer()).get('/api/v1/articles').expect(404);
+  });
+
+  it('allows only one concurrent edit from the same version and rejects stale image and lifecycle requests', async () => {
+    const author = await creator();
+    const admin = await administrator();
+    const created = await createDraft(author);
+    const articleId = created.body.id as string;
+    const version = created.body.version as number;
+    expect(version).toBe(1);
+    const beforeEvents = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .count();
+    const edits = await Promise.all(
+      ['First edit', 'Second edit'].map((title) =>
+        author.agent
+          .patch(`${CREATOR_ROOT}/${articleId}`)
+          .set(author.headers)
+          .send({ title, expected_version: version }),
+      ),
+    );
+    expect(edits.map((response) => response.status).sort()).toEqual([200, 409]);
+    const winner = edits.find((response) => response.status === 200)!;
+    expect(winner.body.version).toBe(version + 1);
+    const persisted = await suite.dataSource
+      .getRepository(ArticleEntity)
+      .findOneByOrFail({ id: articleId });
+    expect(persisted.version).toBe(version + 1);
+    expect(persisted.content.title).toBe(winner.body.title);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      beforeEvents + 1,
+    );
+    const keys = [...storage.objects.keys()];
+
+    await author.agent
+      .put(`${CREATOR_ROOT}/${articleId}/hero`)
+      .set(author.headers)
+      .field('expected_version', String(version))
+      .field('hero_alt_text', 'Stale replacement')
+      .attach('hero', PNG, 'stale.png')
+      .expect(409);
+    await author.agent
+      .post(`${CREATOR_ROOT}/${articleId}/submit`)
+      .set(author.headers)
+      .send({ expected_version: version })
+      .expect(409);
+    expect([...storage.objects.keys()]).toEqual(keys);
+    expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      beforeEvents + 1,
+    );
+    await author.agent
+      .patch(`${CREATOR_ROOT}/${articleId}`)
+      .set(author.headers)
+      .send({ title: 'Missing version' })
+      .expect(422);
+
+    const submitted = await author.agent
+      .post(`${CREATOR_ROOT}/${articleId}/submit`)
+      .set(author.headers)
+      .send({ expected_version: winner.body.version })
+      .expect(200);
+    expect(submitted.body.version).toBe(version + 2);
+    await admin.agent
+      .post(`${ADMINISTRATION_ROOT}/${articleId}/publish`)
+      .set(admin.headers)
+      .send({ expected_version: winner.body.version })
+      .expect(409);
+    const published = await admin.agent
+      .post(`${ADMINISTRATION_ROOT}/${articleId}/publish`)
+      .set(admin.headers)
+      .send({ expected_version: submitted.body.version })
+      .expect(200);
+    expect(published.body.version).toBe(version + 3);
+    const publicArticle = await request(app.getHttpServer())
+      .get(`${PUBLIC_ROOT}/${articleId}`)
+      .expect(200);
+    expect(publicArticle.body).not.toHaveProperty('version');
+  });
+
+  it('replays creation, hero replacement, and administration actions without repeating storage or audit mutations', async () => {
+    const author = await creator();
+    const admin = await administrator();
+    const first = await createDraft(author, 'create-request');
+    const articleId = first.body.id as string;
+    const eventCount = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .count();
+    expect((await createDraft(author, 'create-request')).body).toEqual(
+      first.body,
+    );
+    expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(1);
+    expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
+    expect(storage.objects.size).toBe(1);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      eventCount,
+    );
+
+    const replace = () =>
+      author.agent
+        .put(`${CREATOR_ROOT}/${articleId}/hero`)
+        .set(author.headers)
+        .set('Idempotency-Key', 'replace-request')
+        .field('expected_version', String(first.body.version))
+        .field('hero_alt_text', 'Replacement image')
+        .attach('hero', PNG, 'replacement.png');
+    const replaced = await replace().expect(200);
+    const replacementKeys = [...storage.objects.keys()];
+    expect((await replace().expect(200)).body).toEqual(replaced.body);
+    expect([...storage.objects.keys()]).toEqual(replacementKeys);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      eventCount + 1,
+    );
+
+    const submitted = await author.agent
+      .post(`${CREATOR_ROOT}/${articleId}/submit`)
+      .set(author.headers)
+      .send({ expected_version: replaced.body.version })
+      .expect(200);
+    let version = submitted.body.version as number;
+    for (const action of ['publish', 'archive', 'restore']) {
+      const payload = {
+        expected_version: version,
+        ...(action !== 'publish' ? { reason_code: 'data_correction' } : {}),
+      };
+      const act = () =>
+        admin.agent
+          .post(`${ADMINISTRATION_ROOT}/${articleId}/${action}`)
+          .set(admin.headers)
+          .set('Idempotency-Key', `${action}-request`)
+          .send(payload);
+      const result = await act().expect(200);
+      expect((await act().expect(200)).body).toEqual(result.body);
+      version = result.body.version as number;
+    }
+    expect(await currentVersion(articleId)).toBe(version);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      eventCount + 5,
+    );
+    // Creation replay is still the original response, not today's revised resource.
+    expect((await createDraft(author, 'create-request')).body).toEqual(
+      first.body,
+    );
+    await author.agent
+      .post(CREATOR_ROOT)
+      .set(author.headers)
+      .set('Idempotency-Key', 'create-request')
+      .field('title', 'Different title')
+      .field('summary', 'Summary')
+      .field('body', 'Body')
+      .field('hero_alt_text', 'A small test image.')
+      .attach('hero', PNG, 'hero.png')
+      .expect(409);
+    expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+  });
+
+  it('serializes concurrent creation keys across database connections', async () => {
+    const author = await creator();
+    const audits = suite.dataSource.getRepository(AuditEventEntity);
+    // Registration and sign-in already produced legitimate audit events.
+    const eventsBeforeCreation = await audits.count();
+    const create = () =>
+      author.agent
+        .post(CREATOR_ROOT)
+        .set(author.headers)
+        .set('Idempotency-Key', 'concurrent-create')
+        .field('title', 'Concurrent creation')
+        .field('summary', 'Summary')
+        .field('body', 'Body')
+        .field('hero_alt_text', 'A test image')
+        .attach('hero', PNG, 'hero.png');
+    const responses = await Promise.all([create(), create()]);
+    expect(responses.some((response) => response.status === 201)).toBe(true);
+    expect(
+      responses.every((response) => [201, 409].includes(response.status)),
+    ).toBe(true);
+    const original = responses.find((response) => response.status === 201)!;
+    expect((await create().expect(201)).body).toEqual(original.body);
+    expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(1);
+    expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
+    expect(storage.objects.size).toBe(1);
+    expect(await audits.count()).toBe(eventsBeforeCreation + 1);
+    expect(
+      await audits.count({
+        where: {
+          event: ArticleAuditEvents.CREATED,
+          resource_id: original.body.id as string,
+        },
+      }),
+    ).toBe(1);
+  });
+
   it('validates the multipart article creation contract', async () => {
     const auth = await creator();
 
@@ -210,6 +422,7 @@ describe('article API lifecycle', () => {
       .field('title', 'Missing hero')
       .field('summary', 'Summary')
       .field('body', 'Body')
+      .field('hero_alt_text', 'Missing image description')
       .expect(400);
 
     await auth.agent
@@ -218,6 +431,7 @@ describe('article API lifecycle', () => {
       .field('title', 'Unsupported hero')
       .field('summary', 'Summary')
       .field('body', 'Body')
+      .field('hero_alt_text', 'Unsupported image description')
       .attach('hero', Buffer.from('not an image'), {
         filename: 'hero.txt',
         contentType: 'text/plain',
@@ -226,6 +440,114 @@ describe('article API lifecycle', () => {
 
     expect(storage.objects.size).toBe(0);
     expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(0);
+    expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+  });
+
+  it('persists and publishes explicit decorative heroes and clears stale replacement text', async () => {
+    const author = await creator();
+    const admin = await administrator();
+    const created = await author.agent
+      .post(CREATOR_ROOT)
+      .set(author.headers)
+      .field('title', 'Decorative hero')
+      .field('summary', 'Summary')
+      .field('body', 'Body')
+      .field('hero_decorative', 'true')
+      .attach('hero', PNG, 'hero.png')
+      .expect(201);
+    expect(created.body.hero).toMatchObject({
+      altText: null,
+      decorative: true,
+    });
+    const articleId = created.body.id as string;
+
+    await author.agent
+      .put(`${CREATOR_ROOT}/${articleId}/hero`)
+      .set(author.headers)
+      .field('expected_version', String(await currentVersion(articleId)))
+      .field('hero_alt_text', 'A new informative image')
+      .attach('hero', PNG, 'hero.png')
+      .expect(200);
+    const replaced = await author.agent
+      .put(`${CREATOR_ROOT}/${articleId}/hero`)
+      .set(author.headers)
+      .field('expected_version', String(await currentVersion(articleId)))
+      .field('hero_decorative', 'true')
+      .attach('hero', PNG, 'hero.png')
+      .expect(200);
+    expect(replaced.body.hero).toMatchObject({
+      altText: null,
+      decorative: true,
+    });
+    await author.agent
+      .post(`${CREATOR_ROOT}/${articleId}/submit`)
+      .set(author.headers)
+      .send({ expected_version: await currentVersion(articleId) })
+      .expect(200);
+    await admin.agent
+      .post(`${ADMINISTRATION_ROOT}/${articleId}/publish`)
+      .set(admin.headers)
+      .send({ expected_version: await currentVersion(articleId) })
+      .expect(200);
+    const published = await request(app.getHttpServer())
+      .get(`${PUBLIC_ROOT}/${articleId}`)
+      .expect(200);
+    expect(published.body.hero).toMatchObject({
+      altText: null,
+      decorative: true,
+    });
+  });
+
+  it('rejects unspecified and contradictory multipart hero accessibility without persisting uploads', async () => {
+    const author = await creator();
+    for (const choice of ['missing', 'contradictory']) {
+      const pending = author.agent
+        .post(CREATOR_ROOT)
+        .set(author.headers)
+        .field('title', 'Accessibility required')
+        .field('summary', 'Summary')
+        .field('body', 'Body');
+      if (choice === 'contradictory')
+        pending
+          .field('hero_decorative', 'true')
+          .field('hero_alt_text', 'Contradictory description');
+      await pending.attach('hero', PNG, 'hero.png').expect(422);
+    }
+    expect(storage.objects.size).toBe(0);
+    expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(0);
+    expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+  });
+
+  it('blocks publication of legacy heroes without text or an explicit decorative choice', async () => {
+    const author = await creator();
+    const admin = await administrator();
+    const created = await createDraft(author);
+    const articleId = created.body.id as string;
+    await suite.dataSource
+      .getRepository(ImageEntity)
+      .update(created.body.hero.id as string, {
+        alt_text: null,
+        decorative: false,
+      });
+    await author.agent
+      .post(`${CREATOR_ROOT}/${articleId}/submit`)
+      .set(author.headers)
+      .send({ expected_version: await currentVersion(articleId) })
+      .expect(200);
+    const eventsBefore = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .count();
+    await admin.agent
+      .post(`${ADMINISTRATION_ROOT}/${articleId}/publish`)
+      .set(admin.headers)
+      .send({ expected_version: await currentVersion(articleId) })
+      .expect(400);
+    expect(await suite.dataSource.getRepository(AuditEventEntity).count()).toBe(
+      eventsBefore,
+    );
+    await request(app.getHttpServer())
+      .get(`${PUBLIC_ROOT}/${articleId}`)
+      .expect(404);
   });
 
   it('covers creator, administration, public, storage, ownership, and audit behavior', async () => {
@@ -276,7 +598,10 @@ describe('article API lifecycle', () => {
     const contentUpdate = await author.agent
       .patch(`${CREATOR_ROOT}/${articleId}`)
       .set(author.headers)
-      .send({ title: 'Updated Maintainable NestJS Articles' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        title: 'Updated Maintainable NestJS Articles',
+      })
       .expect(200);
     expect(contentUpdate.body.title).toBe(
       'Updated Maintainable NestJS Articles',
@@ -285,6 +610,7 @@ describe('article API lifecycle', () => {
     const replaced = await author.agent
       .put(`${CREATOR_ROOT}/${articleId}/hero`)
       .set(author.headers)
+      .field('expected_version', String(await currentVersion(articleId)))
       .field('hero_alt_text', 'Replacement test image.')
       .attach('hero', PNG, {
         filename: 'replacement.png',
@@ -302,6 +628,8 @@ describe('article API lifecycle', () => {
     await otherCreator.agent
       .put(`${CREATOR_ROOT}/${articleId}/hero`)
       .set(otherCreator.headers)
+      .field('expected_version', String(await currentVersion(articleId)))
+      .field('hero_alt_text', 'Unauthorized replacement')
       .attach('hero', PNG, {
         filename: 'unauthorized.png',
         contentType: 'image/png',
@@ -311,7 +639,7 @@ describe('article API lifecycle', () => {
     const submitted = await author.agent
       .post(`${CREATOR_ROOT}/${articleId}/submit`)
       .set(author.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(200);
     expect(submitted.body.status.key).toBe('submitted');
 
@@ -332,36 +660,39 @@ describe('article API lifecycle', () => {
     const withdrawn = await author.agent
       .post(`${CREATOR_ROOT}/${articleId}/withdraw`)
       .set(author.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(200);
     expect(withdrawn.body.status.key).toBe('draft');
 
     await author.agent
       .post(`${CREATOR_ROOT}/${articleId}/submit`)
       .set(author.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(200);
     await admin.agent
       .post(`${ADMINISTRATION_ROOT}/${articleId}/return-to-draft`)
       .set(admin.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(422);
     const returned = await admin.agent
       .post(`${ADMINISTRATION_ROOT}/${articleId}/return-to-draft`)
       .set(admin.headers)
-      .send({ reason_code: 'data_correction' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        reason_code: 'data_correction',
+      })
       .expect(200);
     expect(returned.body.status.key).toBe('draft');
 
     await author.agent
       .post(`${CREATOR_ROOT}/${articleId}/submit`)
       .set(author.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(200);
     const published = await admin.agent
       .post(`${ADMINISTRATION_ROOT}/${articleId}/publish`)
       .set(admin.headers)
-      .send({})
+      .send({ expected_version: await currentVersion(articleId) })
       .expect(200);
     expect(published.body).toMatchObject({
       status: { key: 'published' },
@@ -371,7 +702,10 @@ describe('article API lifecycle', () => {
     await author.agent
       .patch(`${CREATOR_ROOT}/${articleId}`)
       .set(author.headers)
-      .send({ title: 'Published articles are immutable' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        title: 'Published articles are immutable',
+      })
       .expect(400);
 
     const publicList = await request(app.getHttpServer())
@@ -387,7 +721,10 @@ describe('article API lifecycle', () => {
     const archived = await admin.agent
       .post(`${ADMINISTRATION_ROOT}/${articleId}/archive`)
       .set(admin.headers)
-      .send({ reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        reason_code: 'policy_enforcement',
+      })
       .expect(200);
     expect(archived.body.status.key).toBe('archived');
     await request(app.getHttpServer())
@@ -397,7 +734,10 @@ describe('article API lifecycle', () => {
     const restored = await admin.agent
       .post(`${ADMINISTRATION_ROOT}/${articleId}/restore`)
       .set(admin.headers)
-      .send({ reason_code: 'data_correction' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        reason_code: 'data_correction',
+      })
       .expect(200);
     expect(restored.body).toMatchObject({
       status: { key: 'draft' },
@@ -455,7 +795,10 @@ describe('article API lifecycle', () => {
     await author.agent
       .patch(`${CREATOR_ROOT}/${articleId}`)
       .set(author.headers)
-      .send({ title: 'Must roll back' })
+      .send({
+        expected_version: await currentVersion(articleId),
+        title: 'Must roll back',
+      })
       .expect(500);
     insertion.mockRestore();
 
@@ -463,9 +806,88 @@ describe('article API lifecycle', () => {
       .getRepository(ArticleEntity)
       .findOneByOrFail({ id: articleId });
     expect(stored.content.title).toBe('Maintainable NestJS Articles');
+    expect(stored.version).toBe(created.body.version);
     expect(
       await suite.dataSource.getRepository(AuditEventEntity).existsBy({
         event: ArticleAuditEvents.UPDATED,
+        resource_id: articleId,
+      }),
+    ).toBe(false);
+  });
+
+  it('removes a new hero object when article creation rolls back', async () => {
+    const author = await creator();
+    const audit = app.get(AuditService);
+    const implementation = audit.record.bind(audit);
+    const insertion = jest
+      .spyOn(audit, 'record')
+      .mockImplementation((input, manager) => {
+        if (input.event === ArticleAuditEvents.CREATED)
+          return Promise.reject(new Error('simulated audit insert failure'));
+        return implementation(input, manager);
+      });
+
+    try {
+      await author.agent
+        .post(CREATOR_ROOT)
+        .set(author.headers)
+        .field('title', 'Creation must roll back')
+        .field('summary', 'Storage must roll back with the database.')
+        .field('body', 'Body')
+        .field('hero_alt_text', 'A small test image.')
+        .attach('hero', PNG, {
+          filename: 'rollback.png',
+          contentType: 'image/png',
+        })
+        .expect(500);
+    } finally {
+      insertion.mockRestore();
+    }
+
+    expect(storage.objects.size).toBe(0);
+    expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(0);
+    expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(0);
+  });
+
+  it('preserves the old hero and removes its replacement when replacement rolls back', async () => {
+    const author = await creator();
+    const created = await createDraft(author);
+    const articleId = created.body.id as string;
+    const oldStorageKey = [...storage.objects.keys()][0];
+    const audit = app.get(AuditService);
+    const implementation = audit.record.bind(audit);
+    const insertion = jest
+      .spyOn(audit, 'record')
+      .mockImplementation((input, manager) => {
+        if (input.event === ArticleAuditEvents.HERO_REPLACED)
+          return Promise.reject(new Error('simulated audit insert failure'));
+        return implementation(input, manager);
+      });
+
+    try {
+      await author.agent
+        .put(`${CREATOR_ROOT}/${articleId}/hero`)
+        .set(author.headers)
+        .field('expected_version', String(await currentVersion(articleId)))
+        .field('hero_alt_text', 'Replacement that must roll back.')
+        .attach('hero', PNG, {
+          filename: 'rollback-replacement.png',
+          contentType: 'image/png',
+        })
+        .expect(500);
+    } finally {
+      insertion.mockRestore();
+    }
+
+    const stored = await suite.dataSource
+      .getRepository(ArticleEntity)
+      .findOneByOrFail({ id: articleId });
+    expect(stored.media.hero.storage_key).toBe(oldStorageKey);
+    expect(stored.version).toBe(created.body.version);
+    expect([...storage.objects.keys()]).toEqual([oldStorageKey]);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).existsBy({
+        event: ArticleAuditEvents.HERO_REPLACED,
         resource_id: articleId,
       }),
     ).toBe(false);

@@ -64,6 +64,9 @@ class Publication {
 
 @Entity('articles')
 export class ArticleEntity extends BaseEntity {
+  @Column({ type: 'int', unsigned: true, default: 1 })
+  public readonly version!: number;
+
   public constructor() {
     super();
 

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { ArticleEntity } from '../entities/article.entity';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 import {
   ARTICLE_STATUS_KEYS,
   ArticleStatusKey,
@@ -15,8 +16,11 @@ import { ArticleStatusTransitionPolicy } from '../policies/article-status-transi
 function article(status: ArticleStatusKey = ARTICLE_STATUS_KEYS.DRAFT) {
   return {
     id: 'article-1',
+    version: 1,
     content: { title: 'Title', summary: 'Summary', body: 'Body' },
-    media: { hero: { id: 'hero-1' } },
+    media: {
+      hero: { id: 'hero-1', alt_text: 'Hero description', decorative: false },
+    },
     attribution: { author: { id: 'author-1' } },
     publication: {
       status: { id: `status-${status}`, key: status },
@@ -38,6 +42,7 @@ describe('ArticleService', () => {
     create: jest.fn(),
     merge: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     delete: jest.fn(),
   };
   const articleRepo = {
@@ -94,6 +99,18 @@ describe('ArticleService', () => {
       articleRepo.lastSaved?.id === id ? articleRepo.lastSaved : article(),
     );
     Object.assign(articleRepo, { lastSaved: undefined });
+    manager.update.mockImplementation(async (_entity, _criteria, value) => {
+      const base = articleRepo.lastSaved ?? article();
+      articleRepo.lastSaved = {
+        ...base,
+        version: base.version + 1,
+        content: { ...base.content, ...value.content },
+        media: { ...base.media, ...value.media },
+        attribution: { ...base.attribution, ...value.attribution },
+        publication: { ...base.publication, ...value.publication },
+      };
+      return { affected: 1 };
+    });
     manager.save.mockImplementation(async (_entity, value) => {
       const saved = { id: value.id ?? 'created-article', ...value };
       articleRepo.lastSaved = saved;
@@ -126,7 +143,11 @@ describe('ArticleService', () => {
     await service.findPublished();
     await service.findByAuthor('author-1');
 
-    expect(manager.transaction).toHaveBeenCalledWith(work);
+    expect(manager.transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(work).toHaveBeenCalledWith(
+      manager,
+      expect.any(TransactionLifecycle),
+    );
     expect(articleRepo.findAll).toHaveBeenCalledWith(manager);
     expect(articleRepo.findByStatusKey).toHaveBeenCalledWith(
       manager,
@@ -312,24 +333,31 @@ describe('ArticleService', () => {
 
   it('creates an article and its uploaded hero through the same manager', async () => {
     const file = { originalname: 'hero.png' } as Express.Multer.File;
+    const lifecycle = new TransactionLifecycle();
 
-    await service.createWithHero({
-      content: { title: 'New', summary: 'Summary', body: 'Body' },
-      authorId: 'author-1',
-      hero: {
-        file,
-        folder: 'articles/author-1/heroes',
-        altText: 'Hero description',
+    await service.createWithHero(
+      {
+        content: { title: 'New', summary: 'Summary', body: 'Body' },
+        authorId: 'author-1',
+        hero: {
+          file,
+          folder: 'articles/author-1/heroes',
+          altText: 'Hero description',
+        },
       },
-    });
+      manager as never,
+      lifecycle,
+    );
 
     expect(imageSvc.create).toHaveBeenCalledWith(
       {
         file,
         folder: 'articles/author-1/heroes',
         alt_text: 'Hero description',
+        decorative: false,
       },
       manager,
+      lifecycle,
     );
     expect(imageSvc.findById).toHaveBeenCalledWith('hero-uploaded', manager);
   });
@@ -344,10 +372,9 @@ describe('ArticleService', () => {
       authorId: null,
     });
 
-    expect(manager.create).toHaveBeenCalledWith(ArticleEntity, current);
-    expect(manager.merge).toHaveBeenCalledWith(
+    expect(manager.update).toHaveBeenCalledWith(
       ArticleEntity,
-      expect.any(Object),
+      { id: current.id, version: 1 },
       expect.objectContaining({
         content: { title: 'Changed' },
         media: { hero: { id: 'hero-2' } },
@@ -374,12 +401,18 @@ describe('ArticleService', () => {
     const current = article();
     const original = structuredClone(current);
     const file = { originalname: 'new.png' } as Express.Multer.File;
+    const lifecycle = new TransactionLifecycle();
 
-    await service.updateHero(current, {
-      file,
-      folder: 'articles/author-1/heroes',
-      altText: 'New hero',
-    });
+    await service.updateHero(
+      current,
+      {
+        file,
+        folder: 'articles/author-1/heroes',
+        altText: 'New hero',
+      },
+      manager as never,
+      lifecycle,
+    );
 
     expect(imageSvc.update).toHaveBeenCalledWith(
       {
@@ -387,8 +420,10 @@ describe('ArticleService', () => {
         file,
         folder: 'articles/author-1/heroes',
         alt_text: 'New hero',
+        decorative: false,
       },
       manager,
+      lifecycle,
     );
     expect(articleRepo.findById).toHaveBeenCalledWith(manager, current.id);
     expect(current).toEqual(original);
@@ -403,6 +438,44 @@ describe('ArticleService', () => {
     ).rejects.toThrow('Only draft articles can be updated.');
 
     expect(imageSvc.update).not.toHaveBeenCalled();
+  });
+
+  it('does not retain stale text when replacing a hero with a decorative image', async () => {
+    const current = article();
+    const file = {} as Express.Multer.File;
+    await service.updateHero(current, {
+      file,
+      folder: 'heroes',
+      decorative: true,
+    });
+    expect(imageSvc.update).toHaveBeenCalledWith(
+      {
+        image: current.media.hero,
+        file,
+        folder: 'heroes',
+        alt_text: null,
+        decorative: true,
+      },
+      manager,
+      expect.any(TransactionLifecycle),
+    );
+    expect(current.media.hero.alt_text).toBe('Hero description');
+  });
+
+  it('rejects missing accessibility choices before uploading on creation and replacement', async () => {
+    const file = {} as Express.Multer.File;
+    await expect(
+      service.createWithHero({
+        content: article().content,
+        hero: { file, folder: 'heroes' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.updateHero(article(), { file, folder: 'heroes' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(imageSvc.create).not.toHaveBeenCalled();
+    expect(imageSvc.update).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('submits only drafts and clears stale publication data', async () => {
@@ -486,6 +559,26 @@ describe('ArticleService', () => {
     await expect(
       service.archive(article(ARTICLE_STATUS_KEYS.SUBMITTED)),
     ).rejects.toThrow('cannot transition');
+  });
+
+  it.each([null, '', '  ', 'x'.repeat(256)])(
+    'blocks publication of unresolved hero text: %s',
+    async (alt_text) => {
+      const current = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+      Object.assign(current.media.hero, { alt_text, decorative: false });
+      await expect(
+        service.publish(current, 'publisher-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(userSvc.findByIdOrFail).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows publication of explicitly decorative heroes', async () => {
+    const current = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(current.media.hero, { alt_text: null, decorative: true });
+    await service.publish(current, 'publisher-1');
+    expect(manager.update).toHaveBeenCalled();
   });
 
   it('archives published articles and keeps return and restore actions distinct', async () => {

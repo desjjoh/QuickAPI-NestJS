@@ -11,6 +11,7 @@ export const MEDIA_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     width: scalar,
     height: scalar,
     alt_text: scalar,
+    decorative: scalar,
     created_at: scalar,
     updated_at: scalar,
   },

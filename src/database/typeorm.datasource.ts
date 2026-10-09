@@ -33,6 +33,7 @@ import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.en
 // ARTICLES
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
+import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
 
 const sourceMigrationDirectory = path.resolve(
   process.cwd(),
@@ -78,6 +79,7 @@ const dataSourceOptions: DataSourceOptions = {
     // ARTICLE MODULE
     ArticleEntity,
     ArticleStatusEntity,
+    IdempotencyEntity,
   ],
   migrations: [path.join(migrationDirectory, '*{.ts,.js}')],
   ssl: env.DB_SSL

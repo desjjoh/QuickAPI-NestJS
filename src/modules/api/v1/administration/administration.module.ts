@@ -10,9 +10,16 @@ import { ArticlesModule } from '@/modules/domain/articles/articles.module';
 import { ArticleAdministrationController } from './controllers/articles.controller';
 import { ArticleAdministrationApiService } from './service/articles.service';
 import { TokenModule } from '@/modules/system/tokens/token.module';
+import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.module';
 
 @Module({
-  imports: [IdentityModule, AuditModule, ArticlesModule, TokenModule],
+  imports: [
+    IdentityModule,
+    AuditModule,
+    ArticlesModule,
+    TokenModule,
+    IdempotencyModule,
+  ],
   providers: [
     UserAdminService,
     UserActivityAdminService,

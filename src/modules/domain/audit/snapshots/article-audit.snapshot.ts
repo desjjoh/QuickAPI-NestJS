@@ -8,6 +8,7 @@ export const articleAuditSnapshot = (
   article: ArticleEntity,
 ): Record<string, unknown> => ({
   id: article.id,
+  version: article.version,
   content: {
     title: article.content.title,
     summary: article.content.summary,

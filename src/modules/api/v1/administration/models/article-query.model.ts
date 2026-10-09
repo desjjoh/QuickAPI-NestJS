@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, Length, Matches } from 'class-validator';
 
-import { CreatorArticleQueryDto } from '../../articles/models/article-query.model';
+import { ArticleLifecycleQueryDto } from '@/modules/domain/articles/models/article-query.model';
 
-export class AdministrationArticleQueryDto extends CreatorArticleQueryDto {
+export class AdministrationArticleQueryDto extends ArticleLifecycleQueryDto {
   @ApiPropertyOptional({
     description: 'Restricts results to articles assigned to one author.',
     minLength: 16,
