@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { BaseModel } from '@/common/models/base.model';
+import { PaginationMeta } from '@/common/models/pagination.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { ImageDto } from '@/modules/domain/media/models/image.model';
@@ -182,5 +183,25 @@ export class ArticleDto extends ArticleListItemDto {
     this.publisher = article.publication.publisher
       ? new ArticleAuthorDto(article.publication.publisher)
       : null;
+  }
+}
+
+export class ArticlePageDto {
+  @ApiProperty({
+    type: ArticleListItemDto,
+    isArray: true,
+    description: 'Articles in the requested result page.',
+  })
+  public readonly data: ArticleListItemDto[];
+
+  @ApiProperty({
+    type: PaginationMeta,
+    description: 'Pagination information for the article result set.',
+  })
+  public readonly meta: PaginationMeta;
+
+  public constructor(data: ArticleListItemDto[], meta: PaginationMeta) {
+    this.data = data;
+    this.meta = meta;
   }
 }

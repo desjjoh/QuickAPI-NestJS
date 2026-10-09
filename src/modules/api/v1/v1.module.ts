@@ -5,6 +5,7 @@ import { AdministrationApiModule } from './administration/administration.module'
 import { SecurityApiModule } from './security/security.module';
 import { LibraryApiModule } from './library/library.module';
 import { AccountApiModule } from './account/account.module';
+import { ArticlesApiModule } from './articles/articles.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { AccountApiModule } from './account/account.module';
     AccountApiModule,
     AdministrationApiModule,
     LibraryApiModule,
+    ArticlesApiModule,
   ],
 })
 export class ApiV1Module {}
@@ -40,6 +42,10 @@ export const apiV1Routes: Routes = [
       {
         path: 'library',
         module: LibraryApiModule,
+      },
+      {
+        path: 'articles',
+        module: ArticlesApiModule,
       },
     ],
   },

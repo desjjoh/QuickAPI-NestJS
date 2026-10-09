@@ -6,6 +6,7 @@ import {
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
+import { PaginationOptions } from '@/common/models/pagination.model';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { ImageService } from '@/modules/domain/media/services/image.service';
 
@@ -14,6 +15,11 @@ import { ArticleStatusEntity } from '../entities/articleStatus.entity';
 import { ArticleRepository } from '../repositories/article.repository';
 import { ArticleStatusRepository } from '../repositories/status.repository';
 import { ArticleStatusTransitionPolicy } from '../policies/article-status-transition.policy';
+import {
+  ArticleAdministrationQuery,
+  ArticleSearchQuery,
+  CreatorArticleQuery,
+} from '../models/article-query.model';
 import {
   ARTICLE_STATUS_KEYS,
   ArticleStatusKey,
@@ -31,10 +37,24 @@ export type CreateArticleInput = {
   authorId?: string | null;
 };
 
+export type CreateArticleWithHeroInput = Omit<CreateArticleInput, 'heroId'> & {
+  hero: {
+    file: Express.Multer.File;
+    folder: string;
+    altText?: string | null;
+  };
+};
+
 export type UpdateArticleInput = {
   content?: Partial<ArticleContentInput>;
   heroId?: string;
   authorId?: string | null;
+};
+
+export type UpdateArticleHeroInput = {
+  file: Express.Multer.File;
+  folder: string;
+  altText?: string | null;
 };
 
 @Injectable()
@@ -77,6 +97,94 @@ export class ArticleService {
       manager,
       ARTICLE_STATUS_KEYS.PUBLISHED,
     );
+  }
+
+  public paginatePublished(
+    pageOptions: PaginationOptions,
+    query: ArticleSearchQuery = {},
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<[ArticleEntity[], number]> {
+    return this.articleRepo.paginatePublished(manager, pageOptions, query);
+  }
+
+  public async findPublishedByIdOrFail(
+    id: string,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    const article = await this.articleRepo.findPublishedById(manager, id);
+
+    if (!article) throw new NotFoundException('Article not found.');
+
+    return article;
+  }
+
+  public paginateByAuthor(
+    authorId: string,
+    pageOptions: PaginationOptions,
+    query: CreatorArticleQuery = {},
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<[ArticleEntity[], number]> {
+    return this.articleRepo.paginateByAuthor(
+      manager,
+      authorId,
+      pageOptions,
+      query,
+    );
+  }
+
+  public async findByIdAndAuthorOrFail(
+    id: string,
+    authorId: string,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    const article = await this.articleRepo.findByIdAndAuthor(
+      manager,
+      id,
+      authorId,
+    );
+
+    if (!article) throw new NotFoundException('Article not found.');
+
+    return article;
+  }
+
+  public async findByIdAndAuthorForUpdateOrFail(
+    id: string,
+    authorId: string,
+    manager: EntityManager,
+  ): Promise<ArticleEntity> {
+    const article = await this.articleRepo.findByIdAndAuthorForUpdate(
+      manager,
+      id,
+      authorId,
+    );
+
+    if (!article) throw new NotFoundException('Article not found.');
+
+    return article;
+  }
+
+  public paginateForAdministration(
+    pageOptions: PaginationOptions,
+    query: ArticleAdministrationQuery = {},
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<[ArticleEntity[], number]> {
+    return this.articleRepo.paginateForAdministration(
+      manager,
+      pageOptions,
+      query,
+    );
+  }
+
+  public async findByIdForUpdateOrFail(
+    id: string,
+    manager: EntityManager,
+  ): Promise<ArticleEntity> {
+    const article = await this.articleRepo.findByIdForUpdate(manager, id);
+
+    if (!article) throw new NotFoundException('Article not found.');
+
+    return article;
   }
 
   public findByAuthor(
@@ -137,11 +245,36 @@ export class ArticleService {
     return this.findByIdOrFail(created.id, manager);
   }
 
+  public async createWithHero(
+    input: CreateArticleWithHeroInput,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    const image = await this.imageSvc.create(
+      {
+        file: input.hero.file,
+        folder: input.hero.folder,
+        alt_text: input.hero.altText,
+      },
+      manager,
+    );
+
+    return this.create(
+      {
+        content: input.content,
+        authorId: input.authorId,
+        heroId: image.id,
+      },
+      manager,
+    );
+  }
+
   public async update(
     article: ArticleEntity,
     input: UpdateArticleInput,
     manager: EntityManager = this.articleRepo.manager,
   ): Promise<ArticleEntity> {
+    this.transitionPolicy.assertEditable(article.publication.status.key);
+
     const [hero, author] = await Promise.all([
       input.heroId !== undefined
         ? this.imageSvc.findById(input.heroId, manager)
@@ -165,6 +298,26 @@ export class ArticleService {
     );
   }
 
+  public async updateHero(
+    article: ArticleEntity,
+    input: UpdateArticleHeroInput,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    this.transitionPolicy.assertEditable(article.publication.status.key);
+
+    await this.imageSvc.update(
+      {
+        image: article.media.hero,
+        file: input.file,
+        folder: input.folder,
+        alt_text: input.altText,
+      },
+      manager,
+    );
+
+    return this.findByIdOrFail(article.id, manager);
+  }
+
   public submit(
     article: ArticleEntity,
     manager: EntityManager = this.articleRepo.manager,
@@ -172,6 +325,20 @@ export class ArticleService {
     return this.transition(
       article,
       ARTICLE_STATUS_KEYS.SUBMITTED,
+      { publisher: null, publishedAt: null },
+      manager,
+    );
+  }
+
+  public async withdraw(
+    article: ArticleEntity,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    this.transitionPolicy.assertCanWithdraw(article.publication.status.key);
+
+    return this.applyTransition(
+      article,
+      ARTICLE_STATUS_KEYS.DRAFT,
       { publisher: null, publishedAt: null },
       manager,
     );
@@ -206,11 +373,29 @@ export class ArticleService {
     return this.transition(article, ARTICLE_STATUS_KEYS.ARCHIVED, {}, manager);
   }
 
-  public returnToDraft(
+  public async returnToDraft(
     article: ArticleEntity,
     manager: EntityManager = this.articleRepo.manager,
   ): Promise<ArticleEntity> {
-    return this.transition(
+    this.transitionPolicy.assertCanReturnToDraft(
+      article.publication.status.key,
+    );
+
+    return this.applyTransition(
+      article,
+      ARTICLE_STATUS_KEYS.DRAFT,
+      { publisher: null, publishedAt: null },
+      manager,
+    );
+  }
+
+  public async restore(
+    article: ArticleEntity,
+    manager: EntityManager = this.articleRepo.manager,
+  ): Promise<ArticleEntity> {
+    this.transitionPolicy.assertCanRestore(article.publication.status.key);
+
+    return this.applyTransition(
       article,
       ARTICLE_STATUS_KEYS.DRAFT,
       { publisher: null, publishedAt: null },

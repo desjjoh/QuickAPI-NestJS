@@ -14,6 +14,7 @@ export const throttlePolicies = {
   signOut: { limit: 10, ttl: minute },
   accountSecurityMutation: { limit: 10, ttl: minute },
   profileMutation: { limit: 30, ttl: minute },
+  articleMutation: { limit: 20, ttl: minute },
   fileUpload: { limit: 10, ttl: minute },
   sessionRead: { limit: 60, ttl: minute },
   sessionMutation: { limit: 20, ttl: minute },

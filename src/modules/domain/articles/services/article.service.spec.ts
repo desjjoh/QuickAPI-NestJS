@@ -47,13 +47,24 @@ describe('ArticleService', () => {
     findById: jest.fn(),
     findByStatusKey: jest.fn(),
     findByAuthorId: jest.fn(),
+    paginatePublished: jest.fn(),
+    findPublishedById: jest.fn(),
+    paginateByAuthor: jest.fn(),
+    findByIdAndAuthor: jest.fn(),
+    findByIdAndAuthorForUpdate: jest.fn(),
+    paginateForAdministration: jest.fn(),
+    findByIdForUpdate: jest.fn(),
   };
   const statusRepo = {
     findAll: jest.fn(),
     findById: jest.fn(),
     findByKey: jest.fn(),
   };
-  const imageSvc = { findById: jest.fn() };
+  const imageSvc = {
+    findById: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
   const userSvc = { findByIdOrFail: jest.fn() };
   let service: ArticleService;
 
@@ -92,6 +103,8 @@ describe('ArticleService', () => {
       key in statuses ? statuses[key] : null,
     );
     imageSvc.findById.mockResolvedValue({ id: 'hero-2' });
+    imageSvc.create.mockResolvedValue({ id: 'hero-uploaded' });
+    imageSvc.update.mockResolvedValue({ id: 'hero-1' });
     userSvc.findByIdOrFail.mockImplementation(async (id) => ({ id }));
     service = new ArticleService(
       articleRepo as never,
@@ -130,6 +143,125 @@ describe('ArticleService', () => {
     await expect(service.findByIdOrFail('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('owns published pagination and published-only detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = { search: 'architecture' };
+    articleRepo.paginatePublished.mockResolvedValue([[article()], 1]);
+    articleRepo.findPublishedById.mockResolvedValue(article('published'));
+
+    await expect(
+      service.paginatePublished(pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(service.findPublishedByIdOrFail('article-1')).resolves.toEqual(
+      article('published'),
+    );
+
+    expect(articleRepo.paginatePublished).toHaveBeenCalledWith(
+      manager,
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findPublishedById).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+    );
+
+    articleRepo.findPublishedById.mockResolvedValue(null);
+    await expect(
+      service.findPublishedByIdOrFail('missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('owns author-scoped pagination and detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = { search: 'draft', statusKey: ARTICLE_STATUS_KEYS.DRAFT };
+    articleRepo.paginateByAuthor.mockResolvedValue([[article()], 1]);
+    articleRepo.findByIdAndAuthor.mockResolvedValue(article());
+
+    await expect(
+      service.paginateByAuthor('author-1', pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(
+      service.findByIdAndAuthorOrFail('article-1', 'author-1'),
+    ).resolves.toEqual(article());
+
+    expect(articleRepo.paginateByAuthor).toHaveBeenCalledWith(
+      manager,
+      'author-1',
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findByIdAndAuthor).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+      'author-1',
+    );
+
+    articleRepo.findByIdAndAuthor.mockResolvedValue(null);
+    await expect(
+      service.findByIdAndAuthorOrFail('missing', 'author-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('loads and locks an author-owned article for mutation', async () => {
+    articleRepo.findByIdAndAuthorForUpdate.mockResolvedValue(article());
+
+    await expect(
+      service.findByIdAndAuthorForUpdateOrFail(
+        'article-1',
+        'author-1',
+        manager as never,
+      ),
+    ).resolves.toEqual(article());
+    expect(articleRepo.findByIdAndAuthorForUpdate).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+      'author-1',
+    );
+
+    articleRepo.findByIdAndAuthorForUpdate.mockResolvedValue(null);
+    await expect(
+      service.findByIdAndAuthorForUpdateOrFail(
+        'missing',
+        'author-1',
+        manager as never,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('owns administration pagination and locked detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = {
+      search: 'review',
+      statusKey: ARTICLE_STATUS_KEYS.SUBMITTED,
+      authorId: 'author-1',
+    };
+    articleRepo.paginateForAdministration.mockResolvedValue([[article()], 1]);
+    articleRepo.findByIdForUpdate.mockResolvedValue(article());
+
+    await expect(
+      service.paginateForAdministration(pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(
+      service.findByIdForUpdateOrFail('article-1', manager as never),
+    ).resolves.toEqual(article());
+
+    expect(articleRepo.paginateForAdministration).toHaveBeenCalledWith(
+      manager,
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findByIdForUpdate).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+    );
+
+    articleRepo.findByIdForUpdate.mockResolvedValue(null);
+    await expect(
+      service.findByIdForUpdateOrFail('missing', manager as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates a draft with resolved hero and author without mutating input', async () => {
@@ -178,6 +310,30 @@ describe('ArticleService', () => {
     );
   });
 
+  it('creates an article and its uploaded hero through the same manager', async () => {
+    const file = { originalname: 'hero.png' } as Express.Multer.File;
+
+    await service.createWithHero({
+      content: { title: 'New', summary: 'Summary', body: 'Body' },
+      authorId: 'author-1',
+      hero: {
+        file,
+        folder: 'articles/author-1/heroes',
+        altText: 'Hero description',
+      },
+    });
+
+    expect(imageSvc.create).toHaveBeenCalledWith(
+      {
+        file,
+        folder: 'articles/author-1/heroes',
+        alt_text: 'Hero description',
+      },
+      manager,
+    );
+    expect(imageSvc.findById).toHaveBeenCalledWith('hero-uploaded', manager);
+  });
+
   it('updates a detached article and supports clearing attribution', async () => {
     const current = article();
     const original = structuredClone(current);
@@ -202,6 +358,53 @@ describe('ArticleService', () => {
     expect(articleRepo.lastSaved?.attribution.author).toBeNull();
   });
 
+  it('rejects updates outside draft without resolving related resources', async () => {
+    await expect(
+      service.update(article(ARTICLE_STATUS_KEYS.SUBMITTED), {
+        content: { title: 'Changed' },
+        heroId: 'hero-2',
+      }),
+    ).rejects.toThrow('Only draft articles can be updated.');
+
+    expect(imageSvc.findById).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('replaces a draft hero without mutating the supplied article', async () => {
+    const current = article();
+    const original = structuredClone(current);
+    const file = { originalname: 'new.png' } as Express.Multer.File;
+
+    await service.updateHero(current, {
+      file,
+      folder: 'articles/author-1/heroes',
+      altText: 'New hero',
+    });
+
+    expect(imageSvc.update).toHaveBeenCalledWith(
+      {
+        image: current.media.hero,
+        file,
+        folder: 'articles/author-1/heroes',
+        alt_text: 'New hero',
+      },
+      manager,
+    );
+    expect(articleRepo.findById).toHaveBeenCalledWith(manager, current.id);
+    expect(current).toEqual(original);
+  });
+
+  it('rejects hero replacement outside draft before storing the file', async () => {
+    await expect(
+      service.updateHero(article(ARTICLE_STATUS_KEYS.SUBMITTED), {
+        file: {} as Express.Multer.File,
+        folder: 'articles/author-1/heroes',
+      }),
+    ).rejects.toThrow('Only draft articles can be updated.');
+
+    expect(imageSvc.update).not.toHaveBeenCalled();
+  });
+
   it('submits only drafts and clears stale publication data', async () => {
     const current = article();
     await service.submit(current);
@@ -221,6 +424,30 @@ describe('ArticleService', () => {
     await expect(
       service.submit(article(ARTICLE_STATUS_KEYS.PUBLISHED)),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('withdraws only submitted articles and clears publication data', async () => {
+    const submitted = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(submitted.publication, {
+      publisher: { id: 'stale-publisher' },
+      publishedAt: new Date('2026-10-08T12:00:00.000Z'),
+    });
+
+    await service.withdraw(submitted);
+
+    expect(articleRepo.lastSaved?.publication).toEqual(
+      expect.objectContaining({
+        status: { id: 'status-draft' },
+        publisher: null,
+        publishedAt: null,
+      }),
+    );
+    await expect(service.withdraw(article())).rejects.toThrow(
+      'Only submitted articles can be withdrawn.',
+    );
+    await expect(
+      service.withdraw(article(ARTICLE_STATUS_KEYS.ARCHIVED)),
+    ).rejects.toThrow('Only submitted articles can be withdrawn.');
   });
 
   it('publishes a submitted article with publisher and timestamp', async () => {
@@ -261,24 +488,37 @@ describe('ArticleService', () => {
     ).rejects.toThrow('cannot transition');
   });
 
-  it('archives published articles and restores submitted or archived articles to draft', async () => {
+  it('archives published articles and keeps return and restore actions distinct', async () => {
     await service.archive(article(ARTICLE_STATUS_KEYS.PUBLISHED));
     expect(articleRepo.lastSaved?.publication.status).toEqual({
       id: 'status-archived',
     });
 
-    const archived = article(ARTICLE_STATUS_KEYS.ARCHIVED);
-    Object.assign(archived.publication, {
+    const submitted = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(submitted.publication, {
       publisher: { id: 'publisher-1' },
       publishedAt: new Date(),
     });
-    await service.returnToDraft(archived);
+    await service.returnToDraft(submitted);
     expect(articleRepo.lastSaved?.publication).toEqual(
       expect.objectContaining({
         status: { id: 'status-draft' },
         publisher: null,
         publishedAt: null,
       }),
+    );
+
+    const archived = article(ARTICLE_STATUS_KEYS.ARCHIVED);
+    await service.restore(archived);
+    expect(articleRepo.lastSaved?.publication.status).toEqual({
+      id: 'status-draft',
+    });
+
+    await expect(service.returnToDraft(archived)).rejects.toThrow(
+      'Only submitted articles can be returned to draft.',
+    );
+    await expect(service.restore(submitted)).rejects.toThrow(
+      'Only archived articles can be restored.',
     );
   });
 
