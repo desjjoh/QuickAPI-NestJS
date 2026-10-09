@@ -3,6 +3,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { AuditPolicy } from '../types/audit-policy.types';
 import { IDENTITY_AUDIT_POLICIES } from '../policies/identity-audit.policies';
 import { MEDIA_AUDIT_POLICIES } from '../policies/media-audit.policies';
+import { ARTICLE_AUDIT_POLICIES } from '../policies/article-audit.policies';
 
 @Injectable()
 export class AuditPolicyRegistry {
@@ -12,6 +13,7 @@ export class AuditPolicyRegistry {
     if (includeDefaults) {
       this.registerAll(IDENTITY_AUDIT_POLICIES);
       this.registerAll(MEDIA_AUDIT_POLICIES);
+      this.registerAll(ARTICLE_AUDIT_POLICIES);
     }
   }
 

@@ -6,6 +6,7 @@ import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/regi
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
@@ -20,6 +21,67 @@ import {
 import { teardownTestSuite, type TestSuite } from '../../helpers/test-app';
 
 describe('Registration request', () => {
+  it('rolls back challenge consumption, user and session when the success audit fails; never leaks cookies', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const csrf = await acquireCsrf(agent);
+    const pending = await agent
+      .post(`${REGISTRATION_ROOT}/request`)
+      .set('x-csrf-token', csrf)
+      .send(await registrationPayload(suite.dataSource))
+      .expect(201);
+    const challengeId = pending.body.challenge_id as string;
+    const body = {
+      challenge_id: challengeId,
+      code: email.verificationCodeFor(challengeId),
+    };
+    const spy = jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('audit unavailable'));
+    const failed = await agent
+      .post(`${REGISTRATION_ROOT}/confirm`)
+      .set('x-csrf-token', csrf)
+      .send(body)
+      .expect(500);
+    expect(failed.headers['set-cookie']).toBeUndefined();
+    expect(await suite.dataSource.getRepository(UserEntity).count()).toBe(0);
+    expect(
+      await suite.dataSource.getRepository(UserSessionEntity).count(),
+    ).toBe(0);
+    expect(
+      (
+        await suite.dataSource
+          .getRepository(RegistrationTokenEntity)
+          .findOneByOrFail({ id: challengeId })
+      ).consumed_at,
+    ).toBeNull();
+    spy.mockRestore();
+    const completed = await agent
+      .post(`${REGISTRATION_ROOT}/confirm`)
+      .set('x-csrf-token', csrf)
+      .send(body)
+      .expect(200);
+    expect(completed.headers['set-cookie']).toBeDefined();
+    expect(completed.headers['cache-control']).toBe('no-store');
+    await agent
+      .post(`${REGISTRATION_ROOT}/confirm`)
+      .set('x-csrf-token', csrf)
+      .send(body)
+      .expect(401);
+  });
+
+  it('rejects idempotency keys on challenge creation instead of caching credentials', async () => {
+    const agent = request.agent(app.getHttpServer());
+    const csrf = await acquireCsrf(agent);
+    await agent
+      .post(`${REGISTRATION_ROOT}/request`)
+      .set('x-csrf-token', csrf)
+      .set('Idempotency-Key', 'unsafe-secret-replay')
+      .send(await registrationPayload(suite.dataSource))
+      .expect(400);
+    expect(
+      await suite.dataSource.getRepository(RegistrationTokenEntity).count(),
+    ).toBe(0);
+  });
   let app: INestApplication;
   let suite: TestSuite;
   let email: CapturingEmailService;

@@ -23,11 +23,13 @@ export type AuditSource = (typeof AuditSource)[keyof typeof AuditSource];
 
 export enum AuditEventDomain {
   IDENTITY = 'identity',
+  ARTICLES = 'articles',
 }
 
 /** Stable aggregate keys used for audit subjects and API filtering. */
 export enum AuditSubjectType {
   USER = 'user',
+  ARTICLE = 'article',
 }
 
 /** Stable, collision-resistant keys for objects affected by audit events. */
@@ -41,6 +43,7 @@ export enum AuditResourceType {
   IDENTITY_ROLE = 'identity.role',
   IDENTITY_ACCOUNT_STATUS = 'identity.account_status',
   MEDIA_IMAGE = 'media.image',
+  ARTICLES_ARTICLE = 'articles.article',
 }
 
 export enum IdentityAuditEvents {
@@ -74,8 +77,21 @@ export enum IdentityAuditEvents {
   ADMIN_USER_DELETED = 'identity.admin.user_deleted',
 }
 
-export type AuditEventKey = IdentityAuditEvents;
+export enum ArticleAuditEvents {
+  CREATED = 'articles.article.created',
+  UPDATED = 'articles.article.updated',
+  HERO_REPLACED = 'articles.article.hero_replaced',
+  SUBMITTED = 'articles.article.submitted',
+  WITHDRAWN = 'articles.article.withdrawn',
+  PUBLISHED = 'articles.article.published',
+  RETURNED_TO_DRAFT = 'articles.article.returned_to_draft',
+  ARCHIVED = 'articles.article.archived',
+  RESTORED = 'articles.article.restored',
+}
+
+export type AuditEventKey = IdentityAuditEvents | ArticleAuditEvents;
 
 export const AUDIT_EVENT_MATRIX = {
   [AuditEventDomain.IDENTITY]: IdentityAuditEvents,
+  [AuditEventDomain.ARTICLES]: ArticleAuditEvents,
 };

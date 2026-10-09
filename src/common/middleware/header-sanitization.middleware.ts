@@ -43,6 +43,7 @@ const ALLOWLIST = new Set([
   'x-request-id',
   'x-api-key',
   'x-operations-key',
+  'idempotency-key',
 ]);
 
 const VALID_NAME_RE: RegExp = /^[A-Za-z0-9-]+$/;

@@ -44,6 +44,17 @@ describe(AuditRedactionService.name, () => {
     ).toEqual({ id: 'ticket-1', state: 'open' });
   });
 
+  it('preserves explicit decorative choices in image audit snapshots', () => {
+    expect(
+      new AuditRedactionService().redactSnapshot('media.image', {
+        id: 'hero-1',
+        alt_text: null,
+        decorative: true,
+        storage_key: 'private/key',
+      }),
+    ).toEqual({ id: 'hero-1', alt_text: null, decorative: true });
+  });
+
   it('applies relationship ID policy across identity and store domains', () => {
     const registry = new AuditPolicyRegistry();
     registry.register('store.product', {

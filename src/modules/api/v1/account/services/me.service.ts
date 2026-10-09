@@ -73,8 +73,8 @@ export class MeApiService {
     const userId = user.id;
     const before = identityUserSnapshot(user);
 
-    await this.userSvc.transaction(async (manager) => {
-      await this.lifecycle.deleteUser(user, manager);
+    await this.userSvc.transaction(async (manager, lifecycle) => {
+      await this.lifecycle.deleteUser(user, manager, lifecycle);
       await this.auditSvc.record(
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,

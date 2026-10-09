@@ -5,6 +5,8 @@ import { AdministrationApiModule } from './administration/administration.module'
 import { SecurityApiModule } from './security/security.module';
 import { LibraryApiModule } from './library/library.module';
 import { AccountApiModule } from './account/account.module';
+import { PublicApiModule } from './public/public.module';
+import { CreatorApiModule } from './creator/creator.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { AccountApiModule } from './account/account.module';
     AccountApiModule,
     AdministrationApiModule,
     LibraryApiModule,
+    PublicApiModule,
+    CreatorApiModule,
   ],
 })
 export class ApiV1Module {}
@@ -40,6 +44,14 @@ export const apiV1Routes: Routes = [
       {
         path: 'library',
         module: LibraryApiModule,
+      },
+      {
+        path: 'public',
+        module: PublicApiModule,
+      },
+      {
+        path: 'creator',
+        module: CreatorApiModule,
       },
     ],
   },

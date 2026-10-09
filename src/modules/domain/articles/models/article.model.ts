@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { BaseModel } from '@/common/models/base.model';
+import { PaginationMeta } from '@/common/models/pagination.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { ImageDto } from '@/modules/domain/media/models/image.model';
@@ -40,12 +41,20 @@ export class ArticleImageDto {
   })
   public readonly altText: string | null;
 
+  @ApiProperty({
+    description:
+      'Explicit decorative choice. When true, render alt="". Null altText alone does not indicate a decorative image.',
+    default: false,
+  })
+  public readonly decorative: boolean;
+
   public constructor(image: ImageEntity) {
     this.id = image.id;
     this.url = new ImageDto(image).url;
     this.width = image.width;
     this.height = image.height;
     this.altText = image.alt_text ?? null;
+    this.decorative = image.decorative ?? false;
   }
 }
 
@@ -182,5 +191,25 @@ export class ArticleDto extends ArticleListItemDto {
     this.publisher = article.publication.publisher
       ? new ArticleAuthorDto(article.publication.publisher)
       : null;
+  }
+}
+
+export class ArticlePageDto {
+  @ApiProperty({
+    type: ArticleListItemDto,
+    isArray: true,
+    description: 'Articles in the requested result page.',
+  })
+  public readonly data: ArticleListItemDto[];
+
+  @ApiProperty({
+    type: PaginationMeta,
+    description: 'Pagination information for the article result set.',
+  })
+  public readonly meta: PaginationMeta;
+
+  public constructor(data: ArticleListItemDto[], meta: PaginationMeta) {
+    this.data = data;
+    this.meta = meta;
   }
 }

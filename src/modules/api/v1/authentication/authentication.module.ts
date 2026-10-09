@@ -13,6 +13,7 @@ import { AuditModule } from '@/modules/domain/audit/audit.module';
 import { PasswordResetService } from './services/password-reset.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 import { AccountApiModule } from '../account/account.module';
+import { SecurityTransactionInterceptor } from '@/common/interceptors/security-transaction.interceptor';
 
 @Module({
   imports: [
@@ -23,7 +24,12 @@ import { AccountApiModule } from '../account/account.module';
     EmailModule,
     AccountApiModule,
   ],
-  providers: [AuthService, RegistrationService, PasswordResetService],
+  providers: [
+    AuthService,
+    RegistrationService,
+    PasswordResetService,
+    SecurityTransactionInterceptor,
+  ],
   controllers: [
     AuthApiController,
     RegistrationApiController,

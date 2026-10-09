@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import {
   ForbiddenException,
   Injectable,
@@ -22,7 +23,7 @@ export class UserCredentialsService {
   public async validateUser(
     email: string,
     password: string,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const user = await this.users.findByEmail(email, manager);
 
@@ -51,14 +52,14 @@ export class UserCredentialsService {
 
   public recordSignIn(
     user: UserEntity,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return this.updateMetadata(user, { last_sign_in: new Date() }, manager);
   }
 
   public recordEmailChanged(
     user: UserEntity,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return this.updateMetadata(
       user,
@@ -69,7 +70,7 @@ export class UserCredentialsService {
 
   public recordPasswordChanged(
     user: UserEntity,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return this.updateMetadata(
       user,
@@ -81,7 +82,7 @@ export class UserCredentialsService {
   public recordMfaChanged(
     user: UserEntity,
     enabled: boolean,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return this.updateMetadata(
       user,

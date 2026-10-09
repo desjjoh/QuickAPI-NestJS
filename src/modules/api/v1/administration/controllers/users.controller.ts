@@ -31,6 +31,7 @@ import {
 } from '@nestjs/swagger';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { EntityIdParam } from '@/common/decorators/id-param.decorator';
+import { Idempotent } from '@/common/decorators/idempotent.decorator';
 import { NanoIdParamPipe } from '@/common/pipes/nanoid.pipe';
 import { UserAdminService } from '../service/users.service';
 import { throttlePolicies } from '@/config/throttle-policy.config';
@@ -76,8 +77,13 @@ export class UserAdministrationController {
   }
 
   @Patch(':id')
+  @Idempotent('identity.administration.user.update')
   @Throttle({ default: throttlePolicies.administrationMutation })
-  @ApiOperation({ summary: 'Update a user account' })
+  @ApiOperation({
+    summary: 'Update a user account',
+    description:
+      'Updates account status or replaces its roles and records the administration reason in the same transaction. An identical Idempotency-Key retry returns the original response without reapplying changes. Distinct actions remain last-write-wins; this endpoint does not yet require an expected version.',
+  })
   @ApiOkResponse({ type: UserDto })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].UPDATE_USERS,
@@ -136,6 +142,7 @@ export class UserAdministrationController {
 
   // POST /:id/delete
   @Post(':id/delete')
+  @Idempotent('identity.administration.user.delete')
   @Throttle({ default: throttlePolicies.administrationMutation })
   @ApiOperation({
     summary: 'Delete user',

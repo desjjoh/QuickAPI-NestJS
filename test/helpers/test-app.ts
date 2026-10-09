@@ -10,6 +10,7 @@ import {
   resetMutableTables,
 } from './database/test-database';
 import { QueueEventsProvider } from '@/common/providers/queue.provider';
+import { EmailOutboxDispatcher } from '@/modules/system/email/services/email-outbox-dispatcher.service';
 
 export async function createTestApp(
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
@@ -25,6 +26,8 @@ export async function createTestApp(
   // process.exit), so replace only the queue event listener while keeping the
   // rest of the application graph intact.
   builder = builder.overrideProvider(QueueEventsProvider).useValue({});
+  // Outbox delivery is exercised explicitly in its disposable-database suite.
+  builder = builder.overrideProvider(EmailOutboxDispatcher).useValue({});
 
   if (configure) builder = configure(builder);
   const moduleRef = await builder.compile();

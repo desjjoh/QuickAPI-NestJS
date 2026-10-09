@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { jest } from '@jest/globals';
-import type { DataSource } from 'typeorm';
+import { EntityManager, type DataSource } from 'typeorm';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import type { ImageService } from '@/modules/domain/media/services/image.service';
@@ -41,7 +42,7 @@ describe('UserRepository (disposable MySQL)', () => {
   let administration: UserAdministrationService;
   let refresh: RefreshService;
   let imageService: {
-    remove: jest.Mock<(image: ImageEntity) => Promise<ImageEntity>>;
+    remove: jest.Mock<ImageService['remove']>;
   };
   let sequence = 0;
 
@@ -243,12 +244,26 @@ describe('UserRepository (disposable MySQL)', () => {
     async (withAvatar) => {
       const image = withAvatar ? await createImage('avatars/delete.png') : null;
       const user = await createUser(image);
+      const userId = user.id;
       const profileId = user.profile.id;
+
+      imageService.remove.mockImplementation(
+        async (avatar, manager, transactionLifecycle) => {
+          // Assert primitives to avoid Jest diffing TypeORM's circular object graph.
+          expect(manager instanceof EntityManager).toBe(true);
+          expect(manager === dataSource.manager).toBe(false);
+          expect(manager?.queryRunner?.isTransactionActive).toBe(true);
+          expect(transactionLifecycle instanceof TransactionLifecycle).toBe(
+            true,
+          );
+          return avatar;
+        },
+      );
 
       await lifecycle.deleteUser(user);
 
       await expect(
-        dataSource.getRepository(UserEntity).findOneBy({ id: user.id }),
+        dataSource.getRepository(UserEntity).findOneBy({ id: userId }),
       ).resolves.toBeNull();
       await expect(
         dataSource
@@ -256,11 +271,12 @@ describe('UserRepository (disposable MySQL)', () => {
           .findOneBy({ id: profileId }),
       ).resolves.toBeNull();
       expect(imageService.remove).toHaveBeenCalledTimes(withAvatar ? 1 : 0);
-      if (image)
-        expect(imageService.remove).toHaveBeenCalledWith(
-          expect.objectContaining({ id: image.id }),
-          dataSource.manager,
-        );
+      if (image) {
+        const call = imageService.remove.mock.calls[0];
+        expect(call.length).toBe(3);
+        expect(call[0].id).toBe(image.id);
+        expect(call[1]?.queryRunner?.isReleased).toBe(true);
+      }
     },
   );
 

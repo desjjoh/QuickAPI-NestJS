@@ -1,3 +1,4 @@
+import { SecurityOperation } from '@/common/decorators/security-operation.decorator';
 import type { Response } from 'express';
 
 import {
@@ -56,6 +57,7 @@ import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
+@SecurityOperation()
 @Controller('')
 @UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
 @Throttle({ default: throttlePolicies.accountSecurityMutation })

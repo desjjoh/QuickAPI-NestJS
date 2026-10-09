@@ -7,15 +7,17 @@ import {
 import { userFixture } from '@/../test/helpers/identity.fixtures';
 import { ADMINISTRATION_REASON_CODES } from '@/config/administration.config';
 import { UserAdminService } from './users.service';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('UserAdminService', () => {
   const setup = () => {
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(userFixture()),
     };
+    const lifecycle = new TransactionLifecycle();
     const audit = { record: jest.fn().mockResolvedValue({}) };
     const userSvc = {
-      transaction: jest.fn(async (callback) => callback(manager)),
+      transaction: jest.fn(async (callback) => callback(manager, lifecycle)),
       paginate: jest.fn(),
       findByIdOrFail: jest.fn(),
       deleteUser: jest.fn(),
@@ -29,6 +31,7 @@ describe('UserAdminService', () => {
 
     return {
       manager,
+      lifecycle,
       audit,
       userSvc,
       context,
@@ -108,7 +111,7 @@ describe('UserAdminService', () => {
   });
 
   it('delegates user removal exactly once with the requested id', async () => {
-    const { userSvc, service, audit, manager } = setup();
+    const { userSvc, service, audit, manager, lifecycle } = setup();
     userSvc.deleteUser.mockResolvedValue(undefined);
 
     await expect(
@@ -121,6 +124,7 @@ describe('UserAdminService', () => {
     expect(userSvc.deleteUser).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'user-1' }),
       manager,
+      lifecycle,
     );
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -179,6 +183,24 @@ describe('UserAdminService', () => {
           status: { id: user.status.id },
           roles: [],
         },
+      }),
+      manager,
+    );
+  });
+  it('captures the deletion snapshot before TypeORM clears the removed entity ID', async () => {
+    const { service, userSvc, audit, manager } = setup();
+    const before = userFixture();
+    manager.findOneOrFail.mockResolvedValue(before);
+    userSvc.deleteUser.mockImplementation(async (entity) => {
+      entity.id = undefined;
+    });
+    await service.removeUser('user-1', {
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        before: expect.objectContaining({ id: 'user-1' }),
+        resourceId: 'user-1',
       }),
       manager,
     );

@@ -29,6 +29,40 @@ jest.mock('bullmq', () => ({ Queue: MockQueue, QueueEvents: MockQueueEvents }));
 import { QueueEventsProvider } from './queue.provider';
 
 describe('QueueEventsProvider email retry and DLQ routing', () => {
+  it('bounds retention and deduplicates repeated terminal failures when configured', async () => {
+    const provider = new QueueEventsProvider({
+      queueName: 'email-queue',
+      connection: {},
+      deadLetterQueueName: 'email-dlq',
+      deadLetterRetentionSeconds: 86400,
+    });
+    await provider.onModuleInit();
+    queueInstances[0].getJob.mockResolvedValue({
+      id: 'email-stable-id',
+      data: { deliveryId: 'stable-id' },
+      opts: { attempts: 3 },
+      attemptsMade: 3,
+      stacktrace: [],
+    });
+    const failed = eventInstances[0].handlers.get('failed')!;
+    await failed({
+      jobId: 'email-stable-id',
+      failedReason: 'Email delivery failed',
+    });
+    await failed({
+      jobId: 'email-stable-id',
+      failedReason: 'Email delivery failed',
+    });
+    expect(queueInstances[1].add).toHaveBeenLastCalledWith(
+      'email-dlq',
+      expect.objectContaining({ originalData: { deliveryId: 'stable-id' } }),
+      {
+        jobId: 'dead-letter-email-stable-id',
+        removeOnComplete: { age: 86400 },
+        removeOnFail: { age: 86400 },
+      },
+    );
+  });
   beforeEach(() => {
     queueInstances.length = 0;
     eventInstances.length = 0;

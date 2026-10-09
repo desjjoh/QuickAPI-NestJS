@@ -8,7 +8,7 @@ An opinionated NestJS application foundation developed for my own projects and p
 
 - **NestJS 11 + TypeScript-first architecture** with decorators, modules, dependency injection, and path aliases
 - **Layered module structure** split into System, Domain, and API boundaries
-- **Versioned REST API** under `/api/v1` with dedicated security, authentication, account, administration, and library modules
+- **Versioned REST API** under `/api/v1` with public, creator, and administration audience areas alongside security, authentication, account, and library modules
 - **TypeORM (MySQL)** as the primary database layer with auto-loaded entities
 - **Zod-backed environment validation** with strict SemVer enforcement for `APP_VERSION`
 - **Class Validator / Class Transformer** request DTO validation through a global validation pipe
@@ -61,7 +61,9 @@ src/
 │   │       ├── account/        # Authenticated account/profile management endpoints
 │   │       ├── administration/ # Platform/admin endpoints
 │   │       ├── authentication/ # Register, sign-in, sign-out, and refresh endpoints
+│   │       ├── creator/        # Creator-facing controllers, services, and request models
 │   │       ├── library/        # Reference-data endpoints
+│   │       ├── public/         # Public-facing controllers, services, and request models
 │   │       └── security/       # CSRF/security endpoints
 │   ├── domain/                 # Business/domain modules
 │   │   ├── identity/           # Users, credentials, profiles, addresses, auth models, repository, service
@@ -82,6 +84,114 @@ test/
 ```
 
 ---
+
+## Article API audiences
+
+Article API controllers, services, and audience-specific request models are grouped under `src/modules/api/v1/public/articles`, `creator/articles`, and `administration`. Each audience module is routed independently. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
+
+- Public reads: `/api/v1/public/articles` and `/api/v1/public/articles/:id`.
+- Creator reads and creation: `/api/v1/creator/articles`; detail and updates: `/api/v1/creator/articles/:id`; hero replacement, submission, and withdrawal: `/:id/hero`, `/:id/submit`, and `/:id/withdraw` beneath that creator collection.
+- Administration: `/api/v1/administration/articles`, including `/:id/publish` and the other review/lifecycle actions.
+
+This is a breaking route change: the former `/api/v1/articles` public routes and `/api/v1/articles/creator` creator routes are no longer mounted. Clients must update their URLs when adopting this release; no temporary aliases are provided. Swagger groups article operations as Public Articles, Creator Articles, and Article Administration.
+
+Creator and administration article list/detail and mutation responses include a numeric `version`. Send that value as `expected_version` for content updates, hero replacements (a multipart field), submission/withdrawal, and administration lifecycle actions. A successful mutation increments the article version, including hero-only and unchanged-content edits. Missing or invalid versions fail request validation; stale versions return `409 Conflict` without mutation or an audit event. On conflict, reload and reconcile the article before retrying rather than blindly retrying the stale edit. Public article responses do not expose the version. Apply the article-version migration before deploying this contract; existing articles start at version 1.
+
+---
+
+### Article listing indexes
+
+Migration `1791562871407-migration` adds three indexes matching the existing repository filters and deterministic ordering: public `(status_id, publishedAt, id)`, creator `(author_id, createdAt, id)`, and administration review `(status_id, createdAt, id)`. Entity metadata uses the corresponding embedded property paths. Both ASC and DESC ordering use the same indexes; no combined author/status or search index is added without measurements. Leading-wildcard title/summary searches are not made indexable by these indexes, and unfiltered administration ordering is a separate access pattern.
+
+The article E2E suite includes an EXPLAIN verification case with 16,000 synthetic articles, skewed statuses, selective authors and tied dates. It captures the actual TypeORM DISTINCT/eager-join pagination SQL and refreshes statistics without logging plans to the console. For public, creator and review lists in both directions, it checks that the intended index is eligible and that MySQL uses an indexed filter prefix; it does not mandate a particular optimizer choice. It also exercises combined author/status and unfiltered administration queries without assuming an extra index is warranted. Index eligibility/filtering is not proof that the joined pagination avoids sorting or that every added index is beneficial in production.
+
+The supplied local public-ASC plan considered the public index but chose the review index for `status_id` filtering. It still used temporary-table/filesort pagination and eagerly joined author/publisher profiles, roles and permissions before limiting results. This is a real query-shape concern, not a missing index or a reason to FORCE INDEX. A separate optimization should paginate/count the lean article scope first, then hydrate only the selected page's required display relations. These indexes alone do not solve eager-join amplification; validate the remaining scenarios locally before declaring query optimization complete.
+
+After configuring the disposable test environment described below, run just that check manually:
+
+```powershell
+node --no-warnings --experimental-vm-modules ./node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand --runTestsByPath test/e2e/articles/articles.e2e-spec.ts --testNamePattern="EXPLAINs actual article pagination SQL"
+```
+
+Global setup resets only the explicitly configured disposable test schema and applies the migration. The revised checks have not been run here; they are supplied for local execution. Validate plans against realistic cardinalities before deployment; a failing eligibility/filtering assertion is a signal to revisit the index/query rather than add FORCE INDEX. The down migration preserves foreign-key supporting indexes if InnoDB replaced their implicit indexes with these composites. Index creation can lock/work on a large table: schedule the production migration appropriately.
+
+The index rollback inspects the live schema and preserves surviving foreign-key supporting indexes, or restores them for `author_id` and `status_id` before dropping the listing indexes. It skips already-missing listing indexes so an interrupted rollback can resume: MySQL DDL implicitly commits, so a logged `ROLLBACK` does not restore a previously dropped index. The compiled migration revert/forward smoke check exercises this deployment boundary without tests importing individual migration classes.
+
+### Article search contract
+
+All article audiences use the same domain search policy: a literal substring in **title or summary**, never body. `%`, `_`, `!`, backslashes and quotes are ordinary search text, not wildcard/operator syntax. SQL uses a bound parameter with an explicit `!` LIKE escape character. Queries are normalized to Unicode NFC, trimmed, and have runs of whitespace (including tabs/newlines) collapsed to one space. Whitespace-only input means no search filter. This is contiguous phrase matching, not independent keyword matching; stored content is not rewritten or whitespace-normalized. The API validates the raw query's 255-character limit before normalization.
+
+Matching explicitly uses MySQL 8's `utf8mb4_0900_ai_ci` collation: case- and accent-insensitive according to that collation's Unicode comparison rules, regardless of the column's default collation. Public published-only visibility, creator ownership/status, and administration author/status filters apply independently to **both** title and summary branches, including their pagination counts. Search never expands the caller's authorized scope.
+
+Policy/repository unit cases and the article E2E suite cover literal wildcard/escape characters, backslashes, SQL-looking text, blank input, whitespace, Unicode composition, case/accent matching, body exclusion and scoped title/summary results. These tests are supplied for manual local execution.
+
+Keep this SQL approach until measured volume/latency justifies full-text indexes or a dedicated search service. Leading-wildcard substring search is not accelerated by ordinary title/summary indexes. Before changing engines, define any changes to tokenization, phrases, stopwords, ranking and short-word handling explicitly. Treat search results as candidate IDs only: independently enforce current visibility, status and ownership in the authoritative database before returning records or counts. Do not rely on a search index's potentially stale authorization data.
+
+### Request idempotency
+
+Article creation, creator hero replacement, administration publish/archive/restore, and account profile avatar/phone/address creation, replacement, and removal accept an optional `Idempotency-Key`. The profile routes are `POST` and `DELETE /api/v1/account/profile/{avatar,phone,address}`. Generate a fresh key for each intended action, then keep the same key and payload (including `expected_version` where required and identical image bytes/client filename) for network retries. Keys must contain 1–128 printable, non-whitespace ASCII characters and no commas. Requests without a key retain their existing behavior. Profile POST responses remain `201`, and profile DELETE responses remain `200`; other opted-in operations returning `204` replay without a response body.
+
+Keys are scoped to the authenticated actor, operation, and HTTP method/resource path. For 24 hours, identical retries return the original JSON body and HTTP status, even if the resource has since changed. Replaying a profile delete does not delete a subsequently recreated avatar or contact. A replayed profile response is a historical snapshot, not current profile/session/permission state; fetch the current account when that distinction matters. A different payload using the same key returns `409 Conflict`; an overlapping request also returns `409` and can be retried with backoff after the first finishes. Authentication, permissions, CSRF protection, and rate limits still apply to retries. Validation and transaction failures roll back the claim so the action can be retried safely.
+
+The reusable `Idempotent` decorator/interceptor and system idempotency service own this concern; controllers only opt in. When adding another operation, import `IdempotencyModule`, apply the decorator above any multipart interceptor, and use `runInTransaction` for all database mutations so they share the request transaction and lifecycle. Explicitly pass that transaction manager to downstream writes and audit calls. Identity and audit services resolve their default managers through `applicationManager`, so they also join the active application transaction; other services must explicitly opt in or receive the manager. Nontransactional external effects still need lifecycle compensation or an outbox; this is not a general guarantee of exactly-once delivery to external systems. This decorator is not suitable unchanged for anonymous authentication or token/cookie-issuing flows.
+
+The MySQL implementation uses non-waiting connection-scoped advisory locks across API replicas and commits the action, audit events, and replay record together. Replay eligibility expires after 24 hours and retries do not extend expiry. Expired rows are swept hourly while the application is running, so physical removal can lag expiry; backups have their own retention. After expiry a reused key is a new action. Existing browser deployments must add `Idempotency-Key` to `CORS_ALLOWED_HEADERS`.
+
+Profile response snapshots include personal information (email, date of birth, contacts, and display/session metadata) already present in `UserDto`. They do not contain password hashes or access/refresh tokens. The store persists a request fingerprint, not the request payload or uploaded bytes, and hashes the raw client key into the scope identifier. Restrict table/backup access as for identity data, encrypt database storage and backups operationally, and include snapshots in retention/erasure procedures. Expiry is not immediate account-erasure cleanup. Never opt credential/token responses into this full-response store without a separate security and replay policy.
+
+Administrator user mutations also accept `Idempotency-Key`: `PATCH /api/v1/administration/users/:id` replays the original `200` user representation, and `POST /api/v1/administration/users/:id/delete` replays bodyless `204` after the target has been deleted. The key includes the administrator and target route; a changed reason/status/role payload conflicts. Update/deletion, the success audit, and the replay record commit together; avatar storage deletion happens after commit. Current authentication and endpoint permissions are checked on every retry. If the administrator deletes their own account or loses the required permission, replay does not bypass that loss of access.
+
+User administration does not yet have an `expected_version` contract. Row locks serialize active transactions, and replaying an old completed key cannot overwrite a newer action. However, a stale edit submitted as a new action/key remains last-write-wins. Optimistic concurrency is a separate follow-up: introduce an administration version, expose it to editors, require it on update/deletion, and reject stale versions with `409`. Idempotency keys and request IDs are not substitutes for that version check. Administrator update snapshots contain the target's `UserDto` personal information and follow the same retention/access policy above.
+
+### Identity security and durable email
+
+Authentication/registration/password-reset and account security/session controllers use `SecurityOperation`: their handler writes, success audits, and email intents commit in one application transaction. Refresh-cookie changes are staged until commit and credential responses have `Cache-Control: no-store`. Guards still execute before this boundary. OTP failure counters and lockout deliberately commit using the root manager after the request transaction releases its connection/locks, but before completing the response. Rejecting a code cannot roll back its security accounting, and failed requests do not monopolize the pool while waiting for another connection. Outside application transactions, accounting is immediate.
+
+Security endpoints **reject `Idempotency-Key` with `400`**, rather than store and replay JWTs, reset authorizations, or refresh cookies. Challenges are single-use: a rolled-back operation may retry; a committed operation with a lost credential response requires fresh sign-in or a new challenge. Concurrent refresh requests using an old credential cannot both rotate the session: the handler locks and compares the persisted refresh hash. Clients must serialize refreshes and sign in again after an ambiguous committed rotation. CSRF/authentication/authorization and throttling continue to apply.
+
+Apply migration `1791892800000-email-outbox` before deploying these services. EmailService compiles and inserts an AES-256-GCM-encrypted MySQL intent in the same transaction, without depending on Redis availability. A five-second dispatcher publishes only a UUID delivery ID; deterministic Bull job IDs prevent duplicate queued work. Pending intents are reconsidered every minute, including exhausted or completed jobs, until expiry. Workers lock the intent, supply the same delivery ID in provider metadata, and erase ciphertext on delivery, cancellation, or expiry. New challenges cancel pending intents for the same subject/template/purpose; challenge intent expiry matches the actual challenge expiry. Cancellation cannot recall a message already accepted by the provider.
+
+All API/worker replicas must use the same stable `CRYPTO_SECRET`. Do not rotate it while encrypted pending intents remain: drain them or implement an explicit key-version migration first. Challenge email secrets and recipients are encrypted, cancellation scopes use keyed hashes, new Redis jobs contain only identifiers, and new delivery failures expose only a generic error. Legacy compiled-payload jobs are still supported for deployment draining; remove those legacy jobs/DLQ records according to the existing privacy policy. Restrict database, queue-dashboard, and backup access. Non-challenge intents expire after 24 hours; the sweep erases expired payloads and removes non-pending tombstones 24 hours after their original expiry, with possible sweep lag. Backups have separate retention.
+
+Delivery is **at-least-once, not exactly-once**: provider acceptance followed by a timeout or a database commit failure can result in another send. The stable metadata identifier supports tracing, not a promise of provider-side deduplication. Monitor pending-intent age, expired/cancelled intent counts, worker failures and DLQ volume; alert before challenge expiry. Redis dispatch waits are bounded to avoid indefinitely retaining transaction locks. SMTP/provider outages can still delay or expire notification delivery.
+
+### Hardening verification and rollout gate
+
+Success audits represent committed domain/security lifecycle mutations, not each HTTP retry. An identical completed keyed retry returns its historical response without a new audit or storage mutation. Failed/stale/unauthorized actions must not leave a success event. Registration confirmation emits its registration event rather than an extra sign-in event; ordinary refresh intentionally has no success audit. Filter assertions by event and resource/subject, or capture a baseline: authentication/setup can legitimately create additional events. Request IDs correlate HTTP attempts; they are not deduplication keys or aggregate versions.
+
+The regression suites cover these boundaries:
+
+| Boundary | Regression suite |
+| --- | --- |
+| Cross-connection claims, rollback, bodyless 204, retention/expiry | `test/e2e/idempotency/idempotency.e2e-spec.ts` |
+| Permission loss on replay, transactional audits, concurrent deletion and storage cleanup | `test/e2e/administration/users.e2e-spec.ts` |
+| Avatar/contact replay, recreated contacts, temporary uploads and upload compensation | `test/e2e/account/profile.e2e-spec.ts` |
+| Concurrent optimistic edits, lifecycle actions, ownership and hero rollback | `test/e2e/articles/articles.e2e-spec.ts` |
+| Single-use challenges, OTP lockout, authentication and security rollback | `test/e2e/authentication/{registration,email-verification,mfa,password-reset,sessions}.e2e-spec.ts` |
+| Encrypted intent, cancellation rollback, expiry, provider retry and real Redis worker delivery | `test/e2e/authentication/security-delivery.e2e-spec.ts` |
+
+Run the full suite against a disposable migrated schema, never the development/production database. `npm run test:infra:up` starts the isolated MySQL 8.4/Redis services. On POSIX shells use `npm run test:e2e:local`; on PowerShell set the explicit test variables first:
+
+```powershell
+$env:TEST_DB_ENABLED = 'true'
+$env:TEST_DB_HOST = '127.0.0.1'
+$env:TEST_DB_PORT = '3308'
+$env:TEST_DB_USER = 'quickapi_test_app'
+$env:TEST_DB_PASSWORD = 'quickapi_test_password'
+$env:TEST_DB_DATABASE = 'quickapi_test'
+$env:REDIS_HOST = '127.0.0.1'
+$env:REDIS_PORT = '6380'
+$env:REDIS_PASSWORD = 'quickapi_test_redis_password'
+npm run test:e2e
+```
+
+Global setup validates the explicit test-schema match, then drops, migrates and seeds **that disposable schema**. Run unit tests, lint, type-checks and build as well; an unavailable dependency or a suite that never reached its tests is not a passing result. CI uses the same MySQL 8.4/Redis topology. The real-delivery regression uses a uniquely named test queue and mocked provider, and removes only its own queue after completion.
+
+Before rollout: require green complete E2E/CI evidence for the exact release commit; back up the production schema; apply all pending migrations (including the request-idempotency migration and `1791892800000-email-outbox`) before updating API/workers; maintain the same `CRYPTO_SECRET` across replicas; and update browser CORS headers and client retry policies. In staging, verify permission removal still blocks a replay, old refresh cookies are rejected, a controlled queue/provider outage recovers the same delivery ID, expired codes are not sent, and `/ready` is healthy. Do not send production credentials or real recipient emails from these regression tests.
+
+Storage compensation is not a durable cleanup queue: deletion is retried three times, and exhausted post-commit cleanup errors are surfaced/logged while the database mutation, audit and replay record remain committed. Retrying the same key returns the committed response and does **not** rerun cleanup. Resolve leaked object keys operationally and monitor cleanup errors; durable storage-deletion/reconciliation is a separate follow-up. A process crash between upload and compensation can also leave an orphan. Email provider acceptance followed by timeout/commit failure likewise remains an at-least-once boundary, not an exactly-once guarantee.
+
+Retention sweeps and Bull age-based auto-removal are not immediate physical erasure (Bull cleanup is opportunistic on subsequent job completions/failures). Include backups and legacy queues in privacy/erasure procedures. Stale administrator edits remain last-write-wins without an `expected_version` contract. Release rollback must not drop outbox/idempotency tables containing live intent or replay data: roll back application versions compatibly, preserve the encryption secret, and drain compatible workers. Monitor pending age/expiry, queue failures/DLQ, lock conflicts and storage-cleanup failures during the rollout.
 
 ## API Structure
 
@@ -228,7 +338,7 @@ LOG_LEVEL="silent"
 
 CORS_ORIGINS="http://localhost:5173"
 CORS_METHODS="GET,POST,PUT,PATCH,DELETE"
-CORS_ALLOWED_HEADERS="Content-Type,Authorization,X-CSRF-Token"
+CORS_ALLOWED_HEADERS="Content-Type,Authorization,X-CSRF-Token,Idempotency-Key"
 CORS_EXPOSED_HEADERS="Authorization,Set-Cookie"
 CORS_CREDENTIALS="true"
 CORS_MAX_AGE_SECONDS="86400"

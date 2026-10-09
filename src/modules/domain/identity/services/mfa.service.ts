@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
@@ -30,7 +31,7 @@ export class MfaService {
 
   public async createSignInChallenge(
     user: UserEntity,
-    manager: EntityManager = this.settingsRepo.manager,
+    manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<CreatedAccountToken | null> {
     const settings = await this.settingsRepo.findByUser(manager, user.id, true);
     if (!settings) return null;
@@ -45,7 +46,7 @@ export class MfaService {
 
   public async requestEnable(
     user: UserEntity,
-    manager: EntityManager = this.settingsRepo.manager,
+    manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<CreatedAccountToken> {
     const current = await this.findSettings(user.id, manager);
 
@@ -65,7 +66,7 @@ export class MfaService {
     code: string,
     purpose: MfaChallengePurpose,
     userId?: string,
-    manager: EntityManager = this.settingsRepo.manager,
+    manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<UserEntity> {
     const token: AccountTokenEntity = await this.accountTokenSvc.consumeMfaCode(
       challengeId,
@@ -81,7 +82,7 @@ export class MfaService {
 
   public async enable(
     user: UserEntity,
-    manager: EntityManager = this.settingsRepo.manager,
+    manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<void> {
     const now = new Date();
     const current = await this.findSettings(user.id, manager);
@@ -113,7 +114,7 @@ export class MfaService {
 
   public async disable(
     user: UserEntity,
-    manager: EntityManager = this.settingsRepo.manager,
+    manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<void> {
     const current = await this.findSettings(user.id, manager);
 
@@ -165,6 +166,7 @@ export class MfaService {
         expiresInMinutes: MFA_CODE_EXPIRES_IN_MINUTES,
       },
       metadata: { userId: user.id, challengeId: token.id, purpose },
+      expiresAt: token.expires_at,
     });
 
     return token;

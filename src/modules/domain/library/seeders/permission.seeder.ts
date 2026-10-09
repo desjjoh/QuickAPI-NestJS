@@ -1,5 +1,7 @@
 import {
   AccountManagementPermissions,
+  ArticleAdministrationPermissions,
+  ArticleCreatorPermissions,
   AuditPermissions,
   SystemPermissions,
   UserAdministrationPermissions,
@@ -42,6 +44,67 @@ export const PERMISSIONS_SEED: PermissionSeed[] = [
     key: String(AccountManagementPermissions.READ_CURRENT_USER_ACTIVITY),
     label: 'Read current-user activity',
     description: 'Allows a user to view only their own retained activity.',
+  },
+
+  // ARTICLE CREATION
+  {
+    key: String(ArticleCreatorPermissions.CREATE_ARTICLES),
+    label: 'Create articles',
+    description: 'Allows a creator to create articles under their own account.',
+  },
+  {
+    key: String(ArticleCreatorPermissions.READ_OWN_ARTICLES),
+    label: 'Read own articles',
+    description:
+      'Allows a creator to view articles authored by their own account.',
+  },
+  {
+    key: String(ArticleCreatorPermissions.UPDATE_OWN_ARTICLES),
+    label: 'Update own articles',
+    description:
+      'Allows a creator to update eligible articles authored by their own account.',
+  },
+  {
+    key: String(ArticleCreatorPermissions.SUBMIT_OWN_ARTICLES),
+    label: 'Submit own articles',
+    description:
+      'Allows a creator to submit their own draft articles for review.',
+  },
+  {
+    key: String(ArticleCreatorPermissions.WITHDRAW_OWN_ARTICLES),
+    label: 'Withdraw own articles',
+    description:
+      'Allows a creator to return their own submitted articles to draft.',
+  },
+
+  // ARTICLE ADMINISTRATION
+  {
+    key: String(ArticleAdministrationPermissions.READ_ARTICLES),
+    label: 'Read articles for administration',
+    description:
+      'Allows an administrator to view articles in every lifecycle status.',
+  },
+  {
+    key: String(ArticleAdministrationPermissions.PUBLISH_ARTICLES),
+    label: 'Publish articles',
+    description: 'Allows an administrator to publish submitted articles.',
+  },
+  {
+    key: String(ArticleAdministrationPermissions.RETURN_ARTICLES_TO_DRAFT),
+    label: 'Return articles to draft',
+    description:
+      'Allows an administrator to return submitted articles to draft for revision.',
+  },
+  {
+    key: String(ArticleAdministrationPermissions.ARCHIVE_ARTICLES),
+    label: 'Archive articles',
+    description: 'Allows an administrator to archive published articles.',
+  },
+  {
+    key: String(ArticleAdministrationPermissions.RESTORE_ARTICLES),
+    label: 'Restore articles',
+    description:
+      'Allows an administrator to restore archived articles to draft.',
   },
 
   // USER ADMINISTRATION

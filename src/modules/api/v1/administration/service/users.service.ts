@@ -58,14 +58,15 @@ export class UserAdminService {
     id: string,
     dto: AdministrationActionDto,
   ): Promise<void> {
-    await this.userSvc.transaction(async (manager) => {
+    await this.userSvc.transaction(async (manager, lifecycle) => {
       const before = await this.lockUser(manager, id);
-      await this.lifecycle.deleteUser(before, manager);
+      const beforeSnapshot = this.auditSnapshot(before);
+      await this.lifecycle.deleteUser(before, manager, lifecycle);
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,
           id,
-          this.auditSnapshot(before),
+          beforeSnapshot,
           null,
           dto.reason_code,
         ),
@@ -80,6 +81,7 @@ export class UserAdminService {
   ): Promise<UserDto> {
     const user = await this.userSvc.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
+      const beforeSnapshot = this.auditSnapshot(before);
       const after = await this.userAdministration.updateAdministration(
         before,
         dto,
@@ -89,7 +91,7 @@ export class UserAdminService {
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_UPDATED,
           id,
-          this.auditSnapshot(before),
+          beforeSnapshot,
           this.auditSnapshot(after),
           dto.reason_code,
         ),

@@ -28,6 +28,36 @@ export type ArticleTransitionContext = {
 
 @Injectable()
 export class ArticleStatusTransitionPolicy {
+  public assertEditable(current: string): void {
+    if (current !== ARTICLE_STATUS_KEYS.DRAFT)
+      throw new BadRequestException('Only draft articles can be updated.');
+  }
+
+  public assertCanWithdraw(current: string): void {
+    if (current !== ARTICLE_STATUS_KEYS.SUBMITTED)
+      throw new BadRequestException(
+        'Only submitted articles can be withdrawn.',
+      );
+
+    this.assertCanTransition(current, ARTICLE_STATUS_KEYS.DRAFT);
+  }
+
+  public assertCanReturnToDraft(current: string): void {
+    if (current !== ARTICLE_STATUS_KEYS.SUBMITTED)
+      throw new BadRequestException(
+        'Only submitted articles can be returned to draft.',
+      );
+
+    this.assertCanTransition(current, ARTICLE_STATUS_KEYS.DRAFT);
+  }
+
+  public assertCanRestore(current: string): void {
+    if (current !== ARTICLE_STATUS_KEYS.ARCHIVED)
+      throw new BadRequestException('Only archived articles can be restored.');
+
+    this.assertCanTransition(current, ARTICLE_STATUS_KEYS.DRAFT);
+  }
+
   public allowedTargets(current: string): readonly ArticleStatusKey[] {
     return (
       ARTICLE_STATUS_TRANSITIONS[current as ArticleStatusKey] ??

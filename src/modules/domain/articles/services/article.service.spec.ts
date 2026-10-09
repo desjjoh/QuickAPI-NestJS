@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 
 import { ArticleEntity } from '../entities/article.entity';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 import {
   ARTICLE_STATUS_KEYS,
   ArticleStatusKey,
@@ -15,8 +16,11 @@ import { ArticleStatusTransitionPolicy } from '../policies/article-status-transi
 function article(status: ArticleStatusKey = ARTICLE_STATUS_KEYS.DRAFT) {
   return {
     id: 'article-1',
+    version: 1,
     content: { title: 'Title', summary: 'Summary', body: 'Body' },
-    media: { hero: { id: 'hero-1' } },
+    media: {
+      hero: { id: 'hero-1', alt_text: 'Hero description', decorative: false },
+    },
     attribution: { author: { id: 'author-1' } },
     publication: {
       status: { id: `status-${status}`, key: status },
@@ -38,6 +42,7 @@ describe('ArticleService', () => {
     create: jest.fn(),
     merge: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     delete: jest.fn(),
   };
   const articleRepo = {
@@ -47,13 +52,24 @@ describe('ArticleService', () => {
     findById: jest.fn(),
     findByStatusKey: jest.fn(),
     findByAuthorId: jest.fn(),
+    paginatePublished: jest.fn(),
+    findPublishedById: jest.fn(),
+    paginateByAuthor: jest.fn(),
+    findByIdAndAuthor: jest.fn(),
+    findByIdAndAuthorForUpdate: jest.fn(),
+    paginateForAdministration: jest.fn(),
+    findByIdForUpdate: jest.fn(),
   };
   const statusRepo = {
     findAll: jest.fn(),
     findById: jest.fn(),
     findByKey: jest.fn(),
   };
-  const imageSvc = { findById: jest.fn() };
+  const imageSvc = {
+    findById: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+  };
   const userSvc = { findByIdOrFail: jest.fn() };
   let service: ArticleService;
 
@@ -83,6 +99,18 @@ describe('ArticleService', () => {
       articleRepo.lastSaved?.id === id ? articleRepo.lastSaved : article(),
     );
     Object.assign(articleRepo, { lastSaved: undefined });
+    manager.update.mockImplementation(async (_entity, _criteria, value) => {
+      const base = articleRepo.lastSaved ?? article();
+      articleRepo.lastSaved = {
+        ...base,
+        version: base.version + 1,
+        content: { ...base.content, ...value.content },
+        media: { ...base.media, ...value.media },
+        attribution: { ...base.attribution, ...value.attribution },
+        publication: { ...base.publication, ...value.publication },
+      };
+      return { affected: 1 };
+    });
     manager.save.mockImplementation(async (_entity, value) => {
       const saved = { id: value.id ?? 'created-article', ...value };
       articleRepo.lastSaved = saved;
@@ -92,6 +120,8 @@ describe('ArticleService', () => {
       key in statuses ? statuses[key] : null,
     );
     imageSvc.findById.mockResolvedValue({ id: 'hero-2' });
+    imageSvc.create.mockResolvedValue({ id: 'hero-uploaded' });
+    imageSvc.update.mockResolvedValue({ id: 'hero-1' });
     userSvc.findByIdOrFail.mockImplementation(async (id) => ({ id }));
     service = new ArticleService(
       articleRepo as never,
@@ -113,7 +143,11 @@ describe('ArticleService', () => {
     await service.findPublished();
     await service.findByAuthor('author-1');
 
-    expect(manager.transaction).toHaveBeenCalledWith(work);
+    expect(manager.transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(work).toHaveBeenCalledWith(
+      manager,
+      expect.any(TransactionLifecycle),
+    );
     expect(articleRepo.findAll).toHaveBeenCalledWith(manager);
     expect(articleRepo.findByStatusKey).toHaveBeenCalledWith(
       manager,
@@ -130,6 +164,125 @@ describe('ArticleService', () => {
     await expect(service.findByIdOrFail('missing')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('owns published pagination and published-only detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = { search: 'architecture' };
+    articleRepo.paginatePublished.mockResolvedValue([[article()], 1]);
+    articleRepo.findPublishedById.mockResolvedValue(article('published'));
+
+    await expect(
+      service.paginatePublished(pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(service.findPublishedByIdOrFail('article-1')).resolves.toEqual(
+      article('published'),
+    );
+
+    expect(articleRepo.paginatePublished).toHaveBeenCalledWith(
+      manager,
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findPublishedById).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+    );
+
+    articleRepo.findPublishedById.mockResolvedValue(null);
+    await expect(
+      service.findPublishedByIdOrFail('missing'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('owns author-scoped pagination and detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = { search: 'draft', statusKey: ARTICLE_STATUS_KEYS.DRAFT };
+    articleRepo.paginateByAuthor.mockResolvedValue([[article()], 1]);
+    articleRepo.findByIdAndAuthor.mockResolvedValue(article());
+
+    await expect(
+      service.paginateByAuthor('author-1', pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(
+      service.findByIdAndAuthorOrFail('article-1', 'author-1'),
+    ).resolves.toEqual(article());
+
+    expect(articleRepo.paginateByAuthor).toHaveBeenCalledWith(
+      manager,
+      'author-1',
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findByIdAndAuthor).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+      'author-1',
+    );
+
+    articleRepo.findByIdAndAuthor.mockResolvedValue(null);
+    await expect(
+      service.findByIdAndAuthorOrFail('missing', 'author-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('loads and locks an author-owned article for mutation', async () => {
+    articleRepo.findByIdAndAuthorForUpdate.mockResolvedValue(article());
+
+    await expect(
+      service.findByIdAndAuthorForUpdateOrFail(
+        'article-1',
+        'author-1',
+        manager as never,
+      ),
+    ).resolves.toEqual(article());
+    expect(articleRepo.findByIdAndAuthorForUpdate).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+      'author-1',
+    );
+
+    articleRepo.findByIdAndAuthorForUpdate.mockResolvedValue(null);
+    await expect(
+      service.findByIdAndAuthorForUpdateOrFail(
+        'missing',
+        'author-1',
+        manager as never,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('owns administration pagination and locked detail lookup', async () => {
+    const pageOptions = { page: 1, take: 25, skip: 0 };
+    const query = {
+      search: 'review',
+      statusKey: ARTICLE_STATUS_KEYS.SUBMITTED,
+      authorId: 'author-1',
+    };
+    articleRepo.paginateForAdministration.mockResolvedValue([[article()], 1]);
+    articleRepo.findByIdForUpdate.mockResolvedValue(article());
+
+    await expect(
+      service.paginateForAdministration(pageOptions as never, query),
+    ).resolves.toEqual([[article()], 1]);
+    await expect(
+      service.findByIdForUpdateOrFail('article-1', manager as never),
+    ).resolves.toEqual(article());
+
+    expect(articleRepo.paginateForAdministration).toHaveBeenCalledWith(
+      manager,
+      pageOptions,
+      query,
+    );
+    expect(articleRepo.findByIdForUpdate).toHaveBeenCalledWith(
+      manager,
+      'article-1',
+    );
+
+    articleRepo.findByIdForUpdate.mockResolvedValue(null);
+    await expect(
+      service.findByIdForUpdateOrFail('missing', manager as never),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('creates a draft with resolved hero and author without mutating input', async () => {
@@ -178,6 +331,37 @@ describe('ArticleService', () => {
     );
   });
 
+  it('creates an article and its uploaded hero through the same manager', async () => {
+    const file = { originalname: 'hero.png' } as Express.Multer.File;
+    const lifecycle = new TransactionLifecycle();
+
+    await service.createWithHero(
+      {
+        content: { title: 'New', summary: 'Summary', body: 'Body' },
+        authorId: 'author-1',
+        hero: {
+          file,
+          folder: 'articles/author-1/heroes',
+          altText: 'Hero description',
+        },
+      },
+      manager as never,
+      lifecycle,
+    );
+
+    expect(imageSvc.create).toHaveBeenCalledWith(
+      {
+        file,
+        folder: 'articles/author-1/heroes',
+        alt_text: 'Hero description',
+        decorative: false,
+      },
+      manager,
+      lifecycle,
+    );
+    expect(imageSvc.findById).toHaveBeenCalledWith('hero-uploaded', manager);
+  });
+
   it('updates a detached article and supports clearing attribution', async () => {
     const current = article();
     const original = structuredClone(current);
@@ -188,10 +372,9 @@ describe('ArticleService', () => {
       authorId: null,
     });
 
-    expect(manager.create).toHaveBeenCalledWith(ArticleEntity, current);
-    expect(manager.merge).toHaveBeenCalledWith(
+    expect(manager.update).toHaveBeenCalledWith(
       ArticleEntity,
-      expect.any(Object),
+      { id: current.id, version: 1 },
       expect.objectContaining({
         content: { title: 'Changed' },
         media: { hero: { id: 'hero-2' } },
@@ -200,6 +383,99 @@ describe('ArticleService', () => {
     );
     expect(current).toEqual(original);
     expect(articleRepo.lastSaved?.attribution.author).toBeNull();
+  });
+
+  it('rejects updates outside draft without resolving related resources', async () => {
+    await expect(
+      service.update(article(ARTICLE_STATUS_KEYS.SUBMITTED), {
+        content: { title: 'Changed' },
+        heroId: 'hero-2',
+      }),
+    ).rejects.toThrow('Only draft articles can be updated.');
+
+    expect(imageSvc.findById).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
+  });
+
+  it('replaces a draft hero without mutating the supplied article', async () => {
+    const current = article();
+    const original = structuredClone(current);
+    const file = { originalname: 'new.png' } as Express.Multer.File;
+    const lifecycle = new TransactionLifecycle();
+
+    await service.updateHero(
+      current,
+      {
+        file,
+        folder: 'articles/author-1/heroes',
+        altText: 'New hero',
+      },
+      manager as never,
+      lifecycle,
+    );
+
+    expect(imageSvc.update).toHaveBeenCalledWith(
+      {
+        image: current.media.hero,
+        file,
+        folder: 'articles/author-1/heroes',
+        alt_text: 'New hero',
+        decorative: false,
+      },
+      manager,
+      lifecycle,
+    );
+    expect(articleRepo.findById).toHaveBeenCalledWith(manager, current.id);
+    expect(current).toEqual(original);
+  });
+
+  it('rejects hero replacement outside draft before storing the file', async () => {
+    await expect(
+      service.updateHero(article(ARTICLE_STATUS_KEYS.SUBMITTED), {
+        file: {} as Express.Multer.File,
+        folder: 'articles/author-1/heroes',
+      }),
+    ).rejects.toThrow('Only draft articles can be updated.');
+
+    expect(imageSvc.update).not.toHaveBeenCalled();
+  });
+
+  it('does not retain stale text when replacing a hero with a decorative image', async () => {
+    const current = article();
+    const file = {} as Express.Multer.File;
+    await service.updateHero(current, {
+      file,
+      folder: 'heroes',
+      decorative: true,
+    });
+    expect(imageSvc.update).toHaveBeenCalledWith(
+      {
+        image: current.media.hero,
+        file,
+        folder: 'heroes',
+        alt_text: null,
+        decorative: true,
+      },
+      manager,
+      expect.any(TransactionLifecycle),
+    );
+    expect(current.media.hero.alt_text).toBe('Hero description');
+  });
+
+  it('rejects missing accessibility choices before uploading on creation and replacement', async () => {
+    const file = {} as Express.Multer.File;
+    await expect(
+      service.createWithHero({
+        content: article().content,
+        hero: { file, folder: 'heroes' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.updateHero(article(), { file, folder: 'heroes' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(imageSvc.create).not.toHaveBeenCalled();
+    expect(imageSvc.update).not.toHaveBeenCalled();
+    expect(manager.save).not.toHaveBeenCalled();
   });
 
   it('submits only drafts and clears stale publication data', async () => {
@@ -221,6 +497,30 @@ describe('ArticleService', () => {
     await expect(
       service.submit(article(ARTICLE_STATUS_KEYS.PUBLISHED)),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('withdraws only submitted articles and clears publication data', async () => {
+    const submitted = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(submitted.publication, {
+      publisher: { id: 'stale-publisher' },
+      publishedAt: new Date('2026-10-08T12:00:00.000Z'),
+    });
+
+    await service.withdraw(submitted);
+
+    expect(articleRepo.lastSaved?.publication).toEqual(
+      expect.objectContaining({
+        status: { id: 'status-draft' },
+        publisher: null,
+        publishedAt: null,
+      }),
+    );
+    await expect(service.withdraw(article())).rejects.toThrow(
+      'Only submitted articles can be withdrawn.',
+    );
+    await expect(
+      service.withdraw(article(ARTICLE_STATUS_KEYS.ARCHIVED)),
+    ).rejects.toThrow('Only submitted articles can be withdrawn.');
   });
 
   it('publishes a submitted article with publisher and timestamp', async () => {
@@ -261,24 +561,57 @@ describe('ArticleService', () => {
     ).rejects.toThrow('cannot transition');
   });
 
-  it('archives published articles and restores submitted or archived articles to draft', async () => {
+  it.each([null, '', '  ', 'x'.repeat(256)])(
+    'blocks publication of unresolved hero text: %s',
+    async (alt_text) => {
+      const current = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+      Object.assign(current.media.hero, { alt_text, decorative: false });
+      await expect(
+        service.publish(current, 'publisher-1'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(userSvc.findByIdOrFail).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows publication of explicitly decorative heroes', async () => {
+    const current = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(current.media.hero, { alt_text: null, decorative: true });
+    await service.publish(current, 'publisher-1');
+    expect(manager.update).toHaveBeenCalled();
+  });
+
+  it('archives published articles and keeps return and restore actions distinct', async () => {
     await service.archive(article(ARTICLE_STATUS_KEYS.PUBLISHED));
     expect(articleRepo.lastSaved?.publication.status).toEqual({
       id: 'status-archived',
     });
 
-    const archived = article(ARTICLE_STATUS_KEYS.ARCHIVED);
-    Object.assign(archived.publication, {
+    const submitted = article(ARTICLE_STATUS_KEYS.SUBMITTED);
+    Object.assign(submitted.publication, {
       publisher: { id: 'publisher-1' },
       publishedAt: new Date(),
     });
-    await service.returnToDraft(archived);
+    await service.returnToDraft(submitted);
     expect(articleRepo.lastSaved?.publication).toEqual(
       expect.objectContaining({
         status: { id: 'status-draft' },
         publisher: null,
         publishedAt: null,
       }),
+    );
+
+    const archived = article(ARTICLE_STATUS_KEYS.ARCHIVED);
+    await service.restore(archived);
+    expect(articleRepo.lastSaved?.publication.status).toEqual({
+      id: 'status-draft',
+    });
+
+    await expect(service.returnToDraft(archived)).rejects.toThrow(
+      'Only submitted articles can be returned to draft.',
+    );
+    await expect(service.restore(submitted)).rejects.toThrow(
+      'Only archived articles can be restored.',
     );
   });
 

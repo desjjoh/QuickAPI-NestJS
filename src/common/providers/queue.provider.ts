@@ -12,6 +12,7 @@ interface QueueEventsProviderOptions {
   queueName: string;
   connection: ConnectionOptions;
   deadLetterQueueName?: string;
+  deadLetterRetentionSeconds?: number;
 }
 
 export class RedisConnectionLostError extends Error {
@@ -89,8 +90,18 @@ export class QueueEventsProvider
       };
 
       await this.dlq.add(deadLetterQueueName, failurePayload, {
-        removeOnComplete: false,
-        removeOnFail: false,
+        ...(this.options.deadLetterRetentionSeconds
+          ? {
+              jobId: `dead-letter-${jobId}`,
+              removeOnComplete: {
+                age: this.options.deadLetterRetentionSeconds,
+              },
+              removeOnFail: { age: this.options.deadLetterRetentionSeconds },
+            }
+          : {
+              removeOnComplete: false,
+              removeOnFail: false,
+            }),
       });
 
       logger.warn(`Job ${jobId} moved to DLQ ${deadLetterQueueName}`);

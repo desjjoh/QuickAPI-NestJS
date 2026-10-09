@@ -1,7 +1,12 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
+import {
+  runInTransaction,
+  type TransactionWork,
+} from '@/common/helpers/transaction.helper';
 
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
@@ -16,29 +21,27 @@ type UpdateUserOptions = {
 export class UserService {
   public constructor(private readonly userRepo: UserRepository) {}
 
-  public transaction<T>(
-    work: (manager: EntityManager) => Promise<T>,
-  ): Promise<T> {
-    return this.userRepo.manager.transaction(work);
+  public transaction<T>(work: TransactionWork<T>): Promise<T> {
+    return runInTransaction(this.userRepo.manager, work);
   }
 
   public paginate(
     pageOptions: UserPaginationOptions,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<[UserEntity[], number]> {
     return this.userRepo.paginate(manager, pageOptions);
   }
 
   public findByEmail(
     email: string,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity | null> {
     return this.userRepo.findByEmail(manager, email);
   }
 
   public async findByIdOrFail(
     id: string,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const user = await this.userRepo.findById(manager, id);
 
@@ -51,7 +54,7 @@ export class UserService {
     user: UserEntity,
     dto: DeepPartial<UserEntity>,
     options: UpdateUserOptions = {},
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
     const dtoMetadata = dto.metadata as

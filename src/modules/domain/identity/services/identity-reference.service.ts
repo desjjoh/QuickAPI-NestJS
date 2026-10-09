@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
@@ -17,7 +18,7 @@ export class IdentityReferenceService {
 
   public async getAccountStatus(
     key: AccountStatusKey,
-    manager: EntityManager = this.statusRepo.manager,
+    manager: EntityManager = applicationManager(this.statusRepo.manager),
   ): Promise<AccountStatusEntity> {
     const status = await this.statusRepo.findByKey(manager, key);
 
@@ -31,7 +32,7 @@ export class IdentityReferenceService {
 
   public async getRole(
     key: ROLE_KEYS,
-    manager: EntityManager = this.roleRepo.manager,
+    manager: EntityManager = applicationManager(this.roleRepo.manager),
   ): Promise<RoleEntity> {
     const role = await this.roleRepo.findByKey(manager, key);
 

@@ -1,5 +1,7 @@
 import {
   AccountManagementPermissions,
+  ArticleAdministrationPermissions,
+  ArticleCreatorPermissions,
   AuditPermissions,
   SystemPermissions,
   UserAdministrationPermissions,
@@ -14,6 +16,7 @@ import {
 
 export enum ROLE_KEYS {
   USER = 'user',
+  CREATOR = 'creator',
   ADMINISTRATOR = 'administrator',
   SYSTEM_ADMINISTRATOR = 'system-administrator',
 }
@@ -37,12 +40,20 @@ export const ROLES_SEED: RoleSeed[] = [
     key: ROLE_KEYS.ADMINISTRATOR,
     label: 'Administrator',
     description:
-      'Administrative access to manage users and inspect retained user activity.',
+      'Administrative access to manage users, article publication, and retained activity.',
     permissions: [
       ...Object.values(UserAdministrationPermissions),
+      ...Object.values(ArticleAdministrationPermissions),
       AuditPermissions.SEARCH_AUDIT,
       AuditPermissions.READ_AUDIT_DETAIL,
     ],
+  },
+  {
+    key: ROLE_KEYS.CREATOR,
+    label: 'Creator',
+    description:
+      'Supplemental access to create and manage articles authored by the account.',
+    permissions: [...Object.values(ArticleCreatorPermissions)],
   },
   {
     key: ROLE_KEYS.USER,
@@ -75,11 +86,6 @@ export class RoleSeeder implements Seeder {
         where: { key: seed.key },
       });
 
-      if (existingRole) {
-        skipped += 1;
-        continue;
-      }
-
       const permissions: PermissionEntity[] = await permissionRepository.find({
         where: {
           key: In([...seed.permissions]),
@@ -87,6 +93,30 @@ export class RoleSeeder implements Seeder {
       });
 
       this.assertAllPermissionsExist(seed.key, seed.permissions, permissions);
+
+      if (existingRole) {
+        const assignedPermissionKeys = new Set(
+          existingRole.permissions?.map((permission) => permission.key) ?? [],
+        );
+        const missingPermissions = permissions.filter(
+          (permission) => !assignedPermissionKeys.has(permission.key),
+        );
+
+        if (missingPermissions.length > 0) {
+          const updatedRole = roleRepository.create({
+            ...existingRole,
+            permissions: [
+              ...(existingRole.permissions ?? []),
+              ...missingPermissions,
+            ],
+          });
+
+          await roleRepository.save(updatedRole);
+        }
+
+        skipped += 1;
+        continue;
+      }
 
       const role: RoleEntity = roleRepository.create({
         key: seed.key,

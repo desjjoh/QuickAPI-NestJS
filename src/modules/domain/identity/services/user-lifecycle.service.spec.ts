@@ -11,6 +11,7 @@ import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
 import { UserEntity } from '../entities/user.entity';
 import { UserProfileEntity } from '../entities/profile.entity';
 import { UserLifecycleService } from './user-lifecycle.service';
+import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('UserLifecycleService', () => {
   const manager = {
@@ -19,6 +20,7 @@ describe('UserLifecycleService', () => {
     findOneOrFail: jest.fn(),
     remove: jest.fn(),
     delete: jest.fn(),
+    transaction: jest.fn(),
   };
   const repository = { manager };
   const users = { findByEmail: jest.fn() };
@@ -31,6 +33,7 @@ describe('UserLifecycleService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    images.remove.mockReset();
     users.findByEmail.mockResolvedValue(null);
     references.getAccountStatus.mockResolvedValue({ id: 'active' });
     references.getRole.mockResolvedValue({ id: 'role-1', key: ROLE_KEYS.USER });
@@ -100,14 +103,52 @@ describe('UserLifecycleService', () => {
       id: 'user-1',
       profile: { id: 'profile-1', media: { avatar } },
     };
+    const lifecycle = new TransactionLifecycle();
 
-    await service.deleteUser(user as never, manager as never);
+    await service.deleteUser(user as never, manager as never, lifecycle);
 
     expect(manager.remove).toHaveBeenCalledWith(UserEntity, user);
     expect(manager.delete).toHaveBeenCalledWith(UserProfileEntity, {
       id: 'profile-1',
     });
     expect(images.remove).toHaveBeenCalledTimes(imageRemovals);
-    if (avatar) expect(images.remove).toHaveBeenCalledWith(avatar, manager);
+    if (avatar)
+      expect(images.remove).toHaveBeenCalledWith(avatar, manager, lifecycle);
+  });
+
+  it('opens a transaction and forwards its manager and lifecycle when none is supplied', async () => {
+    const transactionManager = { remove: jest.fn(), delete: jest.fn() };
+    const avatar = { id: 'image-1' };
+    const user = {
+      id: 'user-1',
+      profile: { id: 'profile-1', media: { avatar } },
+    };
+    let committed = false;
+    const afterCommit = jest.fn(() => {
+      expect(committed).toBe(true);
+    });
+    manager.transaction.mockImplementation(async (work) => {
+      const result = await work(transactionManager);
+      committed = true;
+      return result;
+    });
+    images.remove.mockImplementation(
+      async (image, suppliedManager, suppliedLifecycle) => {
+        expect(suppliedManager === transactionManager).toBe(true);
+        expect(suppliedLifecycle instanceof TransactionLifecycle).toBe(true);
+        suppliedLifecycle.afterCommit(afterCommit);
+        return image;
+      },
+    );
+
+    await service.deleteUser(user as never);
+
+    expect(manager.transaction).toHaveBeenCalledTimes(1);
+    expect(transactionManager.remove).toHaveBeenCalledWith(UserEntity, user);
+    expect(transactionManager.delete).toHaveBeenCalledWith(UserProfileEntity, {
+      id: 'profile-1',
+    });
+    expect(images.remove).toHaveBeenCalledTimes(1);
+    expect(afterCommit).toHaveBeenCalledTimes(1);
   });
 });

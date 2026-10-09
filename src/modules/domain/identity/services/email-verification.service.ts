@@ -60,6 +60,7 @@ export class EmailVerificationService {
       user,
       to: user.identity.email,
       tokenId: verification.id,
+      expiresAt: verification.expires_at,
       mfaCode,
     });
 
@@ -96,6 +97,7 @@ export class EmailVerificationService {
       user,
       to: normalizedEmail,
       tokenId: verification.id,
+      expiresAt: verification.expires_at,
       mfaCode,
     });
 
@@ -119,6 +121,7 @@ export class EmailVerificationService {
       firstName: metadata.profile.name.preferred ?? metadata.profile.name.first,
       to: email,
       tokenId: verification.id,
+      expiresAt: verification.expires_at,
       mfaCode,
       template: RegistrationVerificationTemplate,
       metadata: {
@@ -190,18 +193,20 @@ export class EmailVerificationService {
     challengeId: string,
     code: string,
   ): Promise<UserEntity> {
-    const registrationToken =
-      await this.registrationTokenSvc.consumeVerificationCode(
-        challengeId,
-        code,
+    return this.userSvc.transaction(async (manager) => {
+      const registrationToken =
+        await this.registrationTokenSvc.consumeVerificationCode(
+          challengeId,
+          code,
+          manager,
+        );
+      const user = await this.verifyRegistration(
+        registrationToken.metadata,
+        manager,
       );
-
-    const user = await this.userSvc.transaction((manager) =>
-      this.verifyRegistration(registrationToken.metadata, manager),
-    );
-
-    await this.sendRegistrationSuccess(user);
-    return user;
+      await this.sendRegistrationSuccess(user);
+      return user;
+    });
   }
 
   private async verifyRegistration(
@@ -303,6 +308,7 @@ export class EmailVerificationService {
     firstName = user?.profile.name.preferred ?? user?.profile.name.first ?? '',
     to,
     tokenId,
+    expiresAt,
     mfaCode,
     metadata,
     template = EmailVerificationTemplate,
@@ -311,6 +317,7 @@ export class EmailVerificationService {
     firstName?: string;
     to: string;
     tokenId: string;
+    expiresAt: Date;
     mfaCode: string;
     metadata?: Record<string, string>;
     template?: typeof EmailVerificationTemplate;
@@ -318,6 +325,7 @@ export class EmailVerificationService {
     await this.emailSvc.sendEmail({
       to,
       template,
+      expiresAt,
       model: {
         firstName,
         mfaCode,

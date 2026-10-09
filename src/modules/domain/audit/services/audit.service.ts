@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { RequestContext } from '@/common/store/request-context.store';
 import {
   BadRequestException,
@@ -67,7 +68,7 @@ export class AuditService {
 
   public record(
     input: RecordAuditInput,
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditEventEntity | null> {
     this.validateBase(input);
     const hasBefore = Object.prototype.hasOwnProperty.call(input, 'before');

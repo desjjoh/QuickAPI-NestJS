@@ -6,4 +6,6 @@ export interface SendEmailOptions<TModel extends Record<string, unknown>> {
   model?: TModel;
   tag?: string;
   metadata?: Record<string, string>;
+  /** Prevent delayed delivery after a security challenge expires. */
+  expiresAt?: Date;
 }

@@ -10,6 +10,15 @@ const hash = (value: string): string =>
   createHash('sha256').update(value).digest('hex');
 
 describe('RegistrationTokenService', () => {
+  it('persists invalid OTP attempts independently of the request transaction', async () => {
+    repo.findPendingById.mockResolvedValue(entity());
+    const requestManager = { createQueryBuilder: jest.fn() };
+    await expect(
+      service.consumeVerificationCode('r1', '000000', requestManager as never),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(manager.createQueryBuilder).toHaveBeenCalled();
+    expect(requestManager.createQueryBuilder).not.toHaveBeenCalled();
+  });
   const query = {
     update: jest.fn(),
     set: jest.fn(),

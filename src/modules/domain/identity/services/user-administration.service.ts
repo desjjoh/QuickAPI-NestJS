@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 
@@ -29,7 +30,7 @@ export class UserAdministrationService {
   public async updateUserStatusByKey(
     user: UserEntity,
     key: AccountStatusKey,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const status = await this.references.getAccountStatus(key, manager);
     const updated = await this.users.updateUser(
@@ -47,7 +48,7 @@ export class UserAdministrationService {
   public async addUserRoleByKey(
     user: UserEntity,
     key: ROLE_KEYS,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const role = await this.references.getRole(key, manager);
 
@@ -65,7 +66,7 @@ export class UserAdministrationService {
   public async updateAdministration(
     user: UserEntity,
     input: UpdateUserAdministrationInput,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const status = input.status_id
       ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })

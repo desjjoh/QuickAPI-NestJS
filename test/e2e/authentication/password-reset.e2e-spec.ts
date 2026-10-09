@@ -10,6 +10,9 @@ import {
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import { IdentityAuditEvents } from '@/config/audit-events.config';
 import {
   acquireCsrf,
   CapturingEmailService,
@@ -24,6 +27,75 @@ const OLD_PASSWORD = 'Valid!Pass1';
 const NEW_PASSWORD = 'New!Pass2';
 
 describe('Password reset', () => {
+  it('rolls back password, authorization consumption and session revocation when auditing fails', async () => {
+    const user = await createRegisteredUser(app, suite, email);
+    await signIn(OLD_PASSWORD, 201);
+    const before = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: user.id });
+    const pending = await requestReset();
+    const token = await suite.dataSource
+      .getRepository(AccountTokenEntity)
+      .findOneOrFail({
+        where: { user: { id: user.id }, type: AccountTokenType.PASSWORD_RESET },
+      });
+    const verified = await pending.agent
+      .post(`${ROOT}/verify`)
+      .set('x-csrf-token', pending.csrf)
+      .send({
+        email: user.identity.email,
+        code: email.verificationCodeFor(token.id),
+      })
+      .expect(200);
+    const body = {
+      authorization: verified.body.authorization,
+      password: NEW_PASSWORD,
+      confirm: NEW_PASSWORD,
+    };
+    const confirm = () =>
+      pending.agent
+        .patch(`${ROOT}/confirm?challenge_id=${token.id}`)
+        .set('x-csrf-token', pending.csrf)
+        .send(body);
+    const audit = jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('audit unavailable'));
+    await confirm().expect(500);
+    expect(
+      (
+        await suite.dataSource
+          .getRepository(UserEntity)
+          .findOneByOrFail({ id: user.id })
+      ).identity.password,
+    ).toBe(before.identity.password);
+    expect(
+      (
+        await suite.dataSource
+          .getRepository(AccountTokenEntity)
+          .findOneByOrFail({ id: token.id })
+      ).consumed_at,
+    ).toBeNull();
+    expect(
+      await suite.dataSource
+        .getRepository(UserSessionEntity)
+        .countBy({ active: true }),
+    ).toBe(1);
+    const events = suite.dataSource.getRepository(AuditEventEntity);
+    const where = {
+      event: IdentityAuditEvents.PASSWORD_RESET_COMPLETED,
+      subject_id: user.id,
+    };
+    expect(await events.countBy(where)).toBe(0);
+    audit.mockRestore();
+    await confirm().expect(200);
+    expect(await events.countBy(where)).toBe(1);
+    expect(
+      await suite.dataSource
+        .getRepository(UserSessionEntity)
+        .countBy({ active: true }),
+    ).toBe(0);
+    await confirm().expect(401);
+  });
   let app: INestApplication;
   let suite: TestSuite;
   let email: CapturingEmailService;

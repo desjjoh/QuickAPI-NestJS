@@ -17,13 +17,12 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
 
 import {
   PERMISSION_MATRIX,
   PermissionDomain,
 } from '@/config/permissions.config';
-import { storage } from '@/config/storage.config';
 
 import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -38,7 +37,7 @@ import {
 } from '@/common/decorators/current-user.decorator';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
-import { megabyte } from '@/common/constants/bytes.constants';
+import { imageUploadPolicy } from '@/config/image-upload.config';
 import { ApiFileUpload } from '@/common/decorators/file-upload.decorator';
 
 import { ProfileApiService } from '../services/profile.service';
@@ -51,6 +50,7 @@ import {
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
+import { Idempotent } from '@/common/decorators/idempotent.decorator';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
@@ -146,6 +146,7 @@ export class ProfileApiController {
 
   // POST /avatar
   @Post('avatar')
+  @Idempotent('identity.profile.avatar.replace')
   @Throttle({ default: throttlePolicies.fileUpload })
   @ApiOperation({
     summary: 'Set profile avatar',
@@ -156,14 +157,16 @@ export class ProfileApiController {
   @ApiFileUpload({
     fieldName: 'avatar',
     description:
-      'Image file to use as the authenticated user’s profile avatar. The file must pass image validation and size restrictions.',
+      'PNG, JPEG, or GIF avatar no larger than 1 MB, 8192 pixels per side, and 40 million pixels across all frames.',
   })
   @ApiOkResponse({
     description:
       'Profile avatar updated successfully. Returns the updated authenticated user payload.',
     type: UserDto,
   })
-  @UseInterceptors(FileInterceptor('avatar', { storage }))
+  @UseInterceptors(
+    ImageFileInterceptor('avatar', imageUploadPolicy.avatarMaxBytes),
+  )
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
   )
@@ -172,7 +175,7 @@ export class ProfileApiController {
     @CurrentSession() session: UserSessionEntity,
     @UploadedFile(
       new ImageUploadValidationPipe({
-        maxSize: 1 * megabyte,
+        maxSize: imageUploadPolicy.avatarMaxBytes,
         fileIsRequired: true,
       }),
     )
@@ -183,6 +186,7 @@ export class ProfileApiController {
 
   // DELETE /avatar
   @Delete('avatar')
+  @Idempotent('identity.profile.avatar.remove')
   @ApiOperation({
     summary: 'Remove profile avatar',
     description:
@@ -205,6 +209,7 @@ export class ProfileApiController {
 
   // POST /phone
   @Post('phone')
+  @Idempotent('identity.profile.phone.set')
   @ApiOperation({
     summary: 'Set primary phone number',
     description:
@@ -230,6 +235,7 @@ export class ProfileApiController {
 
   // DELETE /phone
   @Delete('phone')
+  @Idempotent('identity.profile.phone.remove')
   @ApiOperation({
     summary: 'Remove primary phone number',
     description:
@@ -248,6 +254,7 @@ export class ProfileApiController {
 
   // POST /address
   @Post('address')
+  @Idempotent('identity.profile.address.set')
   @ApiOperation({
     summary: 'Set profile address',
     description:
@@ -276,6 +283,7 @@ export class ProfileApiController {
 
   // DELETE /address
   @Delete('address')
+  @Idempotent('identity.profile.address.remove')
   @ApiOperation({
     summary: 'Remove profile address',
     description:

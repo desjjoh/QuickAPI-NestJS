@@ -25,4 +25,7 @@ export class ImageEntity extends BaseEntity {
 
   @Column({ type: 'varchar', length: 255, nullable: true, default: null })
   public readonly alt_text!: string | null;
+
+  @Column({ type: 'boolean', default: false })
+  public readonly decorative!: boolean;
 }
