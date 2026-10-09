@@ -14,6 +14,7 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { TokenService } from '@/modules/system/tokens/services/token.service';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
+import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import {
   AUDIT_EVENT_MATRIX,
   AuditEventDomain,
@@ -49,6 +50,76 @@ function cookieValue(response: request.Response, name: string): string {
 }
 
 describe('Authentication and session lifecycle', () => {
+  it('allows only one concurrent rotation of the same refresh credential', async () => {
+    await createUser();
+    const agent = request.agent(app.getHttpServer());
+    const signedIn = await signIn(agent);
+    const oldRefresh = cookieValue(signedIn.response, REFRESH_COOKIE);
+    const csrfResponse = await request(app.getHttpServer())
+      .get('/api/v1/security/csrf')
+      .expect(200);
+    const refresh = () =>
+      request(app.getHttpServer())
+        .post(`${AUTH_ROOT}/refresh`)
+        .set('x-csrf-token', csrfResponse.body.token as string)
+        .set(
+          'cookie',
+          `${CSRF_COOKIE}=${cookieValue(csrfResponse, CSRF_COOKIE)}; ${REFRESH_COOKIE}=${oldRefresh}`,
+        )
+        .send({});
+    const responses = await Promise.all([refresh(), refresh()]);
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      201, 401,
+    ]);
+    const winner = responses.find((response) => response.status === 201)!;
+    const loser = responses.find((response) => response.status === 401)!;
+    expect(cookies(loser)).toEqual([]);
+    const session = await suite.dataSource
+      .getRepository(UserSessionEntity)
+      .findOneByOrFail({
+        id: signedIn.response.body.user.session.id as string,
+      });
+    expect(session.token_version).toBe(2);
+    expect(session.refresh).toBe(
+      app.get(TokenService).hashToken(cookieValue(winner, REFRESH_COOKIE)),
+    );
+    await refresh().expect(401);
+  });
+
+  it('rolls back sign-out and cookie clearing when its success audit fails', async () => {
+    const user = await createUser();
+    const agent = request.agent(app.getHttpServer());
+    const signedIn = await signIn(agent);
+    const sessionId = signedIn.response.body.user.session.id as string;
+    const before = await suite.dataSource
+      .getRepository(UserSessionEntity)
+      .findOneByOrFail({ id: sessionId });
+    const signOut = () =>
+      agent
+        .post(`${AUTH_ROOT}/sign-out`)
+        .set('authorization', `Bearer ${signedIn.access}`)
+        .set('x-csrf-token', signedIn.csrf)
+        .send({});
+    const audit = jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('audit unavailable'));
+    const failed = await signOut().expect(500);
+    expect(cookies(failed)).toEqual([]);
+    expect(
+      await suite.dataSource
+        .getRepository(UserSessionEntity)
+        .findOneByOrFail({ id: sessionId }),
+    ).toMatchObject({ active: true, refresh: before.refresh });
+    const events = suite.dataSource.getRepository(AuditEventEntity);
+    const where = {
+      event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
+      subject_id: user.id,
+    };
+    expect(await events.countBy(where)).toBe(0);
+    audit.mockRestore();
+    await signOut().expect(201);
+    expect(await events.countBy(where)).toBe(1);
+  });
   let app: INestApplication;
   let suite: TestSuite;
   let email: CapturingEmailService;

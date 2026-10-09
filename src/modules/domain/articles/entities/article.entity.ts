@@ -1,4 +1,11 @@
-import { Column, Entity, JoinColumn, ManyToOne, type Relation } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  type Relation,
+} from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
 
@@ -63,6 +70,21 @@ class Publication {
 }
 
 @Entity('articles')
+@Index('IDX_articles_public_listing', [
+  'publication.status.id',
+  'publication.publishedAt',
+  'id',
+])
+@Index('IDX_articles_creator_listing', [
+  'attribution.author.id',
+  'createdAt',
+  'id',
+])
+@Index('IDX_articles_review_listing', [
+  'publication.status.id',
+  'createdAt',
+  'id',
+])
 export class ArticleEntity extends BaseEntity {
   @Column({ type: 'int', unsigned: true, default: 1 })
   public readonly version!: number;

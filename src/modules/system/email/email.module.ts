@@ -17,6 +17,11 @@ import { env } from '@/config/environment.config';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { ExpressAdapter } from '@bull-board/express';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { EmailIntentEntity } from './entities/email-intent.entity';
+import { EmailIntentRepository } from './repositories/email-intent.repository';
+import { EmailOutboxService } from './services/email-outbox.service';
+import { EmailOutboxDispatcher } from './services/email-outbox-dispatcher.service';
 
 const bullBoardImports = env.BULL_BOARD_ENABLED
   ? [
@@ -40,6 +45,7 @@ const bullBoardImports = env.BULL_BOARD_ENABLED
 @Module({
   imports: [
     ConfigModule,
+    TypeOrmModule.forFeature([EmailIntentEntity]),
     BullModule.forRoot({
       connection: redisConnection,
     }),
@@ -73,6 +79,9 @@ const bullBoardImports = env.BULL_BOARD_ENABLED
     EmailService,
     EmailTransportService,
     EmailQueueService,
+    EmailIntentRepository,
+    EmailOutboxService,
+    EmailOutboxDispatcher,
 
     EmailQueueProcessor,
     EmailDeadLetterQueueProcessor,
@@ -84,6 +93,7 @@ const bullBoardImports = env.BULL_BOARD_ENABLED
           queueName: EMAIL_QUEUE,
           connection: redisConnection,
           deadLetterQueueName: EMAIL_DLQ,
+          deadLetterRetentionSeconds: 86400,
         }),
     },
   ],

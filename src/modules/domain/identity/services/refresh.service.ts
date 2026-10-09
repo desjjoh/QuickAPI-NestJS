@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { applicationManager } from '@/common/helpers/transaction.helper';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { EntityManager } from 'typeorm';
 
@@ -33,8 +38,19 @@ export class RefreshService {
     res: Response,
     existingSession?: UserSessionEntity,
     req?: Request,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<JWTDto> {
+    if (manager.queryRunner?.isTransactionActive && existingSession?.refresh) {
+      const current = await manager.findOne(UserSessionEntity, {
+        where: { id: existingSession.id, user: { id: user.id }, active: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current || current.refresh !== existingSession.refresh)
+        throw new UnauthorizedException(
+          'Session credentials have already rotated or been revoked. Sign in again.',
+        );
+      existingSession = current;
+    }
     const contextSessionId = this.requestContext.get('sessionId');
     const currentSession = contextSessionId
       ? await this.sessionRepo.findByUser(manager, user.id, contextSessionId)
@@ -84,7 +100,7 @@ export class RefreshService {
 
   public async revokeSession(
     session: UserSessionEntity,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
     await manager.update(UserSessionEntity, session.id, {
       active: false,
@@ -95,7 +111,7 @@ export class RefreshService {
   public async revokeAllSessions(
     userId: string,
     res?: Response,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
     await manager
       .createQueryBuilder()
@@ -110,7 +126,7 @@ export class RefreshService {
   public async revokeOtherSessions(
     userId: string,
     currentSessionId: string,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
     await manager
       .createQueryBuilder()
@@ -125,7 +141,7 @@ export class RefreshService {
 
   public async incrementTokenVersion(
     userId: string,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
     await manager
       .createQueryBuilder()
@@ -137,7 +153,7 @@ export class RefreshService {
 
   public findSessions(
     userId: string,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<UserSessionEntity[]> {
     const refreshTokenNotExpiredAfter = new Date(
       Date.now() - env.REFRESH_COOKIE_MAX_AGE_DAYS * day,
@@ -153,7 +169,7 @@ export class RefreshService {
   public async revokeSessionById(
     userId: string,
     sessionId: string,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
     const session = await this.sessionRepo.findByUser(
       manager,
@@ -169,7 +185,7 @@ export class RefreshService {
   public findSessionById(
     userId: string,
     sessionId: string,
-    manager: EntityManager = this.sessionRepo.manager,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<UserSessionEntity | null> {
     return this.sessionRepo.findByUser(manager, userId, sessionId, true);
   }

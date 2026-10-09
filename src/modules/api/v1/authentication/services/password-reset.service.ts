@@ -67,6 +67,7 @@ export class PasswordResetService {
     await this.emailSvc.sendEmail({
       to: user.identity.email,
       template: PasswordResetTemplate,
+      expiresAt: reset.expires_at,
       model: {
         firstName: user.profile.name.preferred ?? user.profile.name.first,
         code,

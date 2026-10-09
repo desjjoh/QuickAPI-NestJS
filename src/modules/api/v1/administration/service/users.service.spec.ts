@@ -187,6 +187,24 @@ describe('UserAdminService', () => {
       manager,
     );
   });
+  it('captures the deletion snapshot before TypeORM clears the removed entity ID', async () => {
+    const { service, userSvc, audit, manager } = setup();
+    const before = userFixture();
+    manager.findOneOrFail.mockResolvedValue(before);
+    userSvc.deleteUser.mockImplementation(async (entity) => {
+      entity.id = undefined;
+    });
+    await service.removeUser('user-1', {
+      reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+    });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        before: expect.objectContaining({ id: 'user-1' }),
+        resourceId: 'user-1',
+      }),
+      manager,
+    );
+  });
 
   it.each([
     ['grants', [], ['role-1']],

@@ -104,6 +104,11 @@ describe('AccountTokenService', () => {
     ['missing, revoked, consumed, or incorrectly typed', null],
     ['expired', entity({ expires_at: new Date(Date.now() - 1) })],
     ['incorrectly hashed', entity({ token_hash: hash('other') })],
+    ['locked', entity({ locked_at: new Date() })],
+    [
+      'over-attempted',
+      entity({ failed_attempts: MAX_VERIFICATION_CODE_ATTEMPTS }),
+    ],
   ])('rejects a %s token', async (_label, value) => {
     repo.findPendingById.mockResolvedValue(value);
     await expect(
@@ -126,6 +131,16 @@ describe('AccountTokenService', () => {
     );
     expect(result.metadata).toEqual({ state: 'consumed' });
     expect(result.consumed_at).toBeInstanceOf(Date);
+    expect(manager.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: AccountTokenType.PASSWORD_RESET,
+        token_hash: hash('plain-token'),
+        expires_at: expect.anything(),
+        locked_at: expect.anything(),
+      }),
+      expect.anything(),
+    );
   });
 
   it('rejects incorrectly purposed metadata and token-consumption replay', async () => {
@@ -250,5 +265,28 @@ describe('AccountTokenService', () => {
       }),
       expect.objectContaining({ consumed_at: expect.any(Date) }),
     );
+  });
+
+  it('commits failed OTP attempts on the root manager, not the request manager', async () => {
+    repo.findPendingById.mockResolvedValue(entity());
+    const requestManager = { createQueryBuilder: jest.fn() };
+    await expect(
+      service.consumeMfaCode(
+        't1',
+        AccountTokenType.PASSWORD_RESET,
+        '654321',
+        {},
+        'u1',
+        requestManager as never,
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(repo.findPendingById).toHaveBeenCalledWith(
+      requestManager,
+      't1',
+      AccountTokenType.PASSWORD_RESET,
+    );
+    expect(manager.transaction).toHaveBeenCalled();
+    expect(manager.createQueryBuilder).toHaveBeenCalled();
+    expect(requestManager.createQueryBuilder).not.toHaveBeenCalled();
   });
 });

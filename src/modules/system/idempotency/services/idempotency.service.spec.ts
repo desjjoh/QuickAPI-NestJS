@@ -161,6 +161,22 @@ describe('durable request idempotency', () => {
     await service.purgeExpired();
     expect(store.rows.size).toBe(0);
   });
+  it('never retains a response body for a 204 completion', async () => {
+    const work = jest.fn(async () => ({
+      status: 204,
+      body: { unnecessary: 'private data' },
+    }));
+    expect(await service.execute(scope, 'key', 'fp', work)).toEqual({
+      status: 204,
+      body: null,
+    });
+    expect(await service.execute(scope, 'key', 'fp', work)).toEqual({
+      status: 204,
+      body: null,
+    });
+    expect(work).toHaveBeenCalledTimes(1);
+    expect([...store.rows.values()][0].response_body).toBeNull();
+  });
   it('discards a connection if releasing its advisory lock fails', async () => {
     jest.spyOn(logger, 'error').mockImplementation(() => undefined);
     store.setFailReleaseLock(true);

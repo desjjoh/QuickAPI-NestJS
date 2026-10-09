@@ -3,6 +3,10 @@ import { getOptionsToken } from '@nestjs/throttler';
 import { mkdir, rm, readdir } from 'node:fs/promises';
 import request from 'supertest';
 import { jest } from '@jest/globals';
+import type { Logger } from 'typeorm';
+import { Order, PaginationOptions } from '@/common/models/pagination.model';
+import { ArticleRepository } from '@/modules/domain/articles/repositories/article.repository';
+import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 
 import { env } from '@/config/environment.config';
 import { ArticleAuditEvents } from '@/config/audit-events.config';
@@ -68,6 +72,177 @@ type AuthenticatedAgent = {
 };
 
 describe('article API lifecycle', () => {
+  it('EXPLAINs actual article pagination SQL on representative data', async () => {
+    const author = await register('index-author@example.test');
+    const other = await register('index-other@example.test');
+    const statuses = await suite.dataSource
+      .getRepository(ArticleStatusEntity)
+      .find();
+    const statusId = (key: string) =>
+      statuses.find((status) => status.key === key)!.id;
+    const images = suite.dataSource.getRepository(ImageEntity);
+    const hero = await images.save(
+      images.create({
+        storage_key: 'index-fixture.png',
+        filename: 'index-fixture.png',
+        mime_type: 'image/png',
+        size_bytes: 1,
+        width: 1,
+        height: 1,
+        decorative: true,
+      }),
+    );
+    const articles = suite.dataSource.getRepository(ArticleEntity);
+    // 16k rows, skewed statuses, a selective author, and tied dates/ID ordering.
+    for (let start = 0; start < 16_000; start += 500) {
+      await articles.insert(
+        Array.from({ length: 500 }, (_, offset) => {
+          const i = start + offset;
+          const key =
+            i % 10 < 3
+              ? 'published'
+              : i % 10 === 3
+                ? 'submitted'
+                : i % 10 === 9
+                  ? 'archived'
+                  : 'draft';
+          const date = new Date(Date.UTC(2026, 0, 1) + (i % 2000) * 60_000);
+          return {
+            id: `qidx-${String(i).padStart(11, '0')}`,
+            createdAt: date,
+            content: {
+              title: `Article ${i}`,
+              summary: 'Representative query data',
+              body: 'Fixture',
+            },
+            media: { hero: { id: hero.id } },
+            attribution: {
+              author: { id: i % 31 === 0 ? author.id : other.id },
+            },
+            publication: {
+              status: { id: statusId(key) },
+              publishedAt: key === 'published' ? date : null,
+            },
+          };
+        }),
+      );
+    }
+    await suite.dataSource.query('ANALYZE TABLE `articles`');
+    const repository = new ArticleRepository(suite.dataSource);
+    const originalLogger = suite.dataSource.logger;
+    const statements: Array<{ sql: string; parameters: unknown[] }> = [];
+    const capture: Logger = {
+      logQuery: (sql, parameters) => {
+        statements.push({ sql, parameters: parameters ?? [] });
+      },
+      logQueryError() {},
+      logQuerySlow() {},
+      logSchemaBuild() {},
+      logMigration() {},
+      log() {},
+    };
+    const planNodes = (value: unknown): Record<string, unknown>[] => {
+      if (!value || typeof value !== 'object') return [];
+      if (Array.isArray(value)) return value.flatMap(planNodes);
+      const node = value as Record<string, unknown>;
+      return [node, ...Object.values(node).flatMap(planNodes)];
+    };
+    const cases = [
+      {
+        name: 'public',
+        index: 'IDX_articles_public_listing',
+        run: (page: PaginationOptions) =>
+          repository.paginatePublished(suite.dataSource.manager, page),
+      },
+      {
+        name: 'creator',
+        index: 'IDX_articles_creator_listing',
+        run: (page: PaginationOptions) =>
+          repository.paginateByAuthor(
+            suite.dataSource.manager,
+            author.id,
+            page,
+          ),
+      },
+      {
+        name: 'review',
+        index: 'IDX_articles_review_listing',
+        run: (page: PaginationOptions) =>
+          repository.paginateForAdministration(suite.dataSource.manager, page, {
+            statusKey: 'submitted',
+          }),
+      },
+      {
+        name: 'creator-status',
+        index: null,
+        run: (page: PaginationOptions) =>
+          repository.paginateByAuthor(
+            suite.dataSource.manager,
+            author.id,
+            page,
+            { statusKey: 'published' },
+          ),
+      },
+      {
+        name: 'administration-unfiltered',
+        index: null,
+        run: (page: PaginationOptions) =>
+          repository.paginateForAdministration(suite.dataSource.manager, page),
+      },
+    ];
+    try {
+      for (const order of [Order.ASC, Order.DESC]) {
+        for (const scenario of cases) {
+          statements.length = 0;
+          suite.dataSource.logger = capture;
+          const [rows] = await scenario.run(
+            Object.assign(new PaginationOptions(), { order }),
+          );
+          suite.dataSource.logger = originalLogger;
+          expect(rows).toHaveLength(25);
+          // Use the ORM's actual DISTINCT/eager-join pagination query, not an idealized SELECT.
+          const sql = statements.find(
+            (statement) =>
+              statement.sql.startsWith('SELECT DISTINCT') &&
+              statement.sql.includes('FROM `articles`'),
+          );
+          expect(sql).toBeDefined();
+          const explain = await suite.dataSource.query(
+            `EXPLAIN FORMAT=JSON ${sql!.sql}`,
+            sql!.parameters,
+          );
+          const plan = JSON.parse(explain[0].EXPLAIN) as unknown;
+          const nodes = planNodes(plan);
+          const access = nodes.filter(
+            (node) => node.table_name === 'ArticleEntity',
+          );
+          if (scenario.index) {
+            // Statistics can make MySQL choose another index with the same filter prefix.
+            // Check eligibility and indexed filtering, not a particular optimizer decision.
+            const filterColumn =
+              scenario.name === 'creator' ? 'author_id' : 'status_id';
+            expect(
+              access.some(
+                (table) =>
+                  Array.isArray(table.possible_keys) &&
+                  table.possible_keys.includes(scenario.index),
+              ),
+            ).toBe(true);
+            expect(
+              access.some(
+                (table) =>
+                  typeof table.key === 'string' &&
+                  Array.isArray(table.used_key_parts) &&
+                  table.used_key_parts[0] === filterColumn,
+              ),
+            ).toBe(true);
+          }
+        }
+      }
+    } finally {
+      suite.dataSource.logger = originalLogger;
+    }
+  }, 60_000);
   let suite: TestSuite;
   let app: INestApplication;
   let email: CapturingEmailService;
@@ -133,6 +308,143 @@ describe('article API lifecycle', () => {
       where: { identity: { email: address } },
     });
   }
+
+  it('enforces literal search semantics and independent visibility filters', async () => {
+    const author = await register('search-author@example.test');
+    const other = await register('search-other@example.test');
+    const statuses = await suite.dataSource
+      .getRepository(ArticleStatusEntity)
+      .find();
+    const images = suite.dataSource.getRepository(ImageEntity);
+    const hero = await images.save(
+      images.create({
+        storage_key: 'search-fixture.png',
+        filename: 'search-fixture.png',
+        mime_type: 'image/png',
+        size_bytes: 1,
+        width: 1,
+        height: 1,
+        decorative: true,
+      }),
+    );
+    const articles = suite.dataSource.getRepository(ArticleEntity);
+    const publishedIds: string[] = [];
+    const add = async (
+      title: string,
+      summary = 'Neutral summary',
+      body = 'Neutral body',
+      status = 'published',
+      authorId = author.id,
+    ) => {
+      const article = await articles.save(
+        articles.create({
+          content: { title, summary, body },
+          media: { hero: { id: hero.id } },
+          attribution: { author: { id: authorId } },
+          publication: {
+            status: {
+              id: statuses.find((candidate) => candidate.key === status)!.id,
+            },
+            publishedAt: status === 'published' ? new Date() : null,
+          },
+        }),
+      );
+      if (status === 'published') publishedIds.push(article.id);
+      return article.id;
+    };
+    const literal = await add("100% under_score! C:\\articles ' OR 1=1");
+    await add('1000 underXscore C:articles');
+    const accented = await add('Café handbook');
+    const phrase = await add('Alpha beta guide');
+    await add('Body-only fixture', 'Neutral summary', 'bodyexclusive');
+    const scopeIds: Record<string, string[]> = {};
+    for (const owner of [author, other]) {
+      for (const status of ['published', 'submitted', 'archived']) {
+        const ids = [] as string[];
+        for (const field of ['title', 'summary']) {
+          ids.push(
+            await add(
+              field === 'title' ? 'Scope needle' : 'Neutral title',
+              field === 'summary' ? 'Scope needle' : 'Neutral summary',
+              'Neutral body',
+              status,
+              owner.id,
+            ),
+          );
+        }
+        scopeIds[`${owner.id}:${status}`] = ids;
+      }
+    }
+    await add('Scope needle', 'Scope needle', 'Neutral body', 'draft');
+
+    // HTTP coverage also exercises URL encoding and the query DTO validation.
+    for (const [search, ids] of [
+      ['%', [literal]],
+      ['_', [literal]],
+      ['!', [literal]],
+      ['C:\\articles', [literal]],
+      ["' OR 1=1", [literal]],
+      ['CAFE', [accented]],
+      ['CAFE\u0301', [accented]],
+      [' \tALPHA\u00a0  beta\n ', [phrase]],
+      ['bodyexclusive', []],
+    ] as Array<[string, string[]]>) {
+      const response = await request(app.getHttpServer())
+        .get(PUBLIC_ROOT)
+        .query({ search })
+        .expect(200);
+      expect(
+        response.body.data.map((article: { id: string }) => article.id).sort(),
+      ).toEqual([...ids].sort());
+      expect(response.body.meta.itemCount).toBe(ids.length);
+    }
+    const absent = await request(app.getHttpServer())
+      .get(PUBLIC_ROOT)
+      .expect(200);
+    const blank = await request(app.getHttpServer())
+      .get(PUBLIC_ROOT)
+      .query({ search: ' \t\n ' })
+      .expect(200);
+    expect(blank.body).toEqual(absent.body);
+    expect(blank.body.meta.itemCount).toBe(publishedIds.length);
+    await request(app.getHttpServer())
+      .get(PUBLIC_ROOT)
+      .query({ search: ' '.repeat(256) })
+      .expect(422);
+
+    const repository = new ArticleRepository(suite.dataSource);
+    const page = new PaginationOptions();
+    const publicResults = await repository.paginatePublished(
+      suite.dataSource.manager,
+      page,
+      { search: 'scope needle' },
+    );
+    const creatorResults = await repository.paginateByAuthor(
+      suite.dataSource.manager,
+      author.id,
+      page,
+      { search: 'scope needle', statusKey: 'submitted' },
+    );
+    const administrationResults = await repository.paginateForAdministration(
+      suite.dataSource.manager,
+      page,
+      { search: 'scope needle', authorId: author.id, statusKey: 'submitted' },
+    );
+    const expectedPublic = [
+      ...scopeIds[`${author.id}:published`],
+      ...scopeIds[`${other.id}:published`],
+    ];
+    for (const [result, ids] of [
+      [publicResults, expectedPublic],
+      [creatorResults, scopeIds[`${author.id}:submitted`]],
+      [administrationResults, scopeIds[`${author.id}:submitted`]],
+    ] as Array<[[ArticleEntity[], number], string[]]>) {
+      expect(result[0].map((article) => article.id).sort()).toEqual(
+        [...ids].sort(),
+      );
+      expect(result[1]).toBe(ids.length);
+    }
+  }, 30_000);
 
   async function assignRole(user: UserEntity, key: ROLE_KEYS): Promise<void> {
     const role = await suite.dataSource

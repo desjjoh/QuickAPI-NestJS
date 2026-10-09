@@ -11,8 +11,10 @@ import { SessionsApiController } from './controllers/session.controller';
 import { SessionsApiService } from './services/sessions.service';
 import { EmailModule } from '@/modules/system/email/email.module';
 import { AuditModule } from '@/modules/domain/audit/audit.module';
+import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.module';
 import { ActivityApiController } from './controllers/activity.controller';
 import { ActivityApiService } from './services/activity.service';
+import { SecurityTransactionInterceptor } from '@/common/interceptors/security-transaction.interceptor';
 
 @Module({
   imports: [
@@ -22,8 +24,10 @@ import { ActivityApiService } from './services/activity.service';
     MediaModule,
     EmailModule,
     AuditModule,
+    IdempotencyModule,
   ],
   providers: [
+    SecurityTransactionInterceptor,
     MeApiService,
     ProfileApiService,
     SessionsApiService,

@@ -17,6 +17,33 @@ import { UserSessionEntity } from '../entities/session.entity';
 import { RefreshService } from './refresh.service';
 
 describe('RefreshService', () => {
+  it.each([null, { refresh: 'new-hash', active: true }])(
+    'rejects a refresh snapshot rotated or revoked by another request',
+    async (current) => {
+      const lockedManager = {
+        ...manager,
+        queryRunner: { isTransactionActive: true },
+      };
+      manager.findOne.mockResolvedValue(current);
+      await expect(
+        service.issueTokens(
+          user as never,
+          res as never,
+          { ...session, refresh: 'old-hash' } as never,
+          undefined,
+          lockedManager as never,
+        ),
+      ).rejects.toThrow(
+        'Session credentials have already rotated or been revoked.',
+      );
+      expect(manager.findOne).toHaveBeenCalledWith(UserSessionEntity, {
+        where: { id: 's1', user: { id: 'u1' }, active: true },
+        lock: { mode: 'pessimistic_write' },
+      });
+      expect(tokenSvc.createTokenPair).not.toHaveBeenCalled();
+      expect(res.cookie).not.toHaveBeenCalled();
+    },
+  );
   const user = { id: 'u1', identity: { email: 'user@test.dev' } };
   const session = {
     id: 's1',

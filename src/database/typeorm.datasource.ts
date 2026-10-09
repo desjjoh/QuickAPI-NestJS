@@ -34,6 +34,7 @@ import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.en
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
+import { EmailIntentEntity } from '@/modules/system/email/entities/email-intent.entity';
 
 const sourceMigrationDirectory = path.resolve(
   process.cwd(),
@@ -80,6 +81,7 @@ const dataSourceOptions: DataSourceOptions = {
     ArticleEntity,
     ArticleStatusEntity,
     IdempotencyEntity,
+    EmailIntentEntity,
   ],
   migrations: [path.join(migrationDirectory, '*{.ts,.js}')],
   ssl: env.DB_SSL

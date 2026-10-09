@@ -17,6 +17,13 @@ import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { UserService } from '@/modules/domain/identity/services/user.service';
+import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
+import {
+  StorageService,
+  PutStorageObjectInput,
+} from '@/modules/system/storage/types/storage.types';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserAdministrationService } from '@/modules/domain/identity/services/user-administration.service';
@@ -38,17 +45,40 @@ import {
 const ROOT = '/api/v1/administration/users';
 type Auth = { authorization: string };
 
+class MemoryStorage extends StorageService {
+  public readonly objects = new Map<string, Buffer>();
+  public async putObject(input: PutStorageObjectInput) {
+    this.objects.set(input.key, Buffer.from(input.body));
+    return {
+      key: input.key,
+      url: `memory://${input.key}`,
+      contentType: input.contentType,
+      sizeBytes: Buffer.byteLength(input.body),
+    };
+  }
+  public async deleteObject({ key }: { key: string }): Promise<void> {
+    this.objects.delete(key);
+  }
+  public async objectExists(key: string): Promise<boolean> {
+    return this.objects.has(key);
+  }
+}
+
 describe('user administration authorization and lifecycle', () => {
   let suite: TestSuite;
   let app: INestApplication;
   let email: CapturingEmailService;
+  let storage: MemoryStorage;
 
   beforeAll(async () => {
     email = new CapturingEmailService();
+    storage = new MemoryStorage();
     suite = await setupTestSuite((builder) =>
       builder
         .overrideProvider(EmailService)
         .useValue(email)
+        .overrideProvider(StorageService)
+        .useValue(storage)
         .overrideProvider(getOptionsToken())
         .useValue({
           skipIf: () => true,
@@ -58,6 +88,8 @@ describe('user administration authorization and lifecycle', () => {
     app = suite.app;
   });
   afterEach(async () => {
+    jest.restoreAllMocks();
+    storage.objects.clear();
     email.clear();
     await suite.resetDatabase();
   });
@@ -255,6 +287,211 @@ describe('user administration authorization and lifecycle', () => {
     ).toBeNull();
   });
 
+  it('replays keyed updates without reapplying an older action over a newer one', async () => {
+    const admin = await register('idempotent-admin@example.test');
+    const target = await register('idempotent-target@example.test');
+    const other = await register('idempotent-other@example.test');
+    await grant(admin, 'e2e-idempotent-update', ['update_users']);
+    const auth = await signIn('idempotent-admin@example.test');
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+    const payload = {
+      status_id: disabled.id,
+      role_ids: [],
+      reason_code: 'policy_enforcement',
+    };
+    const update = (id = target.id, body = payload, key = 'update') =>
+      request(app.getHttpServer())
+        .patch(`${ROOT}/${id}`)
+        .set(auth)
+        .set('Idempotency-Key', key)
+        .send(body);
+    const first = await update().expect(200);
+    expect((await update().expect(200)).body).toEqual(first.body);
+    const newer = {
+      ...payload,
+      status_id: target.status.id,
+      reason_code: 'access_review',
+    };
+    await update(target.id, newer, 'new-action').expect(200);
+    expect((await update().expect(200)).body).toEqual(first.body);
+    expect(
+      (
+        await suite.dataSource
+          .getRepository(UserEntity)
+          .findOneByOrFail({ id: target.id })
+      ).status.id,
+    ).toBe(target.status.id);
+    await update(target.id, newer).expect(409);
+    // Same actor/key is independent for a different target route.
+    await update(other.id).expect(200);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).count({
+        where: {
+          event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+          resource_id: target.id,
+        },
+      }),
+    ).toBe(2);
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(3);
+  });
+
+  it('executes concurrent keyed updates only once and checks permissions again on replay', async () => {
+    const admin = await register('concurrent-admin@example.test');
+    const target = await register('concurrent-target@example.test');
+    const role = await grant(admin, 'e2e-idempotent-concurrent', [
+      'update_users',
+    ]);
+    const auth = await signIn('concurrent-admin@example.test');
+    const update = () =>
+      request(app.getHttpServer())
+        .patch(`${ROOT}/${target.id}`)
+        .set(auth)
+        .set('Idempotency-Key', 'concurrent')
+        .send({ role_ids: [], reason_code: 'access_review' });
+    const responses = await Promise.all([update(), update()]);
+    expect(
+      responses.every((response) => [200, 409].includes(response.status)),
+    ).toBe(true);
+    const winner = responses.find((response) => response.status === 200);
+    expect(winner).toBeDefined();
+    expect((await update().expect(200)).body).toEqual(winner!.body);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).count({
+        where: {
+          event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+          resource_id: target.id,
+        },
+      }),
+    ).toBe(1);
+    await suite.dataSource
+      .createQueryBuilder()
+      .relation(UserEntity, 'roles')
+      .of(admin.id)
+      .remove(role.id);
+    await update().expect(403);
+  });
+
+  async function assignAvatar(target: UserEntity) {
+    const key = `avatars/${target.id}.png`;
+    storage.objects.set(key, Buffer.from('fixture'));
+    const image = await suite.dataSource.getRepository(ImageEntity).save(
+      suite.dataSource.getRepository(ImageEntity).create({
+        storage_key: key,
+        filename: 'avatar.png',
+        mime_type: 'image/png',
+        size_bytes: 7,
+        width: 1,
+        height: 1,
+      }),
+    );
+    await app
+      .get(UserService)
+      .updateUser(target, { profile: { media: { avatar: { id: image.id } } } });
+    return { key, image };
+  }
+
+  it('replays concurrent deletion as bodyless 204 with one retained audit and one storage cleanup', async () => {
+    const admin = await register('delete-replay-admin@example.test');
+    const target = await register('delete-replay-target@example.test');
+    await grant(admin, 'e2e-idempotent-delete', ['delete_users']);
+    const auth = await signIn('delete-replay-admin@example.test');
+    const { key, image } = await assignAvatar(target);
+    const cleanup = jest.spyOn(storage, 'deleteObject');
+    const remove = () =>
+      request(app.getHttpServer())
+        .post(`${ROOT}/${target.id}/delete`)
+        .set(auth)
+        .set('Idempotency-Key', 'delete')
+        .send({ reason_code: 'user_request' });
+    const responses = await Promise.all([remove(), remove()]);
+    expect(
+      responses.every((response) => [204, 409].includes(response.status)),
+    ).toBe(true);
+    expect(responses.some((response) => response.status === 204)).toBe(true);
+    expect((await remove().expect(204)).text).toBe('');
+    expect(
+      await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneBy({ id: target.id }),
+    ).toBeNull();
+    expect(
+      await suite.dataSource
+        .getRepository(ImageEntity)
+        .findOneBy({ id: image.id }),
+    ).toBeNull();
+    expect(storage.objects.has(key)).toBe(false);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    const events = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findBy({
+        event: IdentityAuditEvents.ADMIN_USER_DELETED,
+        resource_id: target.id,
+      });
+    expect(events).toHaveLength(1);
+    expect(events[0].before).toMatchObject({ id: target.id });
+    expect(events[0].actor_id).toBe(admin.id);
+    const record = await suite.dataSource
+      .getRepository(IdempotencyEntity)
+      .findOneByOrFail({ operation: 'identity.administration.user.delete' });
+    expect(record.response_status).toBe(204);
+    expect(record.response_body).toBeNull();
+    await request(app.getHttpServer())
+      .post(`${ROOT}/${target.id}/delete`)
+      .set(auth)
+      .set('Idempotency-Key', 'delete')
+      .send({ reason_code: 'policy_enforcement' })
+      .expect(409);
+  });
+
+  it('rolls back keyed deletion and preserves storage when audit persistence fails', async () => {
+    const admin = await register('delete-rollback-admin@example.test');
+    const target = await register('delete-rollback-target@example.test');
+    await grant(admin, 'e2e-idempotent-delete-rollback', ['delete_users']);
+    const auth = await signIn('delete-rollback-admin@example.test');
+    const { key, image } = await assignAvatar(target);
+    const cleanup = jest.spyOn(storage, 'deleteObject');
+    const audit = jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('audit failed'));
+    const remove = () =>
+      request(app.getHttpServer())
+        .post(`${ROOT}/${target.id}/delete`)
+        .set(auth)
+        .set('Idempotency-Key', 'rollback')
+        .send({ reason_code: 'user_request' });
+    await remove().expect(500);
+    audit.mockRestore();
+    expect(
+      await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneBy({ id: target.id }),
+    ).not.toBeNull();
+    expect(
+      await suite.dataSource
+        .getRepository(ImageEntity)
+        .findOneBy({ id: image.id }),
+    ).not.toBeNull();
+    expect(storage.objects.has(key)).toBe(true);
+    expect(cleanup).not.toHaveBeenCalled();
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(0);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).count({
+        where: {
+          event: IdentityAuditEvents.ADMIN_USER_DELETED,
+          resource_id: target.id,
+        },
+      }),
+    ).toBe(0);
+    await remove().expect(204);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
   it('commits an administrative write and its success audit together', async () => {
     const updater = await register('audit-commit-admin@example.test');
     const target = await register('audit-commit-target@example.test');
@@ -323,6 +560,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-rollback-admin@example.test'))
+      .set('Idempotency-Key', 'failed-domain-update')
       .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(500);
     mutation.mockRestore();
@@ -331,6 +569,9 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(UserEntity)
       .findOneByOrFail({ id: target.id });
     expect(stored.status.id).toBe(originalStatus);
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(0);
     expect(
       await suite.dataSource.getRepository(AuditEventEntity).existsBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
@@ -361,6 +602,7 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-failure-admin@example.test'))
+      .set('Idempotency-Key', 'failed-audit-update')
       .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
       .expect(500);
     insertion.mockRestore();
@@ -370,11 +612,54 @@ describe('user administration authorization and lifecycle', () => {
       .findOneByOrFail({ id: target.id });
     expect(stored.status.id).toBe(originalStatus);
     expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(0);
+    expect(
       await suite.dataSource.getRepository(AuditEventEntity).existsBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         resource_id: target.id,
       }),
     ).toBe(false);
+  });
+
+  it('allows retry of a keyed update after audit rollback', async () => {
+    const admin = await register('update-safe-retry-admin@example.test');
+    const target = await register('update-safe-retry-target@example.test');
+    await grant(admin, 'e2e-update-safe-retry', ['update_users']);
+    const auth = await signIn('update-safe-retry-admin@example.test');
+    const disabled = await suite.dataSource
+      .getRepository(AccountStatusEntity)
+      .findOneByOrFail({ key: 'disabled' });
+    const update = () =>
+      request(app.getHttpServer())
+        .patch(`${ROOT}/${target.id}`)
+        .set(auth)
+        .set('Idempotency-Key', 'safe-retry')
+        .send({ status_id: disabled.id, reason_code: 'policy_enforcement' });
+    jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('failed audit'));
+    await update().expect(500);
+    expect(
+      (
+        await suite.dataSource
+          .getRepository(UserEntity)
+          .findOneByOrFail({ id: target.id })
+      ).status.id,
+    ).toBe(target.status.id);
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(0);
+    const retried = await update().expect(200);
+    expect((await update().expect(200)).body).toEqual(retried.body);
+    expect(
+      await suite.dataSource.getRepository(AuditEventEntity).count({
+        where: {
+          event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+          resource_id: target.id,
+        },
+      }),
+    ).toBe(1);
   });
 
   it('uses the request ID to correlate retries of an administrative mutation', async () => {

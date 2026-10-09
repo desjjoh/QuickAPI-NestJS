@@ -1,5 +1,9 @@
+import {
+  applicationManager,
+  afterApplicationTransaction,
+} from '@/common/helpers/transaction.helper';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { EntityManager, IsNull } from 'typeorm';
+import { EntityManager, IsNull, LessThan, MoreThan } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 
 import { AccountTokenEntity } from '../entities/account-token.entity';
@@ -54,7 +58,7 @@ export class AccountTokenService {
       metadata = null,
       mfaCodeHash = null,
     }: CreateAccountTokenOptions,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<CreatedAccountToken> {
     await this.revokeActiveTokens(user.id, type, manager);
 
@@ -87,7 +91,7 @@ export class AccountTokenService {
     tokenId: string,
     type: AccountTokenType,
     token: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<AccountTokenEntity> {
     const entity = await this.tokenRepo.findPendingById(manager, tokenId, type);
 
@@ -95,7 +99,12 @@ export class AccountTokenService {
 
     const isExpired = entity.expires_at.getTime() <= Date.now();
 
-    if (isExpired) throw new UnauthorizedException('Invalid or expired token.');
+    if (
+      isExpired ||
+      entity.locked_at ||
+      entity.failed_attempts >= MAX_VERIFICATION_CODE_ATTEMPTS
+    )
+      throw new UnauthorizedException('Invalid or expired token.');
 
     const tokenHash = hashIdentityToken(token);
     const isMatch = compareIdentityTokenHashes(entity.token_hash, tokenHash);
@@ -111,7 +120,7 @@ export class AccountTokenService {
     token: string,
     expectedMetadata?: AccountTokenMetadata,
     consumedMetadata?: AccountTokenMetadata,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<AccountTokenEntity> {
     const entity = await this.validateToken(tokenId, type, token, manager);
 
@@ -122,7 +131,14 @@ export class AccountTokenService {
     const metadata = consumedMetadata ?? entity.metadata;
     const result = await manager.update(
       AccountTokenEntity,
-      { id: entity.id, consumed_at: IsNull() },
+      {
+        id: entity.id,
+        type,
+        token_hash: entity.token_hash,
+        consumed_at: IsNull(),
+        locked_at: IsNull(),
+        expires_at: MoreThan(consumedAt),
+      },
       {
         consumed_at: consumedAt,
         metadata,
@@ -141,7 +157,7 @@ export class AccountTokenService {
     code: string,
     expectedMetadata: AccountTokenMetadata,
     userId?: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<AccountTokenEntity> {
     const entity = await this.tokenRepo.findPendingById(manager, tokenId, type);
 
@@ -165,7 +181,7 @@ export class AccountTokenService {
       !isVerificationCode(code) ||
       !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
     ) {
-      await this.recordFailedAttempt(entity.id, manager);
+      await this.recordFailedAttempt(entity.id);
       throw new UnauthorizedException('Invalid or expired token.');
     }
 
@@ -193,35 +209,35 @@ export class AccountTokenService {
     return { ...entity, consumed_at: consumedAt };
   }
 
-  private async recordFailedAttempt(
-    id: string,
-    manager: EntityManager,
-  ): Promise<void> {
-    await manager.transaction(async (transactionManager) => {
-      await transactionManager
-        .createQueryBuilder()
-        .update(AccountTokenEntity)
-        .set({ failed_attempts: () => '`failed_attempts` + 1' })
-        .where('id = :id', { id })
-        .andWhere('consumed_at IS NULL')
-        .andWhere('locked_at IS NULL')
-        .andWhere('failed_attempts < :maxAttempts', {
-          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-        })
-        .execute();
+  private async recordFailedAttempt(id: string): Promise<void> {
+    // Security accounting must commit even when the enclosing mutation rolls back.
+    await afterApplicationTransaction(() =>
+      this.tokenRepo.manager.transaction(async (transactionManager) => {
+        await transactionManager
+          .createQueryBuilder()
+          .update(AccountTokenEntity)
+          .set({ failed_attempts: () => '`failed_attempts` + 1' })
+          .where('id = :id', { id })
+          .andWhere('consumed_at IS NULL')
+          .andWhere('locked_at IS NULL')
+          .andWhere('failed_attempts < :maxAttempts', {
+            maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+          })
+          .execute();
 
-      await transactionManager
-        .createQueryBuilder()
-        .update(AccountTokenEntity)
-        .set({ locked_at: () => 'CURRENT_TIMESTAMP' })
-        .where('id = :id', { id })
-        .andWhere('consumed_at IS NULL')
-        .andWhere('locked_at IS NULL')
-        .andWhere('failed_attempts >= :maxAttempts', {
-          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-        })
-        .execute();
-    });
+        await transactionManager
+          .createQueryBuilder()
+          .update(AccountTokenEntity)
+          .set({ locked_at: () => 'CURRENT_TIMESTAMP' })
+          .where('id = :id', { id })
+          .andWhere('consumed_at IS NULL')
+          .andWhere('locked_at IS NULL')
+          .andWhere('failed_attempts >= :maxAttempts', {
+            maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+          })
+          .execute();
+      }),
+    );
   }
 
   public async authorizeMfaCode(
@@ -233,7 +249,7 @@ export class AccountTokenService {
       verifiedMetadata,
       expiresInMs,
     }: AuthorizeAccountTokenOptions,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<CreatedAccountToken> {
     const entity = await this.tokenRepo.findPendingByUser(
       manager,
@@ -254,14 +270,14 @@ export class AccountTokenService {
       throw new UnauthorizedException('Invalid or expired challenge.');
 
     if (!entity.mfa_code_hash || !isVerificationCode(code)) {
-      await this.recordFailedAttempt(entity.id, manager);
+      await this.recordFailedAttempt(entity.id);
       throw new UnauthorizedException('Invalid verification code.');
     }
 
     if (
       !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
     ) {
-      await this.recordFailedAttempt(entity.id, manager);
+      await this.recordFailedAttempt(entity.id);
       throw new UnauthorizedException('Invalid verification code.');
     }
 
@@ -275,6 +291,8 @@ export class AccountTokenService {
         consumed_at: IsNull(),
         mfa_code_hash: entity.mfa_code_hash,
         locked_at: IsNull(),
+        expires_at: MoreThan(new Date()),
+        failed_attempts: LessThan(MAX_VERIFICATION_CODE_ATTEMPTS),
       },
       {
         token_hash: tokenHash,
@@ -293,7 +311,7 @@ export class AccountTokenService {
   public async revokeActiveTokens(
     userId: string,
     type: AccountTokenType,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<void> {
     await manager.update(
       AccountTokenEntity,

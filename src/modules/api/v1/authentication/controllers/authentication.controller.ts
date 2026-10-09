@@ -1,3 +1,4 @@
+import { SecurityOperation } from '@/common/decorators/security-operation.decorator';
 import type { Request, Response } from 'express';
 import {
   Body,
@@ -41,6 +42,7 @@ import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Identity & Sessions')
 @UseGuards(CsrfGuard)
+@SecurityOperation()
 @Controller()
 export class AuthApiController {
   public constructor(private readonly svc: AuthService) {}

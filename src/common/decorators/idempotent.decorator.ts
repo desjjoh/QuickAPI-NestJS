@@ -14,11 +14,11 @@ export function Idempotent(operation: string) {
       name: 'Idempotency-Key',
       required: false,
       description:
-        'Optional unique request key (1–128 printable characters). Identical completed retries replay the original response for 24 hours. Different payloads or an in-progress request return 409.',
+        'Optional request key: 1–128 printable ASCII characters, excluding whitespace and commas. Scoped to the current actor, operation and route. Identical completed retries replay the original JSON/status for 24 hours (204 has no body); current authorization is still required. Different payloads or an in-progress request return 409. Omit on credential/token/cookie endpoints.',
     }),
     ApiConflictResponse({
       description:
-        'Stale expected_version, conflicting key payload, or another request using this key is still processing.',
+        'Conflicting key payload, another request using this key is still processing, or a stale expected_version on endpoints with optimistic concurrency.',
     }),
   );
 }

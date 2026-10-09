@@ -1,3 +1,7 @@
+import {
+  applicationManager,
+  afterApplicationTransaction,
+} from '@/common/helpers/transaction.helper';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { EntityManager, IsNull } from 'typeorm';
 
@@ -33,7 +37,7 @@ export class RegistrationTokenService {
       metadata,
       mfaCodeHash = null,
     }: CreateRegistrationTokenOptions,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<CreatedAccountToken> {
     await this.revokeActiveTokens(email, manager);
 
@@ -61,7 +65,7 @@ export class RegistrationTokenService {
 
   public async findPendingByEmail(
     email: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<RegistrationTokenEntity | null> {
     return this.tokenRepo.findPendingByEmail(manager, email);
   }
@@ -69,7 +73,7 @@ export class RegistrationTokenService {
   public async validateToken(
     tokenId: string,
     token: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<RegistrationTokenEntity> {
     const entity = await this.tokenRepo.findPendingById(manager, tokenId);
 
@@ -90,7 +94,7 @@ export class RegistrationTokenService {
   public async consumeToken(
     tokenId: string,
     token: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<RegistrationTokenEntity> {
     const entity = await this.validateToken(tokenId, token, manager);
 
@@ -110,7 +114,7 @@ export class RegistrationTokenService {
   public async consumeVerificationCode(
     challengeId: string,
     code: string,
-    manager: EntityManager = this.tokenRepo.manager,
+    manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<RegistrationTokenEntity> {
     const entity = await this.tokenRepo.findPendingById(manager, challengeId);
 
@@ -130,7 +134,7 @@ export class RegistrationTokenService {
       !isVerificationCode(code) ||
       !compareIdentityTokenHashes(entity.mfa_code_hash, codeHash)
     ) {
-      await this.recordFailedAttempt(entity.id, manager);
+      await this.recordFailedAttempt(entity.id);
       throw new UnauthorizedException('Invalid or expired challenge.');
     }
 
@@ -155,25 +159,26 @@ export class RegistrationTokenService {
     return { ...entity, consumed_at: consumedAt };
   }
 
-  private async recordFailedAttempt(
-    id: string,
-    manager: EntityManager,
-  ): Promise<void> {
-    await manager
-      .createQueryBuilder()
-      .update(RegistrationTokenEntity)
-      .set({
-        locked_at: () =>
-          `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
-        failed_attempts: () => '`failed_attempts` + 1',
-      })
-      .where('id = :id', { id })
-      .andWhere('consumed_at IS NULL')
-      .andWhere('locked_at IS NULL')
-      .andWhere('failed_attempts < :maxAttempts', {
-        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-      })
-      .execute();
+  private async recordFailedAttempt(id: string): Promise<void> {
+    // Use an independent autocommit statement, not the failed request transaction.
+    await afterApplicationTransaction(() =>
+      this.tokenRepo.manager
+        .createQueryBuilder()
+        .update(RegistrationTokenEntity)
+        .set({
+          locked_at: () =>
+            `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
+          failed_attempts: () => '`failed_attempts` + 1',
+        })
+        .where('id = :id', { id })
+        .andWhere('consumed_at IS NULL')
+        .andWhere('locked_at IS NULL')
+        .andWhere('failed_attempts < :maxAttempts', {
+          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
+        })
+        .execute()
+        .then(() => undefined),
+    );
   }
 
   private async revokeActiveTokens(

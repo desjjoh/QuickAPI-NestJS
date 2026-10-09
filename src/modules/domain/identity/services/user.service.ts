@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
@@ -26,21 +27,21 @@ export class UserService {
 
   public paginate(
     pageOptions: UserPaginationOptions,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<[UserEntity[], number]> {
     return this.userRepo.paginate(manager, pageOptions);
   }
 
   public findByEmail(
     email: string,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity | null> {
     return this.userRepo.findByEmail(manager, email);
   }
 
   public async findByIdOrFail(
     id: string,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const user = await this.userRepo.findById(manager, id);
 
@@ -53,7 +54,7 @@ export class UserService {
     user: UserEntity,
     dto: DeepPartial<UserEntity>,
     options: UpdateUserOptions = {},
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
     const dtoMetadata = dto.metadata as

@@ -64,7 +64,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
           }),
         );
         response.status(result.status);
-        return result.body;
+        return result.status === 204 ? undefined : result.body;
       })(),
     );
   }

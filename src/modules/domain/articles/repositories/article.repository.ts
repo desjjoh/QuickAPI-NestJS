@@ -4,7 +4,7 @@ import {
   EntityManager,
   FindOptionsOrder,
   FindOptionsWhere,
-  Like,
+  Raw,
 } from 'typeorm';
 
 import { Order, PaginationOptions } from '@/common/models/pagination.model';
@@ -17,6 +17,7 @@ import {
   CreatorArticleQuery,
 } from '../models/article-query.model';
 import { ARTICLE_STATUS_KEYS } from '../seeders/status.seeder';
+import { articleSearchPattern } from '../policies/article-search.policy';
 
 const ARTICLE_ORDER: FindOptionsOrder<ArticleEntity> = {
   createdAt: 'DESC',
@@ -200,11 +201,17 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
     scope: FindOptionsWhere<ArticleEntity>,
     search?: string,
   ): FindOptionsWhere<ArticleEntity> | FindOptionsWhere<ArticleEntity>[] {
-    const term = search?.trim();
+    const term = articleSearchPattern(search);
 
     if (!term) return scope;
 
-    const pattern = Like(`%${term}%`);
+    // Keep case/accent semantics explicit instead of inheriting environment collation.
+    // Only the ORM column alias is interpolated; user text stays in a bound parameter.
+    const pattern = Raw(
+      (alias) =>
+        `CONVERT(${alias} USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE :articleSearch ESCAPE '!'`,
+      { articleSearch: term },
+    );
 
     return [
       { ...scope, content: { title: pattern } },

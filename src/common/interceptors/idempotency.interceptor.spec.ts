@@ -1,5 +1,7 @@
 import {
   Body,
+  Delete,
+  HttpCode,
   Controller,
   ExecutionContext,
   INestApplication,
@@ -44,6 +46,12 @@ class ActorGuard {
 class RetryController {
   public calls = 0;
   public fail = false;
+  @Delete('remove')
+  @HttpCode(204)
+  @Idempotent('remove')
+  public remove(): void {
+    this.calls++;
+  }
   @Post('create')
   @Idempotent('create')
   @UseInterceptors(ImageFileInterceptor('hero', 4096))
@@ -155,6 +163,21 @@ describe('idempotency HTTP and multipart integration', () => {
     const replay = await create().expect(201);
     expect(replay.body).toEqual(first.body);
     expect(controller.calls).toBe(1);
+  });
+  it('replays 204 with no body and no repeated execution', async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await request(app.getHttpServer())
+        .delete('/idempotency/remove')
+        .set('Authorization', 'actor-1')
+        .set('Idempotency-Key', 'remove')
+        .expect(204);
+      expect(response.text).toBe('');
+    }
+    expect(controller.calls).toBe(1);
+    expect([...store.rows.values()][0]).toMatchObject({
+      response_status: 204,
+      response_body: null,
+    });
   });
   it('compares both body fields and uploaded bytes', async () => {
     await create().expect(201);

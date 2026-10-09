@@ -8,7 +8,7 @@ export type EmailJobPayload = {
 };
 
 export type EmailDeadLetterPayload = {
-  originalData: EmailJobPayload;
+  originalData: EmailQueuePayload;
   meta: {
     jobId: string | undefined;
     attemptsMade: number;
@@ -18,3 +18,5 @@ export type EmailDeadLetterPayload = {
     queueName: string;
   };
 };
+
+export type EmailQueuePayload = EmailJobPayload | { deliveryId: string };

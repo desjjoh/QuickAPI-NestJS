@@ -1,3 +1,4 @@
+import { SecurityOperation } from '@/common/decorators/security-operation.decorator';
 import {
   Body,
   Controller,
@@ -34,6 +35,7 @@ import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Password Reset')
 @UseGuards(CsrfGuard)
+@SecurityOperation()
 @Controller('password-reset')
 export class PasswordResetApiController {
   public constructor(private readonly prSvc: PasswordResetService) {}

@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import {
   ConflictException,
   Injectable,
@@ -30,7 +31,7 @@ export class UserLifecycleService {
 
   public async createUser(
     input: DeepPartial<UserEntity>,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const email = input.identity?.email;
 
@@ -59,7 +60,7 @@ export class UserLifecycleService {
 
   public async deleteUser(
     user: UserEntity,
-    manager: EntityManager = this.userRepo.manager,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
     lifecycle?: TransactionLifecycle,
   ): Promise<void> {
     if (!lifecycle)

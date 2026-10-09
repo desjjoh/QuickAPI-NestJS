@@ -1,3 +1,4 @@
+import { SecurityOperation } from '@/common/decorators/security-operation.decorator';
 import { Controller, Delete, Get, Param, Res, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,6 +29,7 @@ import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Account Security & Access')
 @ApiBearerAuth('access-token')
+@SecurityOperation()
 @Controller('sessions')
 @UseGuards(CsrfGuard, JwtAuthGuard, PermissionsGuard)
 @Throttle({ default: throttlePolicies.sessionRead })

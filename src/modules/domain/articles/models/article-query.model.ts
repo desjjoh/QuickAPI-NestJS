@@ -35,7 +35,8 @@ export class ArticleQueryDto
 {
   @ApiPropertyOptional({
     maxLength: 255,
-    description: 'Search text matched against article titles and summaries.',
+    description:
+      'Literal, case- and accent-insensitive substring search across title or summary (not body). Query whitespace is trimmed/collapsed to single spaces; Unicode is normalized to NFC. %, _ and ! are literal, not wildcard syntax. Whitespace-only input applies no search filter. Maximum 255 characters before normalization; author/status restrictions always apply.',
   })
   @IsOptional()
   @IsString()

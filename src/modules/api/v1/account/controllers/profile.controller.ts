@@ -50,6 +50,7 @@ import {
 import { UpdatePhoneDto } from '../models/updatePhone.model';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
+import { Idempotent } from '@/common/decorators/idempotent.decorator';
 
 @ApiTags('Profile Management')
 @ApiBearerAuth('access-token')
@@ -145,6 +146,7 @@ export class ProfileApiController {
 
   // POST /avatar
   @Post('avatar')
+  @Idempotent('identity.profile.avatar.replace')
   @Throttle({ default: throttlePolicies.fileUpload })
   @ApiOperation({
     summary: 'Set profile avatar',
@@ -184,6 +186,7 @@ export class ProfileApiController {
 
   // DELETE /avatar
   @Delete('avatar')
+  @Idempotent('identity.profile.avatar.remove')
   @ApiOperation({
     summary: 'Remove profile avatar',
     description:
@@ -206,6 +209,7 @@ export class ProfileApiController {
 
   // POST /phone
   @Post('phone')
+  @Idempotent('identity.profile.phone.set')
   @ApiOperation({
     summary: 'Set primary phone number',
     description:
@@ -231,6 +235,7 @@ export class ProfileApiController {
 
   // DELETE /phone
   @Delete('phone')
+  @Idempotent('identity.profile.phone.remove')
   @ApiOperation({
     summary: 'Remove primary phone number',
     description:
@@ -249,6 +254,7 @@ export class ProfileApiController {
 
   // POST /address
   @Post('address')
+  @Idempotent('identity.profile.address.set')
   @ApiOperation({
     summary: 'Set profile address',
     description:
@@ -277,6 +283,7 @@ export class ProfileApiController {
 
   // DELETE /address
   @Delete('address')
+  @Idempotent('identity.profile.address.remove')
   @ApiOperation({
     summary: 'Remove profile address',
     description:

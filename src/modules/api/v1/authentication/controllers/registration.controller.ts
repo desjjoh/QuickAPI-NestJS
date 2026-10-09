@@ -1,3 +1,4 @@
+import { SecurityOperation } from '@/common/decorators/security-operation.decorator';
 import type { Request, Response } from 'express';
 import {
   Body,
@@ -33,6 +34,7 @@ import { throttlePolicies } from '@/config/throttle-policy.config';
 
 @ApiTags('Registration')
 @UseGuards(CsrfGuard)
+@SecurityOperation()
 @Controller('registration')
 export class RegistrationApiController {
   public constructor(

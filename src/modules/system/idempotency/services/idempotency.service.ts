@@ -125,7 +125,9 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
           );
           // Store the original JSON response, not a later projection of a mutable resource.
           const body = JSON.parse(
-            JSON.stringify(response.body ?? null),
+            JSON.stringify(
+              response.status === 204 ? null : (response.body ?? null),
+            ),
           ) as unknown;
           const identity =
             body &&

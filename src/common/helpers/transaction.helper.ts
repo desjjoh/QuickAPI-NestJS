@@ -18,6 +18,23 @@ const applicationTransaction = new AsyncLocalStorage<{
 export const hasApplicationTransaction = (): boolean =>
   applicationTransaction.getStore() !== undefined;
 
+/** Defaults used by participating services resolve to the application transaction. */
+export const applicationManager = (fallback: EntityManager): EntityManager =>
+  applicationTransaction.getStore()?.manager ?? fallback;
+
+/** Persist independent accounting after releasing the request connection/locks. */
+export async function afterApplicationTransaction(
+  action: TransactionAction,
+): Promise<void> {
+  const outer = applicationTransaction.getStore();
+  if (!outer) {
+    await action();
+    return;
+  }
+  outer.lifecycle.afterCommit(action);
+  outer.lifecycle.afterRollback(action);
+}
+
 /** Explicit opt-in for application concerns that wrap an entire request transaction. */
 export function withApplicationTransaction<T>(
   manager: EntityManager,
@@ -125,7 +142,9 @@ export async function runInTransaction<T>(
 
   try {
     result = await manager.transaction((transactionManager) =>
-      work(transactionManager, lifecycle),
+      withApplicationTransaction(transactionManager, lifecycle, () =>
+        work(transactionManager, lifecycle),
+      ),
     );
   } catch (transactionError) {
     try {

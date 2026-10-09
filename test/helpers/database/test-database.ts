@@ -27,6 +27,7 @@ const REFERENCE_SEEDERS: Seeder[] = [
 // Children precede parents. Reference tables and TypeORM's migration ledger
 // are intentionally absent: reset preserves the known baseline data.
 export const MUTABLE_TABLE_DELETE_ORDER = [
+  'email_intents',
   'request_idempotency',
   'activity_audits',
   'articles',

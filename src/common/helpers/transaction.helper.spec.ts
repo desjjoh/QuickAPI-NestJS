@@ -5,9 +5,48 @@ import {
   TransactionLifecycle,
   withApplicationTransaction,
   hasApplicationTransaction,
+  applicationManager,
+  afterApplicationTransaction,
 } from './transaction.helper';
 
 describe('transaction helpers', () => {
+  it.each([false, true])(
+    'persists independent accounting after connection release (rollback=%s)',
+    async (fail) => {
+      const events: string[] = [];
+      const tx = {} as EntityManager;
+      const root = {
+        transaction: async (work) => {
+          try {
+            return await work(tx);
+          } finally {
+            events.push('released');
+          }
+        },
+      } as EntityManager;
+      const accounting = jest.fn(() => {
+        events.push('accounting');
+      });
+      const result = runInTransaction(root, async () => {
+        expect(applicationManager(root)).toBe(tx);
+        await afterApplicationTransaction(accounting);
+        expect(accounting).not.toHaveBeenCalled();
+        if (fail) throw new Error('unauthorized');
+        return 'ok';
+      });
+      if (fail) await expect(result).rejects.toThrow('unauthorized');
+      else await expect(result).resolves.toBe('ok');
+      expect(events).toEqual(['released', 'accounting']);
+      expect(accounting).toHaveBeenCalledTimes(1);
+      expect(applicationManager(root)).toBe(root);
+    },
+  );
+
+  it('executes independent accounting immediately outside application transactions', async () => {
+    const accounting = jest.fn();
+    await afterApplicationTransaction(accounting);
+    expect(accounting).toHaveBeenCalledTimes(1);
+  });
   it('shares the application manager and lifecycle without opening another transaction', async () => {
     const connection = {};
     const manager = {

@@ -3,6 +3,25 @@ import { EmailTransportService } from '../services/email-transport.service';
 import { EmailQueueProcessor } from './email.processor';
 
 describe('EmailQueueProcessor', () => {
+  it('resolves durable IDs and sanitizes provider failure details before Redis persistence', async () => {
+    const id = '01234567-89ab-4cde-8fab-0123456789ab';
+    const deliver = jest
+      .fn()
+      .mockRejectedValue(new Error('person@example.test code=123456'));
+    const sendCompiledEmail = jest.fn();
+    const processor = new EmailQueueProcessor(
+      { sendCompiledEmail } as never,
+      { deliver } as never,
+    );
+    await expect(
+      processor.process({ data: { deliveryId: id } } as Job),
+    ).rejects.toThrow('Email delivery failed; durable intent remains pending.');
+    expect(deliver).toHaveBeenCalledWith(id);
+    expect(sendCompiledEmail).not.toHaveBeenCalled();
+    await expect(
+      processor.process({ data: { deliveryId: 'invalid' } } as Job),
+    ).rejects.toThrow('Malformed email delivery job.');
+  });
   const payload = {
     to: 'u@example.com',
     subject: 'Hi',
