@@ -101,7 +101,7 @@ Creator and administration article list/detail and mutation responses include a 
 
 ### Article listing indexes
 
-Migration `1791564000000-article-query-indexes` adds three indexes matching the existing repository filters and deterministic ordering: public `(status_id, publishedAt, id)`, creator `(author_id, createdAt, id)`, and administration review `(status_id, createdAt, id)`. Entity metadata uses the corresponding embedded property paths. Both ASC and DESC ordering use the same indexes; no combined author/status or search index is added without measurements. Leading-wildcard title/summary searches are not made indexable by these indexes, and unfiltered administration ordering is a separate access pattern.
+Migration `1791562871407-migration` adds three indexes matching the existing repository filters and deterministic ordering: public `(status_id, publishedAt, id)`, creator `(author_id, createdAt, id)`, and administration review `(status_id, createdAt, id)`. Entity metadata uses the corresponding embedded property paths. Both ASC and DESC ordering use the same indexes; no combined author/status or search index is added without measurements. Leading-wildcard title/summary searches are not made indexable by these indexes, and unfiltered administration ordering is a separate access pattern.
 
 The article E2E suite includes an EXPLAIN verification case with 16,000 synthetic articles, skewed statuses, selective authors and tied dates. It captures the actual TypeORM DISTINCT/eager-join pagination SQL and refreshes statistics without logging plans to the console. For public, creator and review lists in both directions, it checks that the intended index is eligible and that MySQL uses an indexed filter prefix; it does not mandate a particular optimizer choice. It also exercises combined author/status and unfiltered administration queries without assuming an extra index is warranted. Index eligibility/filtering is not proof that the joined pagination avoids sorting or that every added index is beneficial in production.
 
@@ -114,6 +114,8 @@ node --no-warnings --experimental-vm-modules ./node_modules/jest/bin/jest.js --c
 ```
 
 Global setup resets only the explicitly configured disposable test schema and applies the migration. The revised checks have not been run here; they are supplied for local execution. Validate plans against realistic cardinalities before deployment; a failing eligibility/filtering assertion is a signal to revisit the index/query rather than add FORCE INDEX. The down migration preserves foreign-key supporting indexes if InnoDB replaced their implicit indexes with these composites. Index creation can lock/work on a large table: schedule the production migration appropriately.
+
+The index rollback inspects the live schema and preserves surviving foreign-key supporting indexes, or restores them for `author_id` and `status_id` before dropping the listing indexes. It skips already-missing listing indexes so an interrupted rollback can resume: MySQL DDL implicitly commits, so a logged `ROLLBACK` does not restore a previously dropped index. The compiled migration revert/forward smoke check exercises this deployment boundary without tests importing individual migration classes.
 
 ### Article search contract
 
