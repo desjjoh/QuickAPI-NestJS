@@ -45,7 +45,10 @@ export class SecurityTransactionInterceptor implements NestInterceptor {
           );
           response.cookie = cookie;
           response.clearCookie = clearCookie;
-          cookies.forEach((apply) => apply());
+          // A timeout can already have completed the HTTP response while the
+          // transaction drains. Never append credentials to a finished socket.
+          if (!response.headersSent && !response.destroyed)
+            cookies.forEach((apply) => apply());
           return result;
         } finally {
           response.cookie = cookie;

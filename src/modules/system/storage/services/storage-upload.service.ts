@@ -1,4 +1,5 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PublicServiceUnavailableException } from '@/common/exceptions/public-service-unavailable.exception';
 import { logger } from '@/config/logger.config';
 import { StorageService } from '../types/storage.types';
 import { StorageObjectService } from './storage-object.service';
@@ -38,7 +39,7 @@ export class StorageUploadService {
           })
           .then(() => undefined)
           .catch(() => {
-            throw new ServiceUnavailableException(STORAGE_UPLOAD_FAILURE);
+            throw new PublicServiceUnavailableException(STORAGE_UPLOAD_FAILURE);
           }),
       );
     } catch (error) {

@@ -1,0 +1,147 @@
+# Deployment and operations
+
+[Documentation index](../README.md#documentation)
+
+The checked-in staging topology and release workflows define the deployment contract. Hosting, ingress, secrets and backup ownership remain environment-specific.
+
+Recommended deployment contract:
+
+- Build the Docker image from the repository.
+- Inject secrets and environment variables through the hosting platform.
+- Run all pending database migrations before starting or replacing API instances.
+- Keep `DB_SYNC=false` in production.
+- Use HTTPS publicly.
+- Set `COOKIE_SECURE=true` for HTTPS environments.
+- Use `/ready` for readiness checks.
+- For staging, keep `DOCUMENTATION_ENABLED=false`, `METRICS_ENABLED=true`, and
+  `DETAILED_DIAGNOSTICS_ENABLED=false` by default. Give the metrics scraper a
+  randomly generated `OPERATIONS_TOKEN` (at least 32 characters), send it as
+  `X-Operations-Key`, and additionally restrict operational routes to a private
+  network at the ingress when possible. Temporarily enable documentation or
+  detailed diagnostics only when needed.
+- Do not bake `.env`, certificates, runtime uploads, or local temp files into the image.
+
+## Staging Compose contract
+
+Run the staging definition **by itself** after the deployment platform has
+exported its configuration and secrets (for example, from a secret-manager
+sidecar or CI secret context):
+
+```bash
+cp .env.staging.example .env.staging # then inject secrets and deployment values
+npm run staging:preflight
+docker compose --env-file .env.staging -f docker-compose.staging.yml config --quiet
+docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm migration
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d api
+```
+
+Use an immutable tag or digest for `QUICKAPI_IMAGE`. The compose file refuses to
+render without database, Redis, token, operations, email, GeoIP, and object-store
+credentials. It also requires the actual HTTPS `PUBLIC_API_URL`, HTTPS
+`PUBLIC_WEB_URL`/`CORS_ORIGINS`, the external `INGRESS_NETWORK`, and a narrow
+`TRUST_PROXY` ingress address or CIDR allowlist. Do not use localhost, example
+domains, a wildcard CORS origin, or a trust-all proxy setting.
+
+## Release images and supply-chain evidence
+
+After the `CI` workflow succeeds on `main` or `staging`, the
+`.github/workflows/release-image.yml` workflow builds the production image once
+and pushes that manifest with the full commit SHA and `package.json` version
+tags. Set the repository variables `CONTAINER_REGISTRY` and
+`CONTAINER_REPOSITORY` to select a registry/repository (they default to GHCR and
+the GitHub repository name). Non-GHCR registries require the environment secrets
+`REGISTRY_USERNAME` and `REGISTRY_PASSWORD`.
+
+For a named staging release, dispatch the workflow with the full SHA of a commit
+that already passed CI and an optional OCI-compatible `staging-release` tag.
+Automated runs can instead read `STAGING_RELEASE_IDENTIFIER` from repository
+variables. Tags are convenient discovery aliases only: deployment automation
+must download the `release-image.env` evidence artifact and inject its
+`QUICKAPI_IMAGE=registry/repository@sha256:...` value into `.env.staging`. The
+migration, GeoLite initializer, preflight, and API services all pull that exact
+digest; the staging Compose definition has no local build fallback.
+
+The image carries OCI source, revision, version, and creation-time labels and a
+BuildKit provenance/SBOM attestation. The workflow publishes an SPDX JSON SBOM, high-severity report and critical JSON/SARIF reports. Current scans use `--ignore-unfixed` and `--exit-code 0`: findings are reported, not automatically blocked. Review release evidence before deploying. There is no checked-in vulnerability exception register; an exception policy or enforced gate is a follow-up, not an implemented guarantee.
+
+MySQL and Redis are attached only to the internal `private` network and have no
+host-published ports. The API exposes port 4000 to its Docker networks but does
+not publish it on the host. The ingress is the only public entry point: it must
+terminate TLS, strip untrusted forwarding headers, connect through the named
+external network, and proxy plain HTTP to port 4000. Consequently application
+TLS is disabled while secure cookies remain enabled. The API health check probes
+`/health`; configure the ingress/orchestrator readiness probe to use `/ready`.
+
+The `preflight` service loads and validates `.env.staging` and must finish successfully before the migration or GeoLite jobs can run. Those jobs, in turn, must finish before the API deployment. Targeted deployment automation must run `npm run staging:preflight` first as shown above.
+
+The one-shot `migration` service uses the same immutable image and database
+configuration as the API. It must complete successfully before API replacement;
+the Compose dependency enforces this for a full `up`, while deployment tooling
+must preserve the ordering for targeted updates. Never enable `DB_SYNC`.
+
+The one-shot `geoip-init` service uses that same immutable API image and writes
+validated GeoLite2 Country and City databases to `quickapi_geoip` before the API
+starts. Populate a new staging volume (or update an existing one) with:
+
+```bash
+docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm geoip-init
+docker compose --env-file .env.staging -f docker-compose.staging.yml up -d api
+```
+
+Set `MAXMIND_ACCOUNT_ID`, `MAXMIND_LICENSE_KEY`, and
+`IP_LOCATION_DATA_DIR=/app/data/geoip` in `.env.staging`. Schedule updates according to the deployment owner’s freshness policy, then restart the API so its readers open the new files. A failed
+download, archive extraction, or database validation exits nonzero and leaves
+the last valid pair in place. The updater alone has read-write volume access;
+the API keeps its mount read-only.
+
+For local development, `npm run geoip:update` loads the repository `.env`
+automatically. `MAXMIND_LICENSE_KEY` is required; `MAXMIND_ACCOUNT_ID` is
+optional for the GeoLite download endpoint.
+
+## Persistence, sizing, backups, and rollback
+
+- `quickapi_mysql_data` is the authoritative relational-data volume;
+  `quickapi_redis_data` retains queues and rate-limit state. `quickapi_uploads`
+  mounts the public-assets directory; it is not an implemented local upload-storage driver. `quickapi_geoip` is populated by the GeoIP update
+  job, and `quickapi_tmp` is scratch space and is not backed up. The storage provider currently binds R2 unconditionally; see [Known gaps](backlog.md). New durable email and storage jobs can be reconstructed from SQL, but legacy queue-only work cannot.
+- The platform/database owner owns encrypted MySQL backups, restore tests,
+  retention, and point-in-time recovery. The application owner owns R2/uploads
+  retention and validates restored object/database consistency. The operations
+  owner owns Redis backup policy when queued jobs must survive a total loss.
+  Snapshot persistent volumes only with application-consistent tooling; copying
+  live volume files is not a valid backup.
+- Start staging near the local baseline (API 0.5 CPU/512 MiB, MySQL 1 CPU/2 GiB
+  with a 512 MiB buffer pool, Redis 0.25 CPU/256 MiB), then set platform-level
+  requests and limits from measured latency, connection, queue, and memory data.
+  Compose resource flags are intentionally omitted because enforcement differs
+  between Docker Compose and orchestrators. Keep Node's heap below its container
+  memory limit and size the database pool across all replicas below MySQL's
+  connection ceiling.
+- Before migration, take and verify a restorable database backup and record the
+  current immutable image. Roll back application instances to that image only
+  when migrations are backward compatible. Use a reviewed TypeORM revert only
+  when its data effects are understood; otherwise restore the backup during a
+  maintenance window or deploy a forward-fix migration. A failed migration blocks rollout. Configure the hosting platform’s rollout policy to react to failed `/ready` probes; this repository does not implement deployment rollback automation. Do not delete or automatically roll back persistent volumes with the application.
+
+## Observability and operations
+
+Built-in operational endpoints include:
+
+| Endpoint   | Purpose                                               |
+| ---------- | ----------------------------------------------------- |
+| `/health`  | Process liveness check                                |
+| `/ready`   | Aggregate readiness result for platform probes        |
+| `/info`    | Protected application/runtime metadata (opt-in)       |
+| `/system`  | Protected runtime and dependency diagnostics (opt-in) |
+| `/metrics` | Protected Prometheus-formatted metrics (opt-in)       |
+
+`/health` and `/ready` remain unauthenticated for platform probes, but do not
+return dependency identities or failure details. Outside development, set `METRICS_ENABLED=true` or
+`DETAILED_DIAGNOSTICS_ENABLED=true` independently and send the non-user
+deployment credential in `X-Operations-Key`. Disabled operational endpoints
+return 404; missing or invalid credentials return 401. Swagger is only mounted
+when `DOCUMENTATION_ENABLED=true`; `/docs` and `/docs-json` do not require an operations key. Keep documentation disabled or restrict it at ingress in deployed environments. Development diagnostics/metrics guards bypass enabled/key checks, so do not expose a development instance publicly.
+
+The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms when metrics are enabled.
+
+No new periodic monitoring checks, alert routing, or support-ticket automation were added. Metrics expose HTTP and Node.js signals; they are not a backlog/expiry/contention monitoring system. Existing DLQ behavior is described in [Reliability](reliability.md). The deferred scope is tracked in [the backlog](backlog.md).

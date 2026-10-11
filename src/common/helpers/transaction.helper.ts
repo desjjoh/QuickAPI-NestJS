@@ -1,6 +1,10 @@
 import type { EntityManager } from 'typeorm';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { InvalidOperationError } from '@/common/errors/operation.error';
+import {
+  assertRequestActive,
+  withoutRequestDeadline,
+} from './request-deadline.helper';
 
 type TransactionAction = () => Promise<void> | void;
 type CancelTransactionAction = () => void;
@@ -100,7 +104,7 @@ export class TransactionLifecycle {
 
     for (const action of actions) {
       try {
-        await action();
+        await withoutRequestDeadline(action);
       } catch (error) {
         failures.push(error);
       }
@@ -120,6 +124,7 @@ export async function runInTransaction<T>(
   manager: EntityManager,
   work: TransactionWork<T>,
 ): Promise<T> {
+  assertRequestActive();
   const outer = applicationTransaction.getStore();
   if (outer) {
     if (!outer.manager.queryRunner?.isTransactionActive)
@@ -142,9 +147,13 @@ export async function runInTransaction<T>(
 
   try {
     result = await manager.transaction((transactionManager) =>
-      withApplicationTransaction(transactionManager, lifecycle, () =>
-        work(transactionManager, lifecycle),
-      ),
+      withApplicationTransaction(transactionManager, lifecycle, async () => {
+        const value = await work(transactionManager, lifecycle);
+        // Never roll back/release while work is running. Reject expired HTTP
+        // work only once it settles, immediately before TypeORM commits.
+        assertRequestActive();
+        return value;
+      }),
     );
   } catch (transactionError) {
     try {

@@ -20,9 +20,17 @@ export class ErrorResponseDto {
   })
   public readonly timestamp!: number;
 
-  constructor(status: number, message: string) {
+  @ApiProperty({
+    required: false,
+    description:
+      'Server-generated request ID for correlating server failures with sanitized logs.',
+  })
+  public readonly requestId?: string;
+
+  constructor(status: number, message: string, requestId?: string) {
     this.status = status;
     this.message = message;
     this.timestamp = Date.now();
+    if (requestId) this.requestId = requestId;
   }
 }

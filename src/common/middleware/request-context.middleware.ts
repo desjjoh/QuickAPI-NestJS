@@ -8,7 +8,7 @@ import { AuditActorType, AuditSource } from '@/config/audit-events.config';
 export function requestContextMiddleware(): RequestHandler {
   return function requestContext(
     req: Request,
-    _res: Response,
+    res: Response,
     next: NextFunction,
   ): void {
     const userAgent = req.get('user-agent');
@@ -21,6 +21,7 @@ export function requestContextMiddleware(): RequestHandler {
       actorType: AuditActorType.ANONYMOUS,
       source: AuditSource.HTTP,
     };
+    res.setHeader('X-Request-ID', ctx.requestId);
 
     if (!requestContextRef) return next();
 

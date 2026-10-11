@@ -7,7 +7,13 @@ import { SecurityTransactionInterceptor } from './security-transaction.intercept
 describe('SecurityTransactionInterceptor', () => {
   const cookie = jest.fn();
   const clearCookie = jest.fn();
-  const response = { cookie, clearCookie, setHeader: jest.fn() };
+  const response = {
+    cookie,
+    clearCookie,
+    setHeader: jest.fn(),
+    headersSent: false,
+    destroyed: false,
+  };
   const request = { headers: {} as Record<string, string> };
   const context = {
     switchToHttp: () => ({
@@ -25,6 +31,8 @@ describe('SecurityTransactionInterceptor', () => {
     request.headers = {};
     response.cookie = cookie;
     response.clearCookie = clearCookie;
+    response.headersSent = false;
+    response.destroyed = false;
     transaction.mockImplementation(async (work) => work());
   });
 
@@ -76,6 +84,31 @@ describe('SecurityTransactionInterceptor', () => {
           }),
         ),
       ).rejects.toBe(error);
+      expect(cookie).not.toHaveBeenCalled();
+      expect(clearCookie).not.toHaveBeenCalled();
+      expect(response.cookie).toBe(cookie);
+      expect(response.clearCookie).toBe(clearCookie);
+    },
+  );
+
+  it.each(['headersSent', 'destroyed'] as const)(
+    'does not write credentials when %s changes during commit',
+    async (field) => {
+      transaction.mockImplementation(async (work) => {
+        const result = await work();
+        response[field] = true;
+        return result;
+      });
+      await firstValueFrom(
+        interceptor.intercept(context, {
+          handle: () =>
+            defer(async () => {
+              response.cookie('refresh', 'secret');
+              response.clearCookie('refresh');
+              return { token: 'access' };
+            }),
+        }),
+      );
       expect(cookie).not.toHaveBeenCalled();
       expect(clearCookie).not.toHaveBeenCalled();
       expect(response.cookie).toBe(cookie);

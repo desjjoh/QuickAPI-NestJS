@@ -27,6 +27,7 @@ import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+import { StorageObjectEntity } from '@/modules/system/storage/entities/storage-object.entity';
 import { drainStorageCleanup } from '../../helpers/storage-cleanup';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
@@ -982,6 +983,111 @@ describe('article API lifecycle', () => {
       decorative: true,
     });
   });
+
+  it('rejects invalid content without changing articles, versions, audits, or uploads', async () => {
+    const author = await creator();
+    const created = await createDraft(author);
+    const articleId = created.body.id as string;
+    const snapshot = async () => ({
+      articles: await suite.dataSource.getRepository(ArticleEntity).find(),
+      audits: await suite.dataSource.getRepository(AuditEventEntity).count(),
+      images: await suite.dataSource.getRepository(ImageEntity).find(),
+      trackedUploads: await suite.dataSource
+        .getRepository(StorageObjectEntity)
+        .find(),
+      objects: [...storage.objects.entries()],
+    });
+    const before = await snapshot();
+    const oversized = [
+      'a'.repeat(65_536),
+      '漢'.repeat(21_845) + 'a',
+      '😀'.repeat(16_383) + 'abcd',
+    ];
+    for (const body of oversized) {
+      await author.agent
+        .post(CREATOR_ROOT)
+        .set(author.headers)
+        .field('title', 'Invalid body')
+        .field('summary', 'Summary')
+        .field('body', body)
+        .field('hero_alt_text', 'Hero')
+        .attach('hero', PNG, 'hero.png')
+        .expect(422);
+      expect(await snapshot()).toEqual(before);
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+    }
+    for (const property of ['title', 'summary', 'body']) {
+      const pending = author.agent.post(CREATOR_ROOT).set(author.headers);
+      for (const field of ['title', 'summary', 'body']) {
+        if (field !== property) pending.field(field, 'Content');
+      }
+      await pending
+        .field('hero_alt_text', 'Hero')
+        .attach('hero', PNG, 'hero.png')
+        .expect(422);
+      expect(await snapshot()).toEqual(before);
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+    }
+    for (const payload of [
+      ...['title', 'summary', 'body'].map((property) => ({ [property]: null })),
+      ...oversized.map((body) => ({ body })),
+    ]) {
+      await author.agent
+        .patch(`${CREATOR_ROOT}/${articleId}`)
+        .set(author.headers)
+        .send({ expected_version: created.body.version, ...payload })
+        .expect(422);
+      expect(await snapshot()).toEqual(before);
+    }
+  });
+
+  it.each([
+    ['ASCII', 'a'.repeat(65_535)],
+    ['three-byte', '漢'.repeat(21_845)],
+    ['four-byte', '😀'.repeat(16_383) + 'abc'],
+  ])(
+    'persists exact TEXT boundaries for %s content and preserves omitted update fields',
+    async (_label, body) => {
+      const author = await creator();
+      const created = await author.agent
+        .post(CREATOR_ROOT)
+        .set(author.headers)
+        .field('title', 'Boundary')
+        .field('summary', 'Summary')
+        .field('body', body)
+        .field('hero_alt_text', 'Hero')
+        .attach('hero', PNG, 'hero.png')
+        .expect(201);
+      const repository = suite.dataSource.getRepository(ArticleEntity);
+      const read = () =>
+        repository.findOneByOrFail({ id: created.body.id as string });
+      expect((await read()).content.body).toBe(body);
+      const titleEdit = await author.agent
+        .patch(`${CREATOR_ROOT}/${created.body.id}`)
+        .set(author.headers)
+        .send({ expected_version: created.body.version, title: 'New title' })
+        .expect(200);
+      expect((await read()).content).toMatchObject({
+        title: 'New title',
+        summary: 'Summary',
+        body,
+      });
+      await author.agent
+        .patch(`${CREATOR_ROOT}/${created.body.id}`)
+        .set(author.headers)
+        .send({ expected_version: titleEdit.body.version, body })
+        .expect(200);
+      const saved = await read();
+      expect(saved.content).toMatchObject({
+        title: 'New title',
+        summary: 'Summary',
+        body,
+      });
+      expect(saved.version).toBe(created.body.version + 2);
+      expect(storage.objects.size).toBe(1);
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+    },
+  );
 
   it('rejects unspecified and contradictory multipart hero accessibility without persisting uploads', async () => {
     const author = await creator();

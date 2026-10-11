@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
+import { MaxUtf8Bytes } from '@/common/validators/max-utf8-bytes.validator';
+import { ARTICLE_BODY_MAX_BYTES } from '@/modules/domain/articles/constants/article-content.constants';
 
 import { HeroAccessibilityDto } from './hero-accessibility.model';
 
@@ -27,11 +29,12 @@ export class CreateArticleDto extends HeroAccessibilityDto {
 
   @ApiProperty({
     example: 'Long-form article content…',
-    maxLength: 65535,
+    maxLength: ARTICLE_BODY_MAX_BYTES,
+    description: 'Required non-null content, limited to 65,535 UTF-8 bytes.',
   })
   @IsString()
   @IsNotEmpty()
   @Matches(/\S/, { message: 'Body must contain visible text.' })
-  @MaxLength(65535)
+  @MaxUtf8Bytes(ARTICLE_BODY_MAX_BYTES)
   public readonly body!: string;
 }

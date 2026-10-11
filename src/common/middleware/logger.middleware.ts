@@ -13,7 +13,8 @@ export function outgoingLogger(): RequestHandler {
       const duration: string = (performance.now() - start).toFixed(2);
 
       const method: string = req.method;
-      const path: string = req.originalUrl ?? req.url;
+      // Route templates, never query strings or caller-supplied path values.
+      const path: string = req.route?.path ?? '<unmatched>';
 
       const code: number = res.statusCode;
 
