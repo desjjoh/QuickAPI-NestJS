@@ -19,18 +19,22 @@ export class UserActivityAdminService {
     userId: string,
     query: UserActivitySearchQueryDto,
   ): Promise<AuditEventPageDto> {
-    const result = await this.auditQueries.query({
-      subjectType: AuditSubjectType.USER,
-      subjectId: userId,
-      actorId: query.actor,
-      event: query.event,
-      occurredFrom: query.occurredFrom,
-      occurredTo: query.occurredTo,
-      sort: query.sort,
-      order: query.order,
-      page: query.page,
-      take: query.take,
-    });
+    const result = await this.auditQueries.query(
+      {
+        subjectType: AuditSubjectType.USER,
+        subjectId: userId,
+        actorId: query.actor,
+        event: query.event,
+        occurredFrom: query.occurredFrom,
+        occurredTo: query.occurredTo,
+        sort: query.sort,
+        order: query.order,
+        page: query.page,
+        take: query.take,
+      },
+      undefined,
+      { includeActorUsers: true },
+    );
     const data = await Promise.all(
       result.data.map(async (event) => {
         const location = await this.ipLocations.resolveIp(event.ipAddress);

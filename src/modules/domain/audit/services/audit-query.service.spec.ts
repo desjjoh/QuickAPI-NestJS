@@ -45,6 +45,7 @@ describe('AuditQueryService', () => {
       manager,
       query: jest.fn().mockResolvedValue([rows, itemCount]),
       findById: jest.fn(),
+      findActorUsers: jest.fn().mockResolvedValue([]),
     };
     return {
       service: new AuditQueryService(repository as unknown as AuditRepository),
@@ -75,6 +76,70 @@ describe('AuditQueryService', () => {
       hasPreviousPage: true,
       hasNextPage: true,
     });
+  });
+
+  it('enriches only the requested page in one deduplicated display query', async () => {
+    const row = { ...entity(), actor_user_id: 'actor-1' } as AuditEventEntity;
+    const { service, repository, manager } = setup(
+      [row, { ...row, id: 'audit-2' }],
+      50,
+    );
+    repository.findActorUsers.mockResolvedValue([
+      {
+        id: 'actor-1',
+        email: 'internal@users.invalid',
+        first: 'Pat',
+        last: 'Person',
+        preferred: null,
+        status_key: 'deleted',
+        status_label: 'Deleted',
+        avatar_id: null,
+        avatar_key: null,
+      },
+    ]);
+    const result = await service.query({}, manager as never, {
+      includeActorUsers: true,
+    });
+    expect(repository.findActorUsers).toHaveBeenCalledTimes(1);
+    expect(repository.findActorUsers).toHaveBeenCalledWith(manager, [
+      'actor-1',
+    ]);
+    expect(result.meta.itemCount).toBe(50);
+    expect(result.data[0].actorUser).toMatchObject({
+      id: 'actor-1',
+      name: 'Pat Person',
+      email: 'internal@users.invalid',
+      status: { key: 'deleted' },
+    });
+    expect(result.data[1].actorUser).toEqual(result.data[0].actorUser);
+  });
+
+  it('never loads display information by default', async () => {
+    const { service, repository } = setup([
+      { ...entity(), actor_user_id: 'actor-1' } as AuditEventEntity,
+    ]);
+    const result = await service.query({});
+    expect(result.data[0].actorUser).toBeNull();
+    expect(repository.findActorUsers).not.toHaveBeenCalled();
+  });
+
+  it('returns unresolved actors as null and supports explicit detail enrichment', async () => {
+    const { service, repository } = setup();
+    repository.findById.mockResolvedValue({
+      ...entity(),
+      actor_user_id: 'missing',
+    });
+    const event = await service.findById('audit-1', undefined, {
+      includeActorUsers: true,
+    });
+    expect(event?.actorId).toBe('actor-1');
+    expect(event?.actorUser).toBeNull();
+    expect(repository.findActorUsers).toHaveBeenCalledTimes(1);
+    repository.findById.mockResolvedValue(null);
+    expect(
+      await service.findById('missing', undefined, { includeActorUsers: true }),
+    ).toBeNull();
+    expect(repository.findActorUsers).toHaveBeenCalledTimes(1);
   });
 
   it('passes bounded sort and order values to the repository', async () => {

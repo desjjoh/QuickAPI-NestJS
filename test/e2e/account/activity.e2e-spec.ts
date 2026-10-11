@@ -57,14 +57,14 @@ describe('account activity', () => {
     const audit = app.get(AuditService);
     const base = {
       source: 'service' as const,
-      domain: 'activity_test',
+      domain: 'articles',
       metadata: { administratorNote: 'must not be returned' },
       ipAddress: '192.0.2.1',
       userAgent: 'private-client',
     };
     await audit.record({
       ...base,
-      event: 'activity_test.self.first',
+      event: 'articles.activity_test.self.first',
       actorType: 'user',
       actorId: user.id,
       subjectType: AuditSubjectType.USER,
@@ -73,7 +73,7 @@ describe('account activity', () => {
     });
     await audit.record({
       ...base,
-      event: 'activity_test.other.touched.me',
+      event: 'articles.activity_test.other.touched.me',
       actorType: 'admin',
       actorId: 'other-actor-id',
       subjectType: AuditSubjectType.USER,
@@ -82,15 +82,15 @@ describe('account activity', () => {
     });
 
     const response = await agent
-      .get('/api/v1/account/activity?domain=activity_test&take=1')
+      .get('/api/v1/account/activity?domain=articles&take=1')
       .set(headers)
       .expect(200);
 
     expect(response.body).toEqual({
       data: [
         expect.objectContaining({
-          domain: 'activity_test',
-          event: 'activity_test.self.first',
+          domain: 'articles',
+          event: 'articles.activity_test.self.first',
           actorType: 'user',
           actorId: user.id,
         }),
@@ -131,8 +131,8 @@ describe('account activity', () => {
     };
     const audit = app.get(AuditService);
     for (const [event, day] of [
-      ['page_test.page.newer', '03'],
-      ['page_test.page.older', '02'],
+      ['articles.page_test.page.newer', '03'],
+      ['articles.page_test.page.older', '02'],
     ])
       await audit.record({
         event,
@@ -141,16 +141,16 @@ describe('account activity', () => {
         subjectType: AuditSubjectType.USER,
         subjectId: user.id,
         source: 'service',
-        domain: 'page_test',
+        domain: 'articles',
         metadata: {},
         occurredAt: new Date(`2026-01-${day}T00:00:00.000Z`),
       });
 
     const first = await agent
-      .get('/api/v1/account/activity?domain=page_test&take=1')
+      .get('/api/v1/account/activity?domain=articles&take=1')
       .set(headers)
       .expect(200);
-    expect(first.body.data[0].event).toBe('page_test.page.newer');
+    expect(first.body.data[0].event).toBe('articles.page_test.page.newer');
     expect(first.body.meta).toEqual({
       page: 1,
       take: 1,
@@ -160,12 +160,12 @@ describe('account activity', () => {
       hasNextPage: true,
     });
     const second = await agent
-      .get('/api/v1/account/activity?domain=page_test&take=1&page=2')
+      .get('/api/v1/account/activity?domain=articles&take=1&page=2')
       .set(headers)
       .expect(200);
     expect(
       second.body.data.map((item: { event: string }) => item.event),
-    ).toEqual(['page_test.page.older']);
+    ).toEqual(['articles.page_test.page.older']);
     expect(second.body.meta).toEqual({
       page: 2,
       take: 1,

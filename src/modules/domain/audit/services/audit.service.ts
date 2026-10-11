@@ -11,12 +11,14 @@ import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRedactionService, AuditValue } from './audit-redaction.service';
 import {
   AuditActorType,
+  AuditEventDomain,
   AuditResourceType,
   AuditSource,
   AuditSubjectType,
 } from '@/config/audit-events.config';
 import { generateOperationId } from '@/common/helpers/nanoid.helper';
 import { AuditRepository } from '../repositories/audit.repository';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
@@ -54,6 +56,7 @@ const MACHINE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/;
 const EVENT_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$/;
 const ACTOR_TYPES: readonly AuditActorType[] = Object.values(AuditActorType);
 const SOURCES: readonly AuditSource[] = Object.values(AuditSource);
+const DOMAINS: readonly string[] = Object.values(AuditEventDomain);
 const SUBJECT_TYPES: readonly AuditSubjectType[] =
   Object.values(AuditSubjectType);
 const RESOURCE_TYPES: readonly AuditResourceType[] =
@@ -149,11 +152,22 @@ export class AuditService {
 
     this.enforcePayloadBounds(data.before, data.after, data.changes, metadata);
 
+    const actorType = input.actorType ?? context?.actorType;
+    const actorId = this.explicitOrContext(input, 'actorId', context?.actorId);
+    const actorUserId =
+      actorId &&
+      (actorType === AuditActorType.USER ||
+        actorType === AuditActorType.ADMIN) &&
+      (await manager.exists(UserEntity, { where: { id: actorId } }))
+        ? actorId
+        : null;
+
     const entity = manager.create(AuditEventEntity, {
       ...data,
       event: input.event,
-      actor_type: input.actorType ?? context?.actorType,
-      actor_id: this.explicitOrContext(input, 'actorId', context?.actorId),
+      actor_type: actorType,
+      actor_id: actorId,
+      actor_user_id: actorUserId,
       subject_type: input.subjectType ?? null,
       subject_id: input.subjectId ?? null,
       resource_type: input.resourceType ?? null,
@@ -218,6 +232,8 @@ export class AuditService {
 
     if (!MACHINE_KEY_PATTERN.test(input.domain))
       throw new BadRequestException('domain must be a stable machine key');
+    if (!DOMAINS.includes(input.domain))
+      throw new BadRequestException('domain is invalid');
     if (!EVENT_PATTERN.test(input.event))
       throw new BadRequestException('event must be a stable machine key');
     if (!input.event.startsWith(`${input.domain}.`))

@@ -132,7 +132,7 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'List retained activity for a user',
     description:
-      'Returns a paginated audit history whose subject is the selected user. This works after the user record has been deleted.',
+      'Returns a paginated audit history whose subject is the selected user, including display-only initiators with current status. This works for tombstoned users; initiating users are distinct from the selected subject.',
   })
   @ApiOkResponse({ type: AuditEventPageDto })
   @Permissions(

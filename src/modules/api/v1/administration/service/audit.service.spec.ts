@@ -64,6 +64,11 @@ describe(AuditAdministrationService.name, () => {
       }),
     );
     expect(ipLocations.resolveIp).toHaveBeenCalledWith('203.0.113.10');
+    expect(queries.query).toHaveBeenCalledWith(
+      expect.any(AuditSearchQueryDto),
+      undefined,
+      { includeActorUsers: true },
+    );
   });
 
   it('maps detail responses to the shared complete audit representation', async () => {
@@ -85,6 +90,11 @@ describe(AuditAdministrationService.name, () => {
     });
     expect(response.metadata).toEqual(unsafeEvent.metadata);
     expect(response.createdAt).toEqual(unsafeEvent.createdAt);
+    expect(queries.findById).toHaveBeenCalledWith(
+      '0123456789abcdef',
+      undefined,
+      { includeActorUsers: true },
+    );
   });
 
   it('does not promote unknown metadata values to a reason code', async () => {

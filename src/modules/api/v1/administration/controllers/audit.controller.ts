@@ -32,7 +32,7 @@ export class AuditAdministrationController {
   @ApiOperation({
     summary: 'Search audit records',
     description:
-      'Returns complete redacted audit events, including request context, metadata, diffs, and IP geolocation.',
+      'Returns complete redacted audit events, including request context, metadata, diffs, IP geolocation, and display-only initiating users with current account status. Deleted initiators remain identifiable; missing and non-user actors have no actorUser.',
   })
   @ApiOkResponse({ type: AuditEventPageDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].SEARCH_AUDIT)
@@ -47,7 +47,7 @@ export class AuditAdministrationController {
   @ApiOperation({
     summary: 'Read approved audit record detail',
     description:
-      'Returns the complete redacted audit event with IP geolocation and a validated administration reason code.',
+      'Returns the complete redacted audit event with IP geolocation, a validated administration reason code, and the display-only initiating user when resolvable. Actor display information is current, not an event-time identity snapshot.',
   })
   @ApiOkResponse({ type: AuditEventDto })
   @Permissions(PERMISSION_MATRIX[PermissionDomain.AUDIT].READ_AUDIT_DETAIL)

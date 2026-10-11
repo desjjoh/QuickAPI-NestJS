@@ -1,5 +1,20 @@
 import { BaseEntity } from '@/common/entities/base.entity';
-import { Column, Entity, Index } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  type Relation,
+} from 'typeorm';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import {
+  AuditActorType,
+  AuditSource,
+  AuditEventDomain,
+  AuditSubjectType,
+  AuditResourceType,
+} from '@/config/audit-events.config';
 
 type RedactedAuditData = Record<string, unknown>;
 
@@ -30,19 +45,44 @@ export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128 })
   public readonly event!: string;
 
-  @Column({ type: 'varchar', length: 32 })
+  @Column({ type: 'enum', enum: Object.values(AuditActorType) })
   public readonly actor_type!: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   public readonly actor_id!: string | null;
 
-  @Column({ type: 'varchar', length: 64, nullable: true })
+  @Index('IDX_activity_audits_actor_user')
+  @Column({ type: 'varchar', length: 16, nullable: true })
+  public readonly actor_user_id!: string | null;
+
+  @ManyToOne(() => UserEntity, {
+    nullable: true,
+    eager: false,
+    cascade: false,
+    onDelete: 'SET NULL',
+    onUpdate: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'actor_user_id',
+    foreignKeyConstraintName: 'FK_activity_audits_actor_user',
+  })
+  public readonly actor_user!: Relation<UserEntity | null>;
+
+  @Column({
+    type: 'enum',
+    enum: Object.values(AuditSubjectType),
+    nullable: true,
+  })
   public readonly subject_type!: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   public readonly subject_id!: string | null;
 
-  @Column({ type: 'varchar', length: 64, nullable: true })
+  @Column({
+    type: 'enum',
+    enum: Object.values(AuditResourceType),
+    nullable: true,
+  })
   public readonly resource_type!: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
@@ -52,7 +92,7 @@ export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 128, nullable: true })
   public readonly operation_id!: string | null;
 
-  @Column({ type: 'varchar', length: 64 })
+  @Column({ type: 'enum', enum: Object.values(AuditEventDomain) })
   public readonly domain!: string;
 
   @Index('IDX_activity_audits_request_id')
@@ -75,7 +115,7 @@ export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 512, nullable: true })
   public readonly route!: string | null;
 
-  @Column({ type: 'varchar', length: 32 })
+  @Column({ type: 'enum', enum: Object.values(AuditSource) })
   public readonly source!: string;
 
   @Index('IDX_activity_audits_occurred_at')

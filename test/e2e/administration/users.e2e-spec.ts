@@ -720,6 +720,130 @@ describe('user administration authorization and lifecycle', () => {
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
+  it('returns lean actor users with explicit tombstone status and preserves audits after physical actor removal', async () => {
+    const viewer = await register('actor-viewer@example.test');
+    const actor = await register('actor-display@example.test');
+    const subject = await register('actor-subject@example.test');
+    await grant(viewer, 'e2e-actor-audit-display', [
+      'delete_users',
+      'search_audit',
+      'read_audit_detail',
+      'read_administration_user_activity',
+    ]);
+    const auth = await signIn('actor-viewer@example.test');
+    const { image } = await assignAvatar(actor);
+    const audits = app.get(AuditService);
+    const input = {
+      event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+      domain: 'identity',
+      actorType: AuditActorType.ADMIN,
+      actorId: actor.id,
+      subjectType: AuditSubjectType.USER,
+      subjectId: subject.id,
+      source: AuditSource.HTTP,
+      metadata: {},
+    } as const;
+    const event = (await audits.record(input))!;
+    const detail = () =>
+      request(app.getHttpServer())
+        .get(`/api/v1/administration/audits/${event.id}`)
+        .set(auth);
+    const active = await detail().expect(200);
+    expect(event.actor_user_id).toBe(actor.id);
+    expect(active.body.actorUser).toMatchObject({
+      id: actor.id,
+      email: actor.identity.email,
+      avatar: { id: image.id, url: expect.any(String) },
+      status: { key: 'active', label: 'Active' },
+    });
+    expect(Object.keys(active.body.actorUser).sort()).toEqual([
+      'avatar',
+      'email',
+      'id',
+      'name',
+      'status',
+    ]);
+    expect(Object.keys(active.body.actorUser.avatar).sort()).toEqual([
+      'id',
+      'url',
+    ]);
+    expect(JSON.stringify(active.body.actorUser)).not.toMatch(
+      /password|roles|permissions|tokens|storage_key|dob|phone/,
+    );
+    // Non-user actors are never linked, even if their identifier matches a user.
+    const service = (await audits.record({
+      ...input,
+      actorType: AuditActorType.SERVICE,
+    }))!;
+    const missing = (await audits.record({
+      ...input,
+      actorId: 'missing-user-id',
+    }))!;
+    expect(service.actor_user_id).toBeNull();
+    expect(missing.actor_user_id).toBeNull();
+    await request(app.getHttpServer())
+      .post(`${ROOT}/${actor.id}/delete`)
+      .set(auth)
+      .send({
+        expected_version: actor.administration_version,
+        reason_code: 'user_request',
+      })
+      .expect(204);
+    const deleted = await detail().expect(200);
+    const tombstone = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: actor.id });
+    expect(tombstone.identity.email).toMatch(
+      /^deleted-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@users\.invalid$/,
+    );
+    expect(deleted.body.actorUser).toEqual({
+      id: actor.id,
+      name: active.body.actorUser.name,
+      email: tombstone.identity.email,
+      avatar: null,
+      status: { key: 'deleted', label: 'Deleted' },
+    });
+    expect(JSON.stringify(deleted.body)).not.toContain(actor.identity.email);
+    expect(deleted.body.actorId).toBe(actor.id);
+    const page = await request(app.getHttpServer())
+      .get('/api/v1/administration/audits')
+      .set(auth)
+      .query({ actorId: actor.id })
+      .expect(200);
+    expect(
+      page.body.data.find((item: { id: string }) => item.id === event.id)
+        .actorUser,
+    ).toEqual(deleted.body.actorUser);
+    expect(
+      page.body.data.find((item: { id: string }) => item.id === service.id)
+        .actorUser,
+    ).toBeNull();
+    const activity = await request(app.getHttpServer())
+      .get(`${ROOT}/${subject.id}/activity`)
+      .set(auth)
+      .expect(200);
+    expect(
+      activity.body.data.find((item: { id: string }) => item.id === event.id)
+        .actorUser.id,
+    ).toBe(actor.id);
+    // Exercise the FK fallback only in this disposable database: tombstoning normally retains the row.
+    await suite.dataSource.getRepository(UserEntity).delete(actor.id);
+    const retained = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findOneByOrFail({ id: event.id });
+    expect(retained.actor_id).toBe(actor.id);
+    expect(retained.actor_user_id).toBeNull();
+    const unresolved = await detail().expect(200);
+    expect(unresolved.body.actorId).toBe(actor.id);
+    expect(unresolved.body.actorUser).toBeNull();
+    const relation = suite.dataSource
+      .getMetadata(AuditEventEntity)
+      .relations.find((item) => item.propertyName === 'actor_user')!;
+    expect(relation.isEager).toBe(false);
+    expect(relation.isCascadeRemove).toBe(false);
+    expect(relation.onDelete).toBe('SET NULL');
+  });
+
   it('commits an administrative write and its success audit together', async () => {
     const updater = await register('audit-commit-admin@example.test');
     const target = await register('audit-commit-target@example.test');

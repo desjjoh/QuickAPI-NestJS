@@ -7,13 +7,16 @@ import { Order, PaginationOptions } from '@/common/models/pagination.model';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditQuery } from '../models/audit-query.model';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import type { AuditUserRead } from '../models/audit-user.model';
 
 const SORT_COLUMNS: Readonly<Record<AuditSort, string>> = {
   [AuditSort.OCCURRED_AT]: 'audit.occurred_at',
   [AuditSort.CREATED_AT]: 'audit.createdAt',
-  [AuditSort.DOMAIN]: 'audit.domain',
+  // ENUM columns otherwise sort by declaration ordinal, not their text value.
+  [AuditSort.DOMAIN]: 'CAST(audit.domain AS CHAR)',
   [AuditSort.EVENT]: 'audit.event',
-  [AuditSort.ACTOR_TYPE]: 'audit.actor_type',
+  [AuditSort.ACTOR_TYPE]: 'CAST(audit.actor_type AS CHAR)',
 };
 
 @Injectable()
@@ -38,6 +41,33 @@ export class AuditRepository extends DomainRepository<AuditEventEntity> {
       .take(pageOptions.take)
       .skip(pageOptions.skip)
       .getManyAndCount();
+  }
+
+  /** Batch display projection, deliberately including tombstones and no eager relations. */
+  public findActorUsers(
+    manager: EntityManager,
+    ids: readonly string[],
+  ): Promise<AuditUserRead[]> {
+    if (!ids.length) return Promise.resolve([]);
+    return manager
+      .getRepository(UserEntity)
+      .createQueryBuilder('actor')
+      .innerJoin('actor.profile', 'profile')
+      .innerJoin('actor.status', 'status')
+      .leftJoin('profile.media.avatar', 'avatar')
+      .select([
+        'actor.id AS id',
+        'actor.identity.email AS email',
+        'profile.name.first AS first',
+        'profile.name.last AS last',
+        'profile.name.preferred AS preferred',
+        'status.key AS status_key',
+        'status.label AS status_label',
+        'avatar.id AS avatar_id',
+        'avatar.storage_key AS avatar_key',
+      ])
+      .where('actor.id IN (:...ids)', { ids })
+      .getRawMany<AuditUserRead>();
   }
 
   private applyFilters(

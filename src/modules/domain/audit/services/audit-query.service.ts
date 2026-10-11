@@ -15,6 +15,7 @@ import {
   AuditQueryResult,
 } from '../models/audit-query-result.model';
 import { AuditRepository } from '../repositories/audit.repository';
+import { AuditUserDto } from '../models/audit-user.model';
 import {
   AuditResourceType,
   AuditSubjectType,
@@ -40,6 +41,7 @@ export class AuditQueryService {
   public async query(
     filters: AuditQuery,
     manager: EntityManager = this.repository.manager,
+    options: { readonly includeActorUsers?: boolean } = {},
   ): Promise<AuditQueryResult> {
     const pageOptions = Object.assign(new PaginationOptions(), {
       page: filters.page ?? 1,
@@ -55,8 +57,22 @@ export class AuditQueryService {
       filters.order ?? Order.DESC,
     );
 
+    const actors = options.includeActorUsers
+      ? await this.actorUsers(
+          entities.map((entity) => entity.actor_user_id),
+          manager,
+        )
+      : new Map<string, AuditUserDto>();
     return new PaginationDto(
-      entities.map((entity) => new AuditEvent(entity)),
+      entities.map(
+        (entity) =>
+          new AuditEvent(
+            entity,
+            entity.actor_user_id
+              ? (actors.get(entity.actor_user_id) ?? null)
+              : null,
+          ),
+      ),
       new PaginationMeta({ pageOptions, itemCount }),
     );
   }
@@ -64,9 +80,33 @@ export class AuditQueryService {
   public async findById(
     id: string,
     manager: EntityManager = this.repository.manager,
+    options: { readonly includeActorUsers?: boolean } = {},
   ): Promise<AuditEvent | null> {
     const entity = await this.repository.findById(manager, id);
-    return entity ? new AuditEvent(entity) : null;
+    if (!entity) return null;
+    const actors = options.includeActorUsers
+      ? await this.actorUsers([entity.actor_user_id], manager)
+      : new Map<string, AuditUserDto>();
+    return new AuditEvent(
+      entity,
+      entity.actor_user_id ? (actors.get(entity.actor_user_id) ?? null) : null,
+    );
+  }
+
+  private async actorUsers(
+    ids: readonly (string | null)[],
+    manager: EntityManager,
+  ): Promise<Map<string, AuditUserDto>> {
+    const unique = [
+      ...new Set(
+        ids.filter(
+          (id): id is string => typeof id === 'string' && id.length > 0,
+        ),
+      ),
+    ];
+    if (!unique.length) return new Map();
+    const users = await this.repository.findActorUsers(manager, unique);
+    return new Map(users.map((user) => [user.id, new AuditUserDto(user)]));
   }
 
   public byActor(

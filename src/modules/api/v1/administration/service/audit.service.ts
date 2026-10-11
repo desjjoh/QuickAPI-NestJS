@@ -15,7 +15,9 @@ export class AuditAdministrationService {
   ) {}
 
   public async search(query: AuditSearchQueryDto): Promise<AuditEventPageDto> {
-    const result = await this.queries.query(query);
+    const result = await this.queries.query(query, undefined, {
+      includeActorUsers: true,
+    });
     const data = await Promise.all(
       result.data.map(async (event) => {
         const location = await this.ipLocations.resolveIp(event.ipAddress);
@@ -26,7 +28,9 @@ export class AuditAdministrationService {
   }
 
   public async detail(id: string): Promise<AuditEventDto> {
-    const event = await this.queries.findById(id);
+    const event = await this.queries.findById(id, undefined, {
+      includeActorUsers: true,
+    });
     if (!event) throw new NotFoundException('Audit event not found.');
     const location = await this.ipLocations.resolveIp(event.ipAddress);
     return new AuditEventDto(event, location);
