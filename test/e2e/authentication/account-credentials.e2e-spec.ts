@@ -3,6 +3,8 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 
 import { AccountTokenType } from '@/config/token.config';
+import { IdentityAuditEvents } from '@/config/audit-events.config';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
@@ -124,6 +126,38 @@ describe('Authenticated credential and email changes', () => {
       })
       .expect(200);
     expect(changed.body.access_token).toEqual(expect.any(String));
+    const stored = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: user.id });
+    const audit = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findOneByOrFail({
+        event: IdentityAuditEvents.PASSWORD_CHANGED,
+        subject_id: user.id,
+      });
+    expect(audit).toMatchObject({
+      actor_id: user.id,
+      subject_id: user.id,
+      session_id: current.response.body.user.session.id,
+      before: { metadata: { last_changed_password: null } },
+      after: {
+        metadata: {
+          last_changed_password:
+            stored.metadata.last_changed_password!.toISOString(),
+        },
+      },
+      changes: {
+        metadata: {
+          last_changed_password: {
+            before: null,
+            after: stored.metadata.last_changed_password!.toISOString(),
+          },
+        },
+      },
+    });
+    for (const secret of [PASSWORD, 'Other!Pass2', stored.identity.password!]) {
+      expect(JSON.stringify(audit)).not.toContain(secret);
+    }
     const rows = await suite.dataSource
       .getRepository(UserSessionEntity)
       .find({ where: { user: { id: user.id } } });
@@ -170,6 +204,38 @@ describe('Authenticated credential and email changes', () => {
       .findOneByOrFail({ id: user.id });
     expect(stored.identity.email).toBe('new.address@example.test');
     expect(stored.metadata.last_changed_email).toBeTruthy();
+    const audit = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findOneByOrFail({
+        event: IdentityAuditEvents.EMAIL_CHANGE_COMPLETED,
+        subject_id: user.id,
+      });
+    expect(audit).toMatchObject({
+      actor_id: user.id,
+      session_id: session.response.body.user.session.id,
+      before: {
+        identity: { email: '[CHANGED]' },
+        metadata: { last_changed_email: null },
+      },
+      after: {
+        identity: { email: '[CHANGED]' },
+        metadata: {
+          last_changed_email: stored.metadata.last_changed_email!.toISOString(),
+        },
+      },
+      changes: {
+        identity: { email: { before: '[CHANGED]', after: '[CHANGED]' } },
+        metadata: {
+          last_changed_email: {
+            before: null,
+            after: stored.metadata.last_changed_email!.toISOString(),
+          },
+        },
+      },
+    });
+    for (const address of ['person@example.test', 'new.address@example.test']) {
+      expect(JSON.stringify(audit)).not.toContain(address);
+    }
     expect(
       (
         await suite.dataSource

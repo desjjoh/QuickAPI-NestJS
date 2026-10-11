@@ -46,6 +46,8 @@ export interface RecordAuditInput {
   readonly after?: unknown;
   /** Persist a semantic event even when its redacted snapshots have no changes. */
   readonly meaningfulWithoutChanges?: boolean;
+  /** Retain complete policy-redacted context alongside the separate changes. */
+  readonly includeSnapshotContext?: boolean;
 }
 
 const MACHINE_KEY_PATTERN = /^[a-z][a-z0-9]*(?:[._][a-z0-9]+)*$/;
@@ -101,8 +103,22 @@ export class AuditService {
       input.before,
       input.after,
     );
-    const left = this.asRecord(diff.before);
-    const right = this.asRecord(diff.after);
+    const left = this.asRecord(
+      input.includeSnapshotContext
+        ? this.redaction.redactSnapshot(
+            input.resourceType as string,
+            input.before,
+          )
+        : diff.before,
+    );
+    const right = this.asRecord(
+      input.includeSnapshotContext
+        ? this.redaction.redactSnapshot(
+            input.resourceType as string,
+            input.after,
+          )
+        : diff.after,
+    );
     const changes = this.asRecord(diff.changes);
     if (
       Object.keys(changes).length === 0 &&

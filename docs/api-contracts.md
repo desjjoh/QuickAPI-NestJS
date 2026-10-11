@@ -4,6 +4,26 @@
 
 Enabled Swagger is the endpoint/schema reference. This guide records cross-request guarantees clients must understand.
 
+## Account deletion and historical identity
+
+Self-service and administrator deletion preserve the original user/profile IDs and set the account status to `deleted`. This status is the authoritative deletion state: neither display names nor `metadata.deleted_at` determine whether an account is deleted. The entity stores the nullable timestamp in metadata and exposes it in user responses as `metadata.deletedAt` (ISO 8601).
+
+Names, birth date, bio, regional references, and historical metadata are retained. Articles and audit references continue to identify the original user. The email is replaced by a unique random internal address under `users.invalid`, freeing the original email for a new account with a different user ID. Passwords, sessions, account challenges, MFA settings, registration records for the current email, roles, phone numbers, and mailing addresses are removed. Avatars are detached and their image records removed; durable storage cleanup rechecks references and retries provider failures after commit. Normal user lists and ID/phone lookups exclude deleted accounts; email lookup no longer finds a deleted account by its original email. Deleted accounts cannot authenticate or be reactivated through administration.
+
+Soft deletion, avatar cleanup intent, and the success audit share a transaction. Pending durable email intents matching the user or current email are cancelled and their encrypted bodies removed. Provider delivery already in flight cannot be recalled. Legacy payload-bearing BullMQ jobs are not covered by this cancellation; drain them before rollout as described in the technical backlog.
+
+Cached idempotency responses owned by, or directly representing, the user are erased without removing the duplicate-execution fence. An identical retry of an erased response returns `409` and does not execute again. Administrator deletion retries retain their original bodyless `204`. This is a historical-retention policy, not anonymization or comprehensive privacy erasure. Access to retained personal data and any future erasure policy must be managed separately. Audits, logs, backups, and already-delivered emails have separate retention policies; this does not guarantee that they contain the original email or that it has been erased everywhere.
+
+Apply the migration before deploying. It adds the deletion timestamp and the dedicated deleted account status without changing profile nullability. Reverting while deleted accounts exist is deliberately rejected to avoid losing their authoritative state.
+
+## Identity and authentication audit snapshots
+
+Self-service and administrator deletion capture the fresh row under a write lock, reload the persisted tombstone, and insert the audit in the same transaction as deletion and avatar cleanup intent. These deletion events retain complete policy-redacted before/after context plus a separate diff, including stable user/profile IDs, names, administration revision, status, deletion timestamp, and avatar ID/removal. Audit failure rolls back the mutation; completed administrator idempotency retries replay without another audit event.
+
+Email values remain `[CHANGED]`; the diff indicates an email change without retaining either address. Passwords/hashes, OTPs, tokens, cookies, and MFA secrets are never persisted in audit snapshots. Explicitly type-checked security timestamps and MFA-enabled booleans are safe audit state, not secrets. Other mutation events retain changed fields rather than complete snapshots. Unchanged safe state is not a fabricated change: meaningful security events can still be recorded with an empty diff when timestamps collide. Password-reset requests are semantic events, not a fictitious persisted user flag.
+
+Security routes use the shared request transaction and root-user lock. Authentication, account-security, registration, and session audits reload the relevant state at the mutation boundary rather than diffing stale guard objects or intended outcomes. Registration snapshots are taken after session issuance/sign-in metadata; revoked sessions are reloaded including their inactive state. Invalid OTP-attempt accounting keeps its existing independent persistence behavior. Historical audit rows are not backfilled; names and stable subject IDs remain available after deletion, but original emails cannot be recovered from these redacted audit records.
+
 ## Article API audiences
 
 Article API controllers and services are grouped under `src/modules/api/v1/public`, `creator/articles`, and `administration`. Public and creator audience modules are routed independently; administration owns its article controller. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.

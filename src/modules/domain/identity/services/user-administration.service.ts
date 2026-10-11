@@ -1,3 +1,4 @@
+import { isUserDeleted } from '../policies/user-deletion.policy';
 import {
   applicationManager,
   runInTransaction,
@@ -6,10 +7,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 
-import { AccountStatusKey } from '@/config/statuses.config';
+import {
+  ACCOUNT_STATUS_KEYS,
+  AccountStatusKey,
+} from '@/config/statuses.config';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
@@ -41,6 +46,10 @@ export class UserAdministrationService {
     key: AccountStatusKey,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
+    if (key === ACCOUNT_STATUS_KEYS.DELETED)
+      throw new BadRequestException(
+        'Use account deletion to remove access and credentials.',
+      );
     const status = await this.references.getAccountStatus(key, manager);
     const updated = await this.users.updateUser(
       user,
@@ -78,6 +87,7 @@ export class UserAdministrationService {
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return runInTransaction(manager, async (manager) => {
+      if (isUserDeleted(user)) throw new NotFoundException('User not found.');
       assertUserAdministrationVersion(user, input.expected_version);
       const status = input.status_id
         ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
@@ -85,6 +95,10 @@ export class UserAdministrationService {
 
       if (input.status_id && !status)
         throw new BadRequestException('Account status not found.');
+      if (status?.key === ACCOUNT_STATUS_KEYS.DELETED)
+        throw new BadRequestException(
+          'Use account deletion to remove access and credentials.',
+        );
 
       const roles = input.role_ids
         ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })

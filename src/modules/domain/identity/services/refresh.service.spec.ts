@@ -24,7 +24,9 @@ describe('RefreshService', () => {
         ...manager,
         queryRunner: { isTransactionActive: true },
       };
-      manager.findOne.mockResolvedValue(current);
+      manager.findOne
+        .mockResolvedValueOnce(user)
+        .mockResolvedValueOnce(current);
       await expect(
         service.issueTokens(
           user as never,

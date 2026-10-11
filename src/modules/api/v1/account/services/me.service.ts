@@ -68,13 +68,23 @@ export class MeApiService {
     dto: DeleteAccountDto,
     res: Response,
   ): Promise<void> {
-    await this.credentials.validateUser(user.identity.email, dto.password);
-
     const userId = user.id;
-    const before = identityUserSnapshot(user);
 
     await this.userSvc.transaction(async (manager, lifecycle) => {
-      await this.lifecycle.deleteUser(user, manager, lifecycle);
+      const current = await manager.findOneOrFail(UserEntity, {
+        where: { id: userId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      await this.credentials.validateUser(
+        current.identity.email,
+        dto.password,
+        manager,
+      );
+      const before = identityUserSnapshot(current);
+      await this.lifecycle.deleteUser(current, manager, lifecycle);
+      const after = await manager.findOneOrFail(UserEntity, {
+        where: { id: userId },
+      });
       await this.auditSvc.record(
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
@@ -88,7 +98,8 @@ export class MeApiService {
           source: AuditSource.HTTP,
           metadata: {},
           before,
-          after: null,
+          after: identityUserSnapshot(after),
+          includeSnapshotContext: true,
         },
         manager,
       );
@@ -104,8 +115,11 @@ export class MeApiService {
     await this.credentials.validateUser(user.identity.email, dto.password);
 
     if (!dto.enabled) {
+      const before = identityUserSnapshot(
+        await this.userSvc.findByIdOrFail(user.id),
+      );
       await this.mfaSvc.disable(user);
-      await this.credentials.recordMfaChanged(user, false);
+      const updated = await this.credentials.recordMfaChanged(user, false);
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
@@ -117,8 +131,9 @@ export class MeApiService {
         resourceId: user.id,
         source: AuditSource.HTTP,
         metadata: {},
-        before: { id: user.id },
-        after: { id: user.id, metadata: { mfa_enabled: false } },
+        before,
+        after: identityUserSnapshot(updated),
+        meaningfulWithoutChanges: true,
       });
 
       return;
@@ -147,8 +162,11 @@ export class MeApiService {
     if (challengeUser.id !== user.id)
       throw new UnauthorizedException('Invalid MFA challenge.');
 
+    const before = identityUserSnapshot(
+      await this.userSvc.findByIdOrFail(user.id),
+    );
     await this.mfaSvc.enable(user);
-    await this.credentials.recordMfaChanged(user, true);
+    const updated = await this.credentials.recordMfaChanged(user, true);
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,
@@ -162,8 +180,9 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: AuditSource.HTTP,
       metadata: {},
-      before: { id: user.id },
-      after: { id: user.id, metadata: { mfa_enabled: true } },
+      before,
+      after: identityUserSnapshot(updated),
+      meaningfulWithoutChanges: true,
     });
   }
 
@@ -199,11 +218,13 @@ export class MeApiService {
     dto: VerifyEmailDto,
     res: Response,
   ): Promise<JWTDto> {
-    const previousEmail = user.identity.email;
+    const current = await this.userSvc.findByIdOrFail(user.id);
+    const before = identityUserSnapshot(current);
+    const previousEmail = current.identity.email;
     const updated = await this.evSvc.verifyEmail(
       dto.challenge_id,
       dto.code,
-      user,
+      current,
     );
 
     const emailChanged =
@@ -228,8 +249,8 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: 'http',
       metadata: {},
-      before: { id: updated.id },
-      after: { id: updated.id, identity: { email: true } },
+      before,
+      after: identityUserSnapshot(updated),
     });
 
     return this.refreshSvc.issueTokens(updated, res, currentSession);
@@ -244,6 +265,9 @@ export class MeApiService {
     await this.credentials.validateUser(user.identity.email, dto.password);
 
     const hashed = await this.credentials.hashPassword(dto.confirm);
+    const before = identityUserSnapshot(
+      await this.userSvc.findByIdOrFail(user.id),
+    );
 
     await this.userSvc.updateUser(user, {
       identity: { password: hashed },
@@ -263,8 +287,9 @@ export class MeApiService {
       sessionId: currentSession.id,
       source: AuditSource.HTTP,
       metadata: {},
-      before: { id: updated.id },
-      after: { id: updated.id, identity: { password: true } },
+      before,
+      after: identityUserSnapshot(updated),
+      meaningfulWithoutChanges: true,
     });
 
     await this.refreshSvc.revokeOtherSessions(updated.id, currentSession.id);

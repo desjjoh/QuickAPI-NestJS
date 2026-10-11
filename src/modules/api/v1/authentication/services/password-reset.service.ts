@@ -24,6 +24,7 @@ import { AccountPasswordChangedTemplate } from '@/modules/system/email/templates
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { RefreshService } from '@/modules/domain/identity/services/refresh.service';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 import {
   generateVerificationCode,
   hashIdentityToken,
@@ -90,8 +91,6 @@ export class PasswordResetService {
       resourceId: user.id,
       source: AuditSource.HTTP,
       metadata: {},
-      before: { id: user.id, metadata: { password_reset_requested: false } },
-      after: { id: user.id, metadata: { password_reset_requested: true } },
     });
   }
 
@@ -130,11 +129,13 @@ export class PasswordResetService {
     const user: UserEntity = accountToken.user;
 
     this.credentials.assertCanAuthenticate(user);
+    const current = await this.credentials.currentUser(user);
+    const before = identityUserSnapshot(current);
 
     const hashed: string = await this.credentials.hashPassword(password);
 
     await this.userSvc.updateUser(user, { identity: { password: hashed } });
-    await this.credentials.recordPasswordChanged(user);
+    const updated = await this.credentials.recordPasswordChanged(current);
 
     await this.refreshSvc.revokeAllSessions(user.id);
 
@@ -150,8 +151,9 @@ export class PasswordResetService {
       resourceId: user.id,
       source: 'http',
       metadata: {},
-      before: { id: user.id },
-      after: { id: user.id, identity: { password: true } },
+      before,
+      after: identityUserSnapshot(updated),
+      meaningfulWithoutChanges: true,
     });
 
     await this.emailSvc.sendEmail({

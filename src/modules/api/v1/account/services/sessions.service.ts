@@ -35,21 +35,21 @@ export class SessionsApiService {
     sessionId: string,
     res: Response,
   ): Promise<void> {
-    const target =
-      currentSession.id === sessionId
-        ? currentSession
-        : await this.refreshSvc.findSessionById(user.id, sessionId);
+    const target = await this.refreshSvc.sessionForAudit(user.id, sessionId);
 
     if (!target) throw new NotFoundException('Session not found.');
 
     const before = identitySessionSnapshot(target, user.id);
 
     if (currentSession.id === sessionId) {
-      await this.refreshSvc.revokeTokens(currentSession, res);
+      await this.refreshSvc.revokeTokens(target, res);
     } else {
       await this.refreshSvc.revokeSessionById(user.id, sessionId);
     }
 
+    const updated = await this.refreshSvc.sessionForAudit(user.id, sessionId);
+    if (!updated)
+      throw new NotFoundException('Session not found after revocation.');
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SESSION_REVOKED,
       domain: AuditEventDomain.IDENTITY,
@@ -63,7 +63,8 @@ export class SessionsApiService {
       source: AuditSource.HTTP,
       metadata: {},
       before,
-      after: { ...before, active: false },
+      after: identitySessionSnapshot(updated, user.id),
+      meaningfulWithoutChanges: true,
     });
   }
 
@@ -92,6 +93,7 @@ export class SessionsApiService {
       metadata: {},
       before,
       after: { id: user.id, sessions: remainingSessionIds },
+      meaningfulWithoutChanges: true,
     });
   }
 }

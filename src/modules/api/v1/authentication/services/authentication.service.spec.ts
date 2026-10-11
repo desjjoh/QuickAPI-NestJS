@@ -40,11 +40,16 @@ describe('AuthService', () => {
   const setup = () => {
     const userSvc = {
       recordSignIn: jest.fn().mockResolvedValue(user),
+      currentUser: jest.fn().mockResolvedValue(user),
       assertCanAuthenticate: jest.fn(),
     };
     const refreshSvc = {
       issueTokens: jest.fn().mockResolvedValue(tokens),
       revokeTokens: jest.fn().mockResolvedValue(undefined),
+      sessionForAudit: jest
+        .fn()
+        .mockResolvedValueOnce(session)
+        .mockResolvedValue({ ...session, active: false }),
     };
     const auditSvc = { record: jest.fn().mockResolvedValue({}) };
     const mfaSvc = {
@@ -92,18 +97,18 @@ describe('AuthService', () => {
         source: 'http',
         metadata: {},
         before: expect.objectContaining({
-          metadata: {
+          metadata: expect.objectContaining({
             last_sign_in: null,
             last_changed_mfa: null,
             mfa_enabled: false,
-          },
+          }),
         }),
         after: expect.objectContaining({
-          metadata: {
+          metadata: expect.objectContaining({
             last_sign_in: signedInAt.toISOString(),
             last_changed_mfa: null,
             mfa_enabled: false,
-          },
+          }),
         }),
         meaningfulWithoutChanges: true,
       }),

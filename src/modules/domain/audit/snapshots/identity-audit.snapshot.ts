@@ -2,13 +2,16 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 
 const timestamp = (value: Date | null | undefined): string | null =>
-  value instanceof Date ? value.toISOString() : null;
+  value instanceof Date && Number.isFinite(value.getTime())
+    ? value.toISOString()
+    : null;
 
 /** Builds a detached, policy-shaped user value at the mutation boundary. */
 export const identityUserSnapshot = (
   user: UserEntity,
 ): Record<string, unknown> => ({
   id: user.id,
+  version: user.administration_version,
   identity: { email: user.identity.email },
   profile: {
     id: user.profile.id,
@@ -16,6 +19,7 @@ export const identityUserSnapshot = (
       first: user.profile.name.first,
       last: user.profile.name.last,
     },
+    media: { avatar_id: user.profile.media?.avatar?.id ?? null },
   },
   roles: (user.roles ?? []).map(({ id }) => id),
   status: {
@@ -26,7 +30,10 @@ export const identityUserSnapshot = (
   created_at: timestamp(user.createdAt),
   updated_at: timestamp(user.updatedAt),
   metadata: {
+    deleted_at: timestamp(user.metadata.deleted_at),
     last_sign_in: timestamp(user.metadata.last_sign_in),
+    last_changed_email: timestamp(user.metadata.last_changed_email),
+    last_changed_password: timestamp(user.metadata.last_changed_password),
     last_changed_mfa: timestamp(user.metadata.last_changed_mfa),
     mfa_enabled: user.metadata.mfa_enabled,
   },

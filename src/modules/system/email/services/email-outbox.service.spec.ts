@@ -34,6 +34,7 @@ describe('EmailOutboxService', () => {
     update: jest.fn(),
     insert: jest.fn(),
     delete: jest.fn(),
+    findOne: jest.fn(),
   };
   const repository = {
     manager,
@@ -57,10 +58,65 @@ describe('EmailOutboxService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    manager.findOne.mockResolvedValue({ id: 'user-1' });
     manager.transaction.mockImplementation(async (work) => work(manager));
     queue.enqueueDelivery.mockResolvedValue(undefined);
     transport.sendCompiledEmail.mockResolvedValue(undefined);
     repository.findDue.mockResolvedValue([]);
+  });
+
+  it('does not persist delivery intents for a deleted user', async () => {
+    manager.findOne.mockResolvedValue({
+      id: 'deleted-user',
+      status: { key: 'deleted' },
+    });
+    await service.storeIntent({
+      ...payload,
+      metadata: { userId: 'deleted-user' },
+    });
+    expect(manager.insert).not.toHaveBeenCalled();
+  });
+
+  it('cancels encrypted pending messages for either the user ID or recipient, without touching others', async () => {
+    const pending = [
+      {
+        delivery_id: 'a',
+        ciphertext: sealEmail({
+          ...payload,
+          to: 'changed@example.test',
+          metadata: { userId: 'user-1' },
+        }),
+      },
+      { delivery_id: 'b', ciphertext: sealEmail(payload) },
+      {
+        delivery_id: 'c',
+        ciphertext: sealEmail({ ...payload, to: 'other@example.test' }),
+      },
+    ];
+    const query = {
+      where: jest.fn(),
+      andWhere: jest.fn(),
+      orderBy: jest.fn(),
+      take: jest.fn(),
+      getMany: jest
+        .fn()
+        .mockResolvedValueOnce(pending)
+        .mockResolvedValueOnce([]),
+    };
+    for (const key of ['where', 'andWhere', 'orderBy', 'take'] as const)
+      query[key].mockReturnValue(query);
+    const persistence = { createQueryBuilder: () => query };
+    await service.cancelForUser('user-1', 'PERSON@example.test', {
+      ...manager,
+      getRepository: () => persistence,
+    } as never);
+    expect(manager.update).toHaveBeenCalledTimes(2);
+    for (const id of ['a', 'b'])
+      expect(manager.update).toHaveBeenCalledWith(
+        EmailIntentEntity,
+        { delivery_id: id, state: 'pending' },
+        { state: 'cancelled', ciphertext: null },
+      );
   });
 
   it('encrypts email secrets with randomized authenticated encryption', () => {

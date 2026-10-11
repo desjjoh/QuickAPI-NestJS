@@ -18,7 +18,7 @@ export class IdempotencyEntity {
   public readonly fingerprint!: string;
 
   @Column({ type: 'varchar', length: 16 })
-  public readonly state!: 'processing' | 'completed';
+  public readonly state!: 'processing' | 'completed' | 'erased';
 
   @Column({ type: 'int', nullable: true })
   public readonly response_status!: number | null;

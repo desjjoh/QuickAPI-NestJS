@@ -16,6 +16,19 @@ describe('durable request idempotency', () => {
     store = idempotencyTestStore();
     service = new IdempotencyService(store.repository);
   });
+  it('does not replay or execute an erased response', async () => {
+    const work = jest.fn(async () => ({
+      status: 200,
+      body: { id: 'user-1', email: 'private@example.test' },
+    }));
+    await service.execute(scope, 'key', 'fp', work);
+    const row = [...store.rows.values()][0];
+    Object.assign(row, { state: 'erased', response_body: null });
+    await expect(service.execute(scope, 'key', 'fp', work)).rejects.toThrow(
+      'erased after account deletion',
+    );
+    expect(work).toHaveBeenCalledTimes(1);
+  });
   afterEach(() => {
     service.onModuleDestroy();
     jest.restoreAllMocks();

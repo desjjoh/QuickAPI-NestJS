@@ -28,6 +28,15 @@ import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { StorageObjectEntity } from '@/modules/system/storage/entities/storage-object.entity';
+import { AccountTokenType } from '@/config/token.config';
+import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
+import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
+import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
+import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
+import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
+import { EmailIntentEntity } from '@/modules/system/email/entities/email-intent.entity';
+import { sealEmail } from '@/modules/system/email/services/email-outbox.service';
+import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
 import { drainStorageCleanup } from '../../helpers/storage-cleanup';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
@@ -982,6 +991,160 @@ describe('article API lifecycle', () => {
       altText: null,
       decorative: true,
     });
+  });
+
+  it('preserves published articles and historical attribution when author and publisher delete their accounts', async () => {
+    const author = await creator();
+    const admin = await administrator();
+    const created = await createDraft(author);
+    const id = created.body.id as string;
+    await author.agent
+      .post(`${CREATOR_ROOT}/${id}/submit`)
+      .set(author.headers)
+      .send({ expected_version: created.body.version })
+      .expect(200);
+    await admin.agent
+      .post(`${ADMINISTRATION_ROOT}/${id}/publish`)
+      .set(admin.headers)
+      .send({ expected_version: await currentVersion(id) })
+      .expect(200);
+    const before = await suite.dataSource
+      .getRepository(ArticleEntity)
+      .findOneByOrFail({ id });
+    const events = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .count({ where: { subject_id: id } });
+    const manager = suite.dataSource.manager;
+    await manager.save(
+      AccountTokenEntity,
+      manager.create(AccountTokenEntity, {
+        user: { id: author.user.id },
+        type: AccountTokenType.PASSWORD_RESET,
+        token_hash: 'unused-challenge',
+        expires_at: new Date(Date.now() + 60_000),
+        metadata: { private: 'data' },
+      }),
+    );
+    await manager.save(
+      UserMfaSettingsEntity,
+      manager.create(UserMfaSettingsEntity, {
+        user: { id: author.user.id },
+        enabled: true,
+      }),
+    );
+    await manager.save(
+      UserPhoneEntity,
+      manager.create(UserPhoneEntity, {
+        profile: { id: author.user.profile.id },
+        country: { id: author.user.profile.region.country!.id },
+        phone_calling_code: '1',
+        phone_national_number: '6135550199',
+        phone_e164: '+16135550199',
+      }),
+    );
+    await manager.insert(EmailIntentEntity, {
+      delivery_id: 'tombstone-pending-email',
+      state: 'pending',
+      ciphertext: sealEmail({
+        to: 'creator@example.test',
+        subject: 'Security',
+        htmlBody: 'Secret',
+        messageStream: 'outbound',
+        metadata: { userId: author.user.id },
+      }),
+      created_at: new Date(),
+      available_at: new Date(Date.now() + 60_000),
+      expires_at: new Date(Date.now() + 120_000),
+    });
+    await manager.insert(IdempotencyEntity, {
+      scope_hash: 'f'.repeat(64),
+      actor_id: admin.user.id,
+      operation: 'identity.administration.user.update',
+      route: `PATCH /api/v1/administration/users/${author.user.id}`,
+      fingerprint: 'f'.repeat(64),
+      state: 'completed',
+      response_status: 200,
+      response_body: {
+        id: author.user.id,
+        identity: { email: 'creator@example.test' },
+      },
+      response_identity: author.user.id,
+      expires_at: new Date(Date.now() + 60_000),
+    });
+    for (const actor of [author, admin]) {
+      await actor.agent
+        .post('/api/v1/account/delete')
+        .set(actor.headers)
+        .send({ password: 'Valid!Pass1' })
+        .expect(204);
+      await actor.agent.get(CREATOR_ROOT).set(actor.headers).expect(404);
+    }
+    const article = await suite.dataSource
+      .getRepository(ArticleEntity)
+      .findOneByOrFail({ id });
+    expect(await manager.count(AccountTokenEntity)).toBe(0);
+    expect(await manager.count(UserSessionEntity)).toBe(0);
+    expect(await manager.count(UserMfaSettingsEntity)).toBe(0);
+    expect(await manager.count(UserPhoneEntity)).toBe(0);
+    expect(await manager.count(RegistrationTokenEntity)).toBe(0);
+    expect(
+      await manager.findOneByOrFail(EmailIntentEntity, {
+        delivery_id: 'tombstone-pending-email',
+      }),
+    ).toMatchObject({ state: 'cancelled', ciphertext: null });
+    expect(
+      await manager.findOneByOrFail(IdempotencyEntity, {
+        scope_hash: 'f'.repeat(64),
+      }),
+    ).toMatchObject({ state: 'erased', response_body: null });
+    expect(article.attribution.author?.id).toBe(before.attribution.author?.id);
+    expect(article.publication.publisher?.id).toBe(
+      before.publication.publisher?.id,
+    );
+    expect(article.version).toBe(before.version);
+    expect(article.content).toEqual(before.content);
+    expect(
+      await suite.dataSource
+        .getRepository(AuditEventEntity)
+        .count({ where: { subject_id: id } }),
+    ).toBe(events);
+    const detail = await request(app.getHttpServer())
+      .get(`${PUBLIC_ROOT}/${id}`)
+      .expect(200);
+    expect(detail.body.author).toMatchObject({
+      id: before.attribution.author!.id,
+      displayName:
+        before.attribution.author!.profile.name.preferred ||
+        `${before.attribution.author!.profile.name.first} ${before.attribution.author!.profile.name.last}`.trim(),
+      avatar: null,
+    });
+    expect(detail.body.publisher).toMatchObject({
+      id: before.publication.publisher!.id,
+      displayName:
+        before.publication.publisher!.profile.name.preferred ||
+        `${before.publication.publisher!.profile.name.first} ${before.publication.publisher!.profile.name.last}`.trim(),
+      avatar: null,
+    });
+    const list = await request(app.getHttpServer())
+      .get(PUBLIC_ROOT)
+      .expect(200);
+    expect(list.body.data[0].author.displayName).toBe(
+      detail.body.author.displayName,
+    );
+    expect(storage.objects.size).toBe(1);
+    const retained = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: before.attribution.author!.id });
+    expect(retained.status.key).toBe('deleted');
+    expect(retained.identity.email).toMatch(
+      /^deleted-[0-9a-f-]+@users\.invalid$/,
+    );
+    const replacement = await register(
+      before.attribution.author!.identity.email,
+    );
+    expect(replacement.id).not.toBe(retained.id);
+    expect(replacement.status.key).toBe('active');
+    expect(retained.profile).toEqual(before.attribution.author!.profile);
   });
 
   it('rejects invalid content without changing articles, versions, audits, or uploads', async () => {

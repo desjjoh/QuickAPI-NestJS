@@ -37,6 +37,9 @@ describe('RegistrationService', () => {
   const setup = () => {
     const userSvc = {
       findByEmail: jest.fn().mockResolvedValue(null),
+      findByIdOrFail: jest
+        .fn()
+        .mockImplementation(async (id) => userFixture({ id })),
     };
     const credentials = {
       hashPassword: jest.fn().mockResolvedValue('hashed'),

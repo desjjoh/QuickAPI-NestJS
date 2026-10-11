@@ -154,7 +154,7 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'Delete user',
     description:
-      'Permanently deletes a user account using expected_version from an administration read and a controlled reason. Stale actions return 409 before cleanup or deletion. Cleanup and the success audit share the transaction; identical keyed retries replay the original bodyless 204 after deletion.',
+      'Sets a user account status to deleted using expected_version and a controlled reason. Historical profile fields and relationships are preserved; email is replaced with an internal tombstone address, and credentials, sessions, contacts, and avatar are removed. Stale actions return 409 before cleanup. Soft deletion, durable avatar cleanup intent, and the success audit share the transaction; identical keyed deletion retries replay the original bodyless 204.',
   })
   @ApiConflictResponse({
     description:

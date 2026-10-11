@@ -74,7 +74,7 @@ export class MeApiController {
   @ApiOperation({
     summary: 'Delete current account',
     description:
-      'Permanently deletes the authenticated user account and associated account-owned data.',
+      'Sets the authenticated account status to deleted. Historical profile fields and relationships are preserved; email is replaced with an internal tombstone address, and credentials, sessions, contacts, and avatar are removed. Avatar storage cleanup is durable and asynchronous. Deleted accounts cannot authenticate or be reactivated.',
   })
   @ApiNoContentResponse({
     description: 'Account deleted successfully.',

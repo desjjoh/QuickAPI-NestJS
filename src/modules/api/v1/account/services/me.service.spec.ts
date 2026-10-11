@@ -11,7 +11,6 @@ import type { RefreshService } from '@/modules/domain/identity/services/refresh.
 import type { UserService } from '@/modules/domain/identity/services/user.service';
 import type { UserCredentialsService } from '@/modules/domain/identity/services/user-credentials.service';
 import type { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
-import type { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import type { EmailService } from '@/modules/system/email/services/email.service';
 import {
   sessionFixture,
@@ -19,6 +18,7 @@ import {
 } from '@/../test/helpers/identity.fixtures';
 import { MeApiService } from './me.service';
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
+import { AuditRedactionService } from '@/modules/domain/audit/services/audit-redaction.service';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 import {
   AUDIT_EVENT_MATRIX,
@@ -33,11 +33,15 @@ describe('MeApiService', () => {
     clearCookie: jest.fn(),
   } as unknown as Response;
   const setup = () => {
-    const manager = { getRepository: jest.fn() };
+    const manager = {
+      getRepository: jest.fn(),
+      findOneOrFail: jest.fn().mockResolvedValue(user),
+    };
     const transactionLifecycle = new TransactionLifecycle();
     const userSvc = {
       transaction: jest.fn((work) => work(manager, transactionLifecycle)),
       updateUser: jest.fn().mockResolvedValue(user),
+      findByIdOrFail: jest.fn().mockResolvedValue(user),
     };
     const credentials = {
       validateUser: jest.fn().mockResolvedValue(user),
@@ -102,6 +106,7 @@ describe('MeApiService', () => {
     expect(credentials.validateUser).toHaveBeenCalledWith(
       user.identity.email,
       'old',
+      expect.any(Object),
     );
     expect(lifecycle.deleteUser).toHaveBeenCalledWith(
       user,
@@ -140,23 +145,50 @@ describe('MeApiService', () => {
     );
   });
 
-  it('preserves the audit identity when deletion clears the entity id', async () => {
-    const { service, lifecycle, auditSvc } = setup();
-    const currentUser = userFixture({ id: 'deleted-user' });
-    lifecycle.deleteUser.mockImplementation(async (target: UserEntity) => {
-      Object.assign(target, { id: undefined });
+  it('captures a fresh locked before value and reloads the persisted tombstone', async () => {
+    const { service, manager, auditSvc } = setup();
+    const fresh = userFixture({
+      id: 'deleted-user',
+      profile: { name: { first: 'Fresh' } },
     });
-
-    await service.deleteMe(currentUser, { password: 'old' }, res);
-
+    const deletedAt = new Date('2026-10-11T12:00:00.123Z');
+    const after = userFixture({
+      id: fresh.id,
+      identity: { email: 'deleted-internal@users.invalid', password: null },
+      status: { key: 'deleted' },
+      metadata: { deleted_at: deletedAt },
+    });
+    manager.findOneOrFail
+      .mockResolvedValueOnce(fresh)
+      .mockResolvedValueOnce(after);
+    await service.deleteMe(
+      userFixture({ id: fresh.id }),
+      { password: 'old' },
+      res,
+    );
+    expect(manager.findOneOrFail).toHaveBeenNthCalledWith(
+      1,
+      expect.any(Function),
+      { where: { id: fresh.id }, lock: { mode: 'pessimistic_write' } },
+    );
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        actorId: 'deleted-user',
-        subjectId: 'deleted-user',
-        resourceId: 'deleted-user',
-        before: expect.objectContaining({ id: 'deleted-user' }),
+        actorId: fresh.id,
+        subjectId: fresh.id,
+        includeSnapshotContext: true,
+        before: expect.objectContaining({
+          profile: expect.objectContaining({
+            name: { first: 'Fresh', last: fresh.profile.name.last },
+          }),
+        }),
+        after: expect.objectContaining({
+          status: expect.objectContaining({ key: 'deleted' }),
+          metadata: expect.objectContaining({
+            deleted_at: deletedAt.toISOString(),
+          }),
+        }),
       }),
-      expect.any(Object),
+      manager,
     );
   });
 
@@ -294,8 +326,12 @@ describe('MeApiService', () => {
         event:
           AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].EMAIL_CHANGE_COMPLETED,
         sessionId: session.id,
-        before: { id: user.id },
-        after: { id: user.id, identity: { email: true } },
+        before: expect.objectContaining({
+          identity: { email: user.identity.email },
+        }),
+        after: expect.objectContaining({
+          identity: { email: updated.identity.email },
+        }),
       }),
     );
     expect(refreshSvc.issueTokens).toHaveBeenCalledWith(updated, res, session);
@@ -360,8 +396,11 @@ describe('MeApiService', () => {
         subjectId: user.id,
         resourceId: user.id,
         sessionId: session.id,
-        before: { id: user.id },
-        after: { id: user.id, identity: { password: true } },
+        before: expect.objectContaining({
+          id: user.id,
+          metadata: expect.objectContaining({ last_changed_password: null }),
+        }),
+        after: expect.objectContaining({ id: user.id }),
       }),
     );
   });
@@ -381,8 +420,15 @@ describe('MeApiService', () => {
       res,
     );
 
-    const serialized = JSON.stringify(auditSvc.record.mock.calls);
-    expect(serialized).toContain('"email":true');
+    const input = auditSvc.record.mock.calls[0][0];
+    const serialized = JSON.stringify(
+      new AuditRedactionService().redactDiff(
+        input.resourceType,
+        input.before,
+        input.after,
+      ),
+    );
+    expect(serialized).toContain('[CHANGED]');
     expect(serialized).not.toContain(user.identity.email);
     expect(serialized).not.toContain('new-secret@example.test');
     expect(serialized).not.toContain('private-challenge');

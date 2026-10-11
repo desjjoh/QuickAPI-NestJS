@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request, Response } from 'express';
 
 import { RequestContext } from '@/common/store/request-context.store';
@@ -65,8 +65,9 @@ export class AuthService {
     req?: Request,
     options: CompleteSignInOptions = {},
   ): Promise<JWTDto> {
-    const before = identityUserSnapshot(user);
-    const updated = await this.credentials.recordSignIn(user);
+    const current = await this.credentials.currentUser(user);
+    const before = identityUserSnapshot(current);
+    const updated = await this.credentials.recordSignIn(current);
     const after = identityUserSnapshot(updated);
     const tokens = await (req
       ? this.refreshSvc.issueTokens(updated, res, undefined, req)
@@ -126,9 +127,16 @@ export class AuthService {
     session: UserSessionEntity,
     res: Response,
   ): Promise<void> {
-    const before = identitySessionSnapshot(session);
-    await this.refreshSvc.revokeTokens(session, res);
-    const after = { ...before, active: false };
+    const current = await this.refreshSvc.sessionForAudit(user.id, session.id);
+    if (!current)
+      throw new UnauthorizedException(
+        'Authenticated session no longer exists.',
+      );
+    const before = identitySessionSnapshot(current, user.id);
+    await this.refreshSvc.revokeTokens(current, res);
+    const updated = await this.refreshSvc.sessionForAudit(user.id, session.id);
+    if (!updated) throw new Error('Revoked session audit reload failed.');
+    const after = identitySessionSnapshot(updated, user.id);
 
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].SIGN_OUT_COMPLETED,
@@ -144,6 +152,7 @@ export class AuthService {
       metadata: {},
       before,
       after,
+      meaningfulWithoutChanges: true,
     });
   }
 }

@@ -2,6 +2,7 @@ export const ACCOUNT_STATUS_KEYS = {
   ACTIVE: 'active',
   DISABLED: 'disabled',
   LOCKED: 'locked',
+  DELETED: 'deleted',
 } as const;
 
 export type AccountStatusKey =
@@ -14,6 +15,12 @@ export interface AccountStatusSeed {
 }
 
 export const ACCOUNT_STATUSES: AccountStatusSeed[] = [
+  {
+    key: ACCOUNT_STATUS_KEYS.DELETED,
+    label: 'Deleted',
+    description:
+      'The account is permanently soft deleted and cannot authenticate or be reactivated.',
+  },
   {
     key: ACCOUNT_STATUS_KEYS.ACTIVE,
     label: 'Active',

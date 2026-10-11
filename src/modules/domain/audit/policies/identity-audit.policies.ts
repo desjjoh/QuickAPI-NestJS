@@ -4,6 +4,8 @@ import {
   nestedObject,
   relationshipIds,
   scalar,
+  timestamp,
+  booleanField,
 } from '../types/audit-policy.types';
 import { AuditResourceType } from '@/config/audit-events.config';
 
@@ -15,6 +17,7 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     profile: nestedObject({
       id: scalar,
       name: nestedObject({ first: scalar, last: scalar }),
+      media: nestedObject({ avatar_id: scalar }),
     }),
     roles: relationshipIds,
     sessions: relationshipIds,
@@ -22,12 +25,13 @@ export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
     active: scalar,
     created_at: scalar,
     updated_at: scalar,
-    deleted_at: scalar,
     metadata: nestedObject({
-      last_sign_in: scalar,
-      last_changed_mfa: scalar,
-      mfa_enabled: changedOnly,
-      password_reset_requested: scalar,
+      deleted_at: timestamp,
+      last_sign_in: timestamp,
+      last_changed_email: timestamp,
+      last_changed_password: timestamp,
+      last_changed_mfa: timestamp,
+      mfa_enabled: booleanField,
     }),
   },
   [AuditResourceType.IDENTITY_PROFILE]: {

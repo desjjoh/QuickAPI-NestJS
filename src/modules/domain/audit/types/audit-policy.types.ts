@@ -2,6 +2,8 @@ export type AuditMask = 'email' | 'sha256';
 
 export type AuditFieldPolicy =
   | { readonly kind: 'scalar' }
+  | { readonly kind: 'timestamp' }
+  | { readonly kind: 'boolean' }
   | { readonly kind: 'masked'; readonly mask: AuditMask }
   | { readonly kind: 'changed-only' }
   | { readonly kind: 'nested-object'; readonly fields: AuditPolicy }
@@ -12,6 +14,8 @@ export interface AuditPolicy {
 }
 
 export const scalar: AuditFieldPolicy = { kind: 'scalar' };
+export const timestamp: AuditFieldPolicy = { kind: 'timestamp' };
+export const booleanField: AuditFieldPolicy = { kind: 'boolean' };
 export const maskedEmail: AuditFieldPolicy = {
   kind: 'masked',
   mask: 'email',

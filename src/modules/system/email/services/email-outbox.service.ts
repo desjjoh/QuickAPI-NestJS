@@ -6,7 +6,9 @@ import {
   randomBytes,
   randomUUID,
 } from 'node:crypto';
-import { LessThanOrEqual, Not } from 'typeorm';
+import { EntityManager, LessThanOrEqual, Not } from 'typeorm';
+import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { runInTransaction } from '@/common/helpers/transaction.helper';
 import { env } from '@/config/environment.config';
 import { logger } from '@/config/logger.config';
@@ -71,6 +73,16 @@ export class EmailOutboxService {
     scope?: string,
   ): Promise<void> {
     await runInTransaction(this.repository.manager, async (manager) => {
+      const userId = payload.metadata?.userId;
+      if (userId) {
+        // Same root lock as account deletion: a stale security request cannot
+        // enqueue an email for an already deleted account.
+        const user = await manager.findOne(UserEntity, {
+          where: { id: userId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!user || isUserDeleted(user)) return;
+      }
       if (scope)
         await manager.update(
           EmailIntentEntity,
@@ -87,6 +99,41 @@ export class EmailOutboxService {
         cancellation_scope: scope ?? null,
       });
     });
+  }
+  public async cancelForUser(
+    userId: string,
+    email: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    // Existing payloads are encrypted and have no user index. Inspect only
+    // pending intents, in bounded pages, and never emit decrypted data.
+    let after = '';
+    for (;;) {
+      const intents = await manager
+        .getRepository(EmailIntentEntity)
+        .createQueryBuilder('intent')
+        .where('intent.state = :state', { state: 'pending' })
+        .andWhere('intent.delivery_id > :after', { after })
+        .orderBy('intent.delivery_id', 'ASC')
+        .take(100)
+        .getMany();
+      if (!intents.length) return;
+      for (const intent of intents) {
+        if (!intent.ciphertext) continue;
+        const payload = openEmail(intent.ciphertext);
+        if (
+          payload.metadata?.userId === userId ||
+          payload.to.trim().toLowerCase() === email.trim().toLowerCase()
+        ) {
+          await manager.update(
+            EmailIntentEntity,
+            { delivery_id: intent.delivery_id, state: 'pending' },
+            { state: 'cancelled', ciphertext: null },
+          );
+        }
+      }
+      after = intents[intents.length - 1].delivery_id;
+    }
   }
   public async dispatch(): Promise<void> {
     await this.repository.manager.update(

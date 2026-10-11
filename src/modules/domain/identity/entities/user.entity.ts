@@ -21,6 +21,10 @@ import { AccountTokenEntity } from './account-token.entity';
 import { UserMfaSettingsEntity } from './mfa.entity';
 
 class Metadata {
+  /** Historical deletion time. The deleted account status is authoritative. */
+  @Column({ type: 'datetime', precision: 3, nullable: true })
+  public readonly deleted_at!: Date | null;
+
   @Column({ type: 'datetime', nullable: true })
   public readonly last_sign_in!: Date | null;
 
@@ -45,6 +49,7 @@ export type UserMetadata = Metadata;
 export const createUserMetadata = (
   overrides: Partial<UserMetadata> = {},
 ): UserMetadata => ({
+  deleted_at: null,
   last_sign_in: null,
   last_changed_email: null,
   last_changed_password: null,

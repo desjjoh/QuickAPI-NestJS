@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import {
@@ -379,11 +384,16 @@ export class ProfileApiService {
     return new UserDto(updated, session);
   }
 
-  private lockUser(manager: EntityManager, id: string): Promise<UserEntity> {
-    return manager.findOneOrFail(UserEntity, {
+  private async lockUser(
+    manager: EntityManager,
+    id: string,
+  ): Promise<UserEntity> {
+    const user = await manager.findOneOrFail(UserEntity, {
       where: { id },
       lock: { mode: 'pessimistic_write' },
     });
+    if (isUserDeleted(user)) throw new NotFoundException('User not found.');
+    return user;
   }
 
   private record(

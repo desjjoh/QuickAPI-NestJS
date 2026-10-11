@@ -1,13 +1,16 @@
+import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
 import {
   BadRequestException,
   CallHandler,
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  UnauthorizedException,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { firstValueFrom, from, Observable } from 'rxjs';
 import { UserService } from '@/modules/domain/identity/services/user.service';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 /** No credential response replay; stage cookies until every security write commits. */
 @Injectable()
@@ -40,9 +43,23 @@ export class SecurityTransactionInterceptor implements NestInterceptor {
           return response;
         }) as Response['clearCookie'];
         try {
-          const result = await this.users.transaction(async () =>
-            firstValueFrom(next.handle()),
-          );
+          const result = await this.users.transaction(async (manager) => {
+            const actor = (
+              request.user as { userEntity?: UserEntity } | undefined
+            )?.userEntity;
+            if (actor) {
+              const current = await manager.findOneOrFail(UserEntity, {
+                where: { id: actor.id },
+                lock: { mode: 'pessimistic_write' },
+              });
+              if (isUserDeleted(current))
+                throw new UnauthorizedException(
+                  'Account is no longer available.',
+                );
+              (request.user as { userEntity: UserEntity }).userEntity = current;
+            }
+            return firstValueFrom(next.handle());
+          });
           response.cookie = cookie;
           response.clearCookie = clearCookie;
           // A timeout can already have completed the HTTP response while the

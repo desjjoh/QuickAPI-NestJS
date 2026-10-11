@@ -31,6 +31,7 @@ import { UserAdministrationService } from './services/user-administration.servic
 import { UserCredentialsService } from './services/user-credentials.service';
 import { UserLifecycleService } from './services/user-lifecycle.service';
 import { UserProfileService } from './services/user-profile.service';
+import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { UserProfileService } from './services/user-profile.service';
     LibraryModule,
     MediaModule,
     EmailModule,
+    IdempotencyModule,
   ],
   providers: [
     UserRepository,
