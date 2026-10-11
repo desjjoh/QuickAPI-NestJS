@@ -397,18 +397,25 @@ describe('durable storage cleanup (disposable MySQL and Redis)', () => {
       for (const processor of [
         StorageCleanupProcessor,
         StorageCleanupDeadLetterProcessor,
-      ])
-        expect(app.get(processor).worker.opts.connection).toMatchObject({
+      ]) {
+        const worker = app.get(processor).worker;
+        expect((await worker.client).status).toBe('ready');
+        expect(worker.opts.connection).toMatchObject({
           maxRetriesPerRequest: null,
           enableOfflineQueue: true,
         });
-      for (const queue of [STORAGE_CLEANUP_QUEUE, STORAGE_CLEANUP_DLQ])
+      }
+      for (const queue of [STORAGE_CLEANUP_QUEUE, STORAGE_CLEANUP_DLQ]) {
+        expect((await app.get<Queue>(getQueueToken(queue)).client).status).toBe(
+          'ready',
+        );
         expect(
           app.get<Queue>(getQueueToken(queue)).opts.connection,
         ).toMatchObject({
           maxRetriesPerRequest: 1,
           enableOfflineQueue: false,
         });
+      }
       expect(
         errors.mock.calls.filter((args) =>
           String(args[0]).includes('maxRetriesPerRequest'),
