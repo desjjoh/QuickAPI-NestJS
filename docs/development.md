@@ -63,4 +63,6 @@ Production uses `migration:run:prod` against the compiled datasource. Apply all 
 
 Use `npm run check` for formatting, lint, type checking, unit/in-process integration tests, and build; use `test:cov` for coverage gates. See [Testing](../test/TESTING.md) before starting E2E or smoke tests.
 
+Application and test code use TypeScript `strict` mode and reject switch fallthrough. The build and E2E configurations inherit these protections from the root configuration. `npm run typecheck` checks both the main NodeNext configuration and the E2E bundler configuration; CI runs this same command. The individual commands are `typecheck:main` and `typecheck:e2e`. Dependency declaration checking remains skipped with `skipLibCheck`; application/test checking is not weakened.
+
 [package.json](../package.json) defines available commands. The convenience E2E scripts use POSIX environment assignment; PowerShell users should follow the explicit Windows instructions in the testing guide.

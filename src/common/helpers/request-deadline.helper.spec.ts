@@ -19,7 +19,7 @@ describe('request deadline transaction boundary', () => {
   it('allows compensating transactions after cancellation without reviving the request', async () => {
     const events: string[] = [];
     const manager = {
-      transaction: async (work) => {
+      transaction: async <T>(work: (manager: EntityManager) => Promise<T>) => {
         try {
           return await work({} as EntityManager);
         } finally {

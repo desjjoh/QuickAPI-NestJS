@@ -4,7 +4,7 @@ import {
 } from '@/common/helpers/transaction.helper';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { EntityManager, IsNull, LessThan, MoreThan } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 
 import { AccountTokenEntity } from '../entities/account-token.entity';
 import { UserEntity } from '../entities/user.entity';

@@ -85,7 +85,7 @@ describe('HTTP timeout transaction and upload lifecycle', () => {
       resolveDrain = resolve;
     });
     manager = {
-      transaction: async (work) => {
+      transaction: async <T>(work: (manager: EntityManager) => Promise<T>) => {
         try {
           const result = await work({} as EntityManager);
           events.push('committed');

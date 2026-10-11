@@ -16,7 +16,9 @@ describe('transaction helpers', () => {
       const events: string[] = [];
       const tx = {} as EntityManager;
       const root = {
-        transaction: async (work) => {
+        transaction: async <T>(
+          work: (manager: EntityManager) => Promise<T>,
+        ) => {
           try {
             return await work(tx);
           } finally {

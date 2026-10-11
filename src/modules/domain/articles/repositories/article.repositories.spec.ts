@@ -11,25 +11,25 @@ import { ArticleRepository } from './article.repository';
 import { ArticleStatusRepository } from './status.repository';
 
 function builder() {
+  const chain = {
+    clone: jest.fn(),
+    innerJoin: jest.fn(),
+    leftJoin: jest.fn(),
+    andWhere: jest.fn(),
+    select: jest.fn(),
+    addSelect: jest.fn(),
+    orderBy: jest.fn(),
+    addOrderBy: jest.fn(),
+    limit: jest.fn(),
+    offset: jest.fn(),
+  };
   const query = {
+    ...chain,
     getCount: jest.fn().mockResolvedValue(2),
     getRawMany: jest.fn().mockResolvedValue([]),
   };
-  for (const method of [
-    'clone',
-    'innerJoin',
-    'leftJoin',
-    'andWhere',
-    'select',
-    'addSelect',
-    'orderBy',
-    'addOrderBy',
-    'limit',
-    'offset',
-  ]) {
-    query[method] = jest.fn().mockReturnValue(query);
-  }
-  return query as typeof query & Record<string, jest.Mock>;
+  for (const method of Object.values(chain)) method.mockReturnValue(query);
+  return query;
 }
 
 function setup<TEntity extends ObjectLiteral>(target: new () => TEntity) {
