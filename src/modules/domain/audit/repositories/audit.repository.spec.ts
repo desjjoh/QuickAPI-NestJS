@@ -10,6 +10,7 @@ import { Order, PaginationOptions } from '@/common/models/pagination.model';
 
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { AuditRepository } from './audit.repository';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 function entity(id: string): AuditEventEntity {
   return { id } as AuditEventEntity;
@@ -58,6 +59,72 @@ function setup(rows: AuditEventEntity[] = [], itemCount = rows.length) {
 }
 
 describe('AuditRepository', () => {
+  it.each([
+    [AuditSort.DOMAIN, 'CAST(audit.domain AS CHAR)'],
+    [AuditSort.ACTOR_TYPE, 'CAST(audit.actor_type AS CHAR)'],
+  ])(
+    'preserves lexical sorting for enum field %s',
+    async (sort, expression) => {
+      const { repository, builder, manager } = setup();
+      await repository.query(
+        manager,
+        {},
+        new PaginationOptions(),
+        sort,
+        Order.ASC,
+      );
+      expect(builder.orderBy).toHaveBeenCalledWith(expression, Order.ASC);
+      expect(builder.addOrderBy).toHaveBeenCalledWith('audit.id', Order.ASC);
+    },
+  );
+
+  it('selects only bounded actor display data without loading eager user relations', async () => {
+    const { repository } = setup();
+    const rows = [{ id: 'actor-1' }];
+    const display = {
+      innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue(rows),
+    };
+    const persistence = {
+      createQueryBuilder: jest.fn().mockReturnValue(display),
+    };
+    const manager = { getRepository: jest.fn().mockReturnValue(persistence) };
+    await expect(
+      repository.findActorUsers(manager as never, ['actor-1']),
+    ).resolves.toBe(rows);
+    expect(manager.getRepository).toHaveBeenCalledWith(UserEntity);
+    expect(display.select).toHaveBeenCalledWith([
+      'actor.id AS id',
+      'actor.identity.email AS email',
+      'profile.name.first AS first',
+      'profile.name.last AS last',
+      'profile.name.preferred AS preferred',
+      'status.key AS status_key',
+      'status.label AS status_label',
+      'avatar.id AS avatar_id',
+      'avatar.storage_key AS avatar_key',
+    ]);
+    expect(display.where).toHaveBeenCalledWith('actor.id IN (:...ids)', {
+      ids: ['actor-1'],
+    });
+    expect(display.leftJoin).toHaveBeenCalledWith(
+      'profile.media.avatar',
+      'avatar',
+    );
+    expect(display.innerJoin.mock.calls).toEqual([
+      ['actor.profile', 'profile'],
+      ['actor.status', 'status'],
+    ]);
+    manager.getRepository.mockClear();
+    await expect(
+      repository.findActorUsers(manager as never, []),
+    ).resolves.toEqual([]);
+    expect(manager.getRepository).not.toHaveBeenCalled();
+  });
+
   it('queries through the supplied manager with deterministic pagination', async () => {
     const rows = [entity('audit-1')];
     const { repository, persistence, builder, manager } = setup(rows, 5);

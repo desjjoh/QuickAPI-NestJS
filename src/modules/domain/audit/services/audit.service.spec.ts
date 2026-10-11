@@ -16,6 +16,7 @@ describe(AuditService.name, () => {
   let repository: {
     create: jest.Mock;
     insert: jest.Mock;
+    exists: jest.Mock;
   };
   let redaction: AuditRedactionService;
   let context: RequestContext;
@@ -34,6 +35,7 @@ describe(AuditService.name, () => {
 
   beforeEach(() => {
     repository = {
+      exists: jest.fn().mockResolvedValue(false),
       create: jest.fn((_entity, value) => value as AuditEventEntity),
       insert: jest
         .fn()
@@ -68,6 +70,47 @@ describe(AuditService.name, () => {
     );
     expect(result).not.toHaveProperty('category');
     expect(repository.insert).toHaveBeenCalledWith(AuditEventEntity, result);
+  });
+
+  it.each(['user', 'admin'] as const)(
+    'links an existing %s initiator, never the subject',
+    async (actorType) => {
+      repository.exists.mockResolvedValue(true);
+      const result = await service.record({
+        ...activity,
+        actorType,
+        subjectId: 'different-user',
+      });
+      expect(repository.exists).toHaveBeenCalledWith(expect.any(Function), {
+        where: { id: activity.actorId },
+      });
+      expect(result).toMatchObject({
+        actor_id: activity.actorId,
+        actor_user_id: activity.actorId,
+        subject_id: 'different-user',
+      });
+    },
+  );
+
+  it.each(['anonymous', 'service', 'system'] as const)(
+    'does not link %s actors even when their IDs match a user',
+    async (actorType) => {
+      repository.exists.mockResolvedValue(true);
+      const result = await service.record({ ...activity, actorType });
+      expect(result).toMatchObject({
+        actor_id: activity.actorId,
+        actor_user_id: null,
+      });
+      expect(repository.exists).not.toHaveBeenCalled();
+    },
+  );
+
+  it('retains an unresolved historical actor ID without an invalid foreign key', async () => {
+    const result = await service.record(activity);
+    expect(result).toMatchObject({
+      actor_id: activity.actorId,
+      actor_user_id: null,
+    });
   });
 
   it('retains redacted snapshot context for tombstones while diffing only changed fields', async () => {
@@ -328,6 +371,10 @@ describe(AuditService.name, () => {
 
   it.each([
     ['invalid domain format', { domain: 'Identity' }],
+    [
+      'unsupported domain',
+      { domain: 'future', event: 'future.action.completed' },
+    ],
     ['invalid event format', { event: 'identity.profile-UPDATED' }],
     [
       'event outside the declared domain namespace',
@@ -478,6 +525,7 @@ describe(AuditService.name, () => {
 
   it('uses the transaction manager repository when supplied', async () => {
     const transactionRepository = {
+      exists: jest.fn().mockResolvedValue(true),
       create: jest.fn((_entity, value) => value as AuditEventEntity),
       insert: jest.fn().mockResolvedValue({}),
     };

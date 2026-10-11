@@ -29,6 +29,7 @@ import {
 } from '@/config/audit-events.config';
 import type { SessionIpLocation } from '@/modules/system/geolocation/services/ip-location.service';
 import { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
+import { AuditUserDto } from '@/modules/domain/audit/models/audit-user.model';
 
 type AuditData = Readonly<Record<string, unknown>>;
 
@@ -129,6 +130,13 @@ export class AuditEventDto {
     nullable: true,
   })
   public readonly actorId: string | null;
+  @ApiPropertyOptional({
+    type: AuditUserDto,
+    nullable: true,
+    description:
+      'Current display-only initiator, including tombstones. Null for non-user or unresolved actors; actorId retains historical identity.',
+  })
+  public readonly actorUser: AuditUserDto | null;
   @ApiPropertyOptional({
     enum: AuditSubjectType,
     example: AuditSubjectType.USER,
@@ -307,6 +315,7 @@ export class AuditEventDto {
     this.event = event.event;
     this.actorType = event.actorType;
     this.actorId = event.actorId;
+    this.actorUser = event.actorUser ?? null;
     this.subjectType = event.subjectType;
     this.subjectId = event.subjectId;
     this.resourceType = event.resourceType;

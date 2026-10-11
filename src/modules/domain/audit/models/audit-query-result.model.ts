@@ -1,6 +1,7 @@
 import { BaseModel } from '@/common/models/base.model';
 import { AuditEventEntity } from '../entities/audit-event.entity';
 import { PaginationDto } from '@/common/models/pagination.model';
+import { AuditUserDto } from './audit-user.model';
 import {
   AuditActorType,
   AuditResourceType,
@@ -32,6 +33,7 @@ export class AuditEvent extends BaseModel {
   public readonly event: string;
   public readonly actorType: AuditActorType;
   public readonly actorId: string | null;
+  public readonly actorUser: AuditUserDto | null;
   public readonly subjectType: AuditSubjectType | null;
   public readonly subjectId: string | null;
   public readonly resourceType: AuditResourceType | null;
@@ -50,13 +52,17 @@ export class AuditEvent extends BaseModel {
   public readonly changes: AuditData | null;
   public readonly metadata: AuditData | null;
 
-  public constructor(entity: AuditEventEntity) {
+  public constructor(
+    entity: AuditEventEntity,
+    actorUser: AuditUserDto | null = null,
+  ) {
     super(entity);
 
     this.domain = entity.domain;
     this.event = entity.event;
     this.actorType = entity.actor_type as AuditActorType;
     this.actorId = entity.actor_id;
+    this.actorUser = actorUser;
     this.subjectType = entity.subject_type as AuditSubjectType | null;
     this.subjectId = entity.subject_id;
     this.resourceType = entity.resource_type as AuditResourceType | null;
