@@ -51,7 +51,7 @@ export class ArticleAdministrationApiService {
       },
     );
     const data = articles.map(
-      (article: ArticleEntity) => new ArticleManagementListItemDto(article),
+      (article) => new ArticleManagementListItemDto(article),
     );
 
     return new ArticleManagementPageDto(

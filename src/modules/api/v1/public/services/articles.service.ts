@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
 import { PaginationMeta } from '@/common/models/pagination.model';
-import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import {
   ArticleDto,
   ArticleListItemDto,
@@ -19,9 +18,7 @@ export class PublicArticleApiService {
     const [articles, itemCount] = await this.articles.paginatePublished(query, {
       search: query.search,
     });
-    const data = articles.map(
-      (article: ArticleEntity) => new ArticleListItemDto(article),
-    );
+    const data = articles.map((article) => new ArticleListItemDto(article));
 
     return new ArticlePageDto(
       data,

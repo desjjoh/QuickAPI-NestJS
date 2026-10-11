@@ -288,6 +288,7 @@ describe('UserRepository (disposable MySQL)', () => {
         .findOneByOrFail({ key: 'disabled' });
       await expect(
         administration.updateAdministration(user, {
+          expected_version: user.administration_version,
           status_id: disabled.id,
         }),
       ).resolves.toMatchObject({ status: { key: 'disabled' } });
@@ -297,6 +298,7 @@ describe('UserRepository (disposable MySQL)', () => {
       const user = await createUser();
       await expect(
         administration.updateAdministration(user, {
+          expected_version: user.administration_version,
           status_id: 'unknown-status',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -312,6 +314,7 @@ describe('UserRepository (disposable MySQL)', () => {
         .getRepository(RoleEntity)
         .findOneByOrFail({ key: 'system-administrator' });
       const updated = await administration.updateAdministration(user, {
+        expected_version: user.administration_version,
         role_ids: [administrator.id],
       });
       expect(updated.roles?.map(({ key }) => key)).toEqual([
@@ -329,6 +332,7 @@ describe('UserRepository (disposable MySQL)', () => {
         .findOneByOrFail({ key: 'system-administrator' });
       await expect(
         administration.updateAdministration(user, {
+          expected_version: user.administration_version,
           status_id: disabled.id,
           role_ids: [administrator.id, 'unknown-role'],
         }),
@@ -341,6 +345,7 @@ describe('UserRepository (disposable MySQL)', () => {
     it('supports removing every role with an empty replacement', async () => {
       const user = await createUser();
       const updated = await administration.updateAdministration(user, {
+        expected_version: user.administration_version,
         role_ids: [],
       });
       expect(updated.roles).toEqual([]);

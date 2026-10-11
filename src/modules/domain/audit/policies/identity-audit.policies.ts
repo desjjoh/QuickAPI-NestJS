@@ -10,6 +10,7 @@ import { AuditResourceType } from '@/config/audit-events.config';
 export const IDENTITY_AUDIT_POLICIES: Readonly<Record<string, AuditPolicy>> = {
   [AuditResourceType.IDENTITY_USER]: {
     id: scalar,
+    version: scalar,
     identity: nestedObject({ email: changedOnly }),
     profile: nestedObject({
       id: scalar,

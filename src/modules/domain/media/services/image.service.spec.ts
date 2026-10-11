@@ -7,6 +7,8 @@ import { ImageEntity } from '../entities/image.entity';
 import { ImageService } from './image.service';
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 import { InvalidOperationError } from '@/common/errors/operation.error';
+import { StorageCleanupService } from '@/modules/system/storage-cleanup/services/storage-cleanup.service';
+import { StorageUploadService } from '@/modules/system/storage/services/storage-upload.service';
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -36,14 +38,32 @@ describe('ImageService', () => {
     findOneByOrFail: jest.fn(),
     merge: jest.fn(),
     delete: jest.fn(),
+    transaction: jest.fn(),
   };
   const repo = {
     findById: jest.fn(),
     manager,
   };
   const storage = { putObject: jest.fn(), deleteObject: jest.fn() };
+  const cleanup = { schedule: jest.fn() };
+  const objects = {
+    reserve: jest.fn(),
+    upload: jest.fn(),
+    attach: jest.fn(),
+    abandon: jest.fn(),
+  };
   beforeEach(() => {
     jest.resetAllMocks();
+    storage.putObject.mockResolvedValue({});
+    objects.reserve.mockImplementation(async (folder, extension) => ({
+      storage_key: `${folder}/generated${extension}`,
+      filename: `generated${extension}`,
+    }));
+    objects.upload.mockImplementation(async (_key, work) => work());
+    objects.attach.mockResolvedValue(undefined);
+    objects.abandon.mockResolvedValue(undefined);
+    manager.transaction.mockImplementation((work) => work(manager));
+    cleanup.schedule.mockResolvedValue('intent-id');
     manager.create.mockImplementation((_entity, value) => ({
       id: '1',
       ...value,
@@ -60,7 +80,11 @@ describe('ImageService', () => {
   const service = () =>
     new ImageService(
       repo as unknown as ImageRepository,
-      storage as unknown as StorageService,
+      new StorageUploadService(
+        storage as unknown as StorageService,
+        objects as never,
+      ),
+      cleanup as unknown as StorageCleanupService,
     );
 
   it('throws for a missing reference record', async () => {
@@ -124,9 +148,8 @@ describe('ImageService', () => {
     await expect(service().create({ file, folder: 'images' })).rejects.toBe(
       error,
     );
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: 'images/generated.png',
-    });
+    expect(objects.abandon).toHaveBeenCalledWith('images/generated.png');
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
 
   it('removes malformed uploads even for direct domain calls', async () => {
@@ -174,9 +197,8 @@ describe('ImageService', () => {
 
     expect(storage.deleteObject).not.toHaveBeenCalled();
     await lifecycle.rollback();
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: 'images/generated.png',
-    });
+    expect(objects.abandon).toHaveBeenCalledWith('images/generated.png');
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
   it('keeps the old object on update failure and removes the replacement', async () => {
     const file = await fixture();
@@ -187,17 +209,15 @@ describe('ImageService', () => {
     await expect(
       service().update({ image, file, folder: 'new' }),
     ).rejects.toThrow('database failed');
-    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: 'new/generated.png',
-    });
+    expect(objects.abandon).toHaveBeenCalledWith('new/generated.png');
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
   it('does not persist when upload fails but still removes the temporary file', async () => {
     const file = await fixture();
     const error = new Error('upload failed');
     storage.putObject.mockRejectedValue(error);
-    await expect(service().create({ file, folder: 'images' })).rejects.toBe(
-      error,
+    await expect(service().create({ file, folder: 'images' })).rejects.toThrow(
+      'Storage upload failed. Please retry.',
     );
     expect(manager.create).not.toHaveBeenCalled();
     await expect(access(file.path)).rejects.toBeDefined();
@@ -230,9 +250,12 @@ describe('ImageService', () => {
     );
     expect(manager.merge.mock.calls[0][1]).not.toBe(image);
     expect(manager.merge.mock.calls[0][2]).not.toHaveProperty('alt_text');
-    expect(storage.deleteObject).toHaveBeenLastCalledWith({
-      key: 'old/key.png',
-    });
+    expect(cleanup.schedule).toHaveBeenCalledWith(
+      manager,
+      'old/key.png',
+      'image_replaced',
+    );
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
 
   it('persists decorative metadata and clears descriptive text on a detached replacement', async () => {
@@ -271,7 +294,7 @@ describe('ImageService', () => {
     );
   });
 
-  it('deletes the previous object only after an image update commits', async () => {
+  it('persists a deletion intent alongside replacement without deleting in the request', async () => {
     const file = await fixture();
     const lifecycle = new TransactionLifecycle();
     const image = {
@@ -289,56 +312,26 @@ describe('ImageService', () => {
 
     expect(storage.deleteObject).not.toHaveBeenCalled();
     await lifecycle.commit();
-    expect(storage.deleteObject).toHaveBeenCalledWith({ key: 'old/key.png' });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(cleanup.schedule).toHaveBeenCalledWith(
+      manager,
+      'old/key.png',
+      'image_replaced',
+    );
   });
 
-  it('retries a failed post-commit object deletion', async () => {
+  it('compensates the replacement if deletion-intent persistence fails', async () => {
     const file = await fixture();
-    const lifecycle = new TransactionLifecycle();
-    const image = {
-      id: 'image-id',
-      storage_key: 'old/key.png',
-    } as ImageEntity;
-    storage.putObject.mockResolvedValue({});
-    storage.deleteObject
-      .mockRejectedValueOnce(new Error('temporary storage failure'))
-      .mockResolvedValue(undefined);
-
-    await service().update(
-      { image, file, folder: 'new' },
-      manager as never,
-      lifecycle,
-    );
-    await expect(lifecycle.commit()).resolves.toBeUndefined();
-
-    expect(storage.deleteObject).toHaveBeenCalledTimes(2);
-    expect(storage.deleteObject).toHaveBeenNthCalledWith(1, {
-      key: 'old/key.png',
-    });
-    expect(storage.deleteObject).toHaveBeenNthCalledWith(2, {
-      key: 'old/key.png',
-    });
-  });
-
-  it('surfaces a post-commit deletion after exhausting retries', async () => {
-    const file = await fixture();
-    const lifecycle = new TransactionLifecycle();
-    const failure = new Error('storage unavailable');
-    const image = {
-      id: 'image-id',
-      storage_key: 'old/key.png',
-    } as ImageEntity;
-    storage.putObject.mockResolvedValue({});
-    storage.deleteObject.mockRejectedValue(failure);
-
-    await service().update(
-      { image, file, folder: 'new' },
-      manager as never,
-      lifecycle,
-    );
-
-    await expect(lifecycle.commit()).rejects.toBe(failure);
-    expect(storage.deleteObject).toHaveBeenCalledTimes(3);
+    cleanup.schedule.mockRejectedValueOnce(new Error('intent insert failed'));
+    await expect(
+      service().update({
+        image: { id: 'old', storage_key: 'old/key.png' } as ImageEntity,
+        file,
+        folder: 'new',
+      }),
+    ).rejects.toThrow('intent insert failed');
+    expect(objects.abandon).toHaveBeenCalledWith('new/generated.png');
+    expect(storage.deleteObject).not.toHaveBeenCalled();
   });
 
   it('preserves the previous object and removes its replacement on rollback', async () => {
@@ -358,16 +351,14 @@ describe('ImageService', () => {
     );
     await lifecycle.rollback();
 
-    expect(storage.deleteObject).toHaveBeenCalledTimes(1);
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: 'new/generated.png',
-    });
+    expect(objects.abandon).toHaveBeenCalledWith('new/generated.png');
+    expect(storage.deleteObject).not.toHaveBeenCalled();
     expect(storage.deleteObject).not.toHaveBeenCalledWith({
       key: 'old/key.png',
     });
   });
 
-  it('removes storage and database records through the supplied manager', async () => {
+  it('removes the database record and records cleanup atomically', async () => {
     const image = {
       id: 'image-id',
       storage_key: 'images/image.png',
@@ -376,9 +367,12 @@ describe('ImageService', () => {
 
     await expect(service().remove(image)).resolves.toBe(image);
 
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: image.storage_key,
-    });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(cleanup.schedule).toHaveBeenCalledWith(
+      manager,
+      image.storage_key,
+      'image_removed',
+    );
     expect(manager.delete).toHaveBeenCalledWith(ImageEntity, {
       id: image.id,
     });
@@ -397,9 +391,12 @@ describe('ImageService', () => {
     expect(manager.delete).toHaveBeenCalledWith(ImageEntity, { id: image.id });
     expect(storage.deleteObject).not.toHaveBeenCalled();
     await lifecycle.commit();
-    expect(storage.deleteObject).toHaveBeenCalledWith({
-      key: image.storage_key,
-    });
+    expect(storage.deleteObject).not.toHaveBeenCalled();
+    expect(cleanup.schedule).toHaveBeenCalledWith(
+      manager,
+      image.storage_key,
+      'image_removed',
+    );
   });
 
   it('requires lifecycle coordination for mutations in an active transaction', async () => {

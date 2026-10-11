@@ -10,6 +10,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
 import {
   runInTransaction,
+  applicationManager,
   TransactionLifecycle,
   type TransactionWork,
 } from '@/common/helpers/transaction.helper';
@@ -18,6 +19,7 @@ import { UserService } from '@/modules/domain/identity/services/user.service';
 import { ImageService } from '@/modules/domain/media/services/image.service';
 
 import { ArticleEntity } from '../entities/article.entity';
+import type { ArticleListPage } from '../models/article-list.read-model';
 import { ArticleStatusEntity } from '../entities/articleStatus.entity';
 import { ArticleRepository } from '../repositories/article.repository';
 import { ArticleStatusRepository } from '../repositories/status.repository';
@@ -112,8 +114,10 @@ export class ArticleService {
     pageOptions: PaginationOptions,
     query: ArticleSearchQuery = {},
     manager: EntityManager = this.articleRepo.manager,
-  ): Promise<[ArticleEntity[], number]> {
-    return this.articleRepo.paginatePublished(manager, pageOptions, query);
+  ): Promise<ArticleListPage> {
+    return this.readPage(manager, (snapshot) =>
+      this.articleRepo.paginatePublished(snapshot, pageOptions, query),
+    );
   }
 
   public async findPublishedByIdOrFail(
@@ -132,12 +136,9 @@ export class ArticleService {
     pageOptions: PaginationOptions,
     query: CreatorArticleQuery = {},
     manager: EntityManager = this.articleRepo.manager,
-  ): Promise<[ArticleEntity[], number]> {
-    return this.articleRepo.paginateByAuthor(
-      manager,
-      authorId,
-      pageOptions,
-      query,
+  ): Promise<ArticleListPage> {
+    return this.readPage(manager, (snapshot) =>
+      this.articleRepo.paginateByAuthor(snapshot, authorId, pageOptions, query),
     );
   }
 
@@ -177,12 +178,21 @@ export class ArticleService {
     pageOptions: PaginationOptions,
     query: ArticleAdministrationQuery = {},
     manager: EntityManager = this.articleRepo.manager,
-  ): Promise<[ArticleEntity[], number]> {
-    return this.articleRepo.paginateForAdministration(
-      manager,
-      pageOptions,
-      query,
+  ): Promise<ArticleListPage> {
+    return this.readPage(manager, (snapshot) =>
+      this.articleRepo.paginateForAdministration(snapshot, pageOptions, query),
     );
+  }
+
+  /** Snapshot covers count, page IDs, and display reads, without row locks. */
+  private readPage(
+    manager: EntityManager,
+    work: (snapshot: EntityManager) => Promise<ArticleListPage>,
+  ): Promise<ArticleListPage> {
+    const current = applicationManager(manager);
+    // Caller-owned transactions retain their isolation and lifecycle.
+    if (current.queryRunner?.isTransactionActive) return work(current);
+    return current.transaction('REPEATABLE READ', work);
   }
 
   public async findByIdForUpdateOrFail(

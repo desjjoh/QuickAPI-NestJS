@@ -4,18 +4,44 @@ import type {
   ObjectLiteral,
   Repository,
 } from 'typeorm';
-import { FindOperator } from 'typeorm';
-
+import { Order, PaginationOptions } from '@/common/models/pagination.model';
 import { ArticleEntity } from '../entities/article.entity';
 import { ArticleStatusEntity } from '../entities/articleStatus.entity';
 import { ArticleRepository } from './article.repository';
 import { ArticleStatusRepository } from './status.repository';
 
+function builder() {
+  const query = {
+    getCount: jest.fn().mockResolvedValue(2),
+    getRawMany: jest.fn().mockResolvedValue([]),
+  };
+  for (const method of [
+    'clone',
+    'innerJoin',
+    'leftJoin',
+    'andWhere',
+    'select',
+    'addSelect',
+    'orderBy',
+    'addOrderBy',
+    'limit',
+    'offset',
+  ]) {
+    query[method] = jest.fn().mockReturnValue(query);
+  }
+  return query as typeof query & Record<string, jest.Mock>;
+}
+
 function setup<TEntity extends ObjectLiteral>(target: new () => TEntity) {
+  const pageQuery = builder();
+  const displayQuery = builder();
   const persistence = {
     find: jest.fn(),
-    findAndCount: jest.fn(),
     findOne: jest.fn(),
+    createQueryBuilder: jest
+      .fn()
+      .mockReturnValueOnce(pageQuery)
+      .mockReturnValueOnce(displayQuery),
   };
   const manager = {
     getRepository: jest.fn().mockReturnValue(persistence),
@@ -23,42 +49,53 @@ function setup<TEntity extends ObjectLiteral>(target: new () => TEntity) {
   const dataSource = {
     getRepository: jest.fn().mockReturnValue({ manager, target }),
   } as unknown as DataSource;
-
   return {
     dataSource,
     manager,
+    pageQuery,
+    displayQuery,
     persistence: persistence as unknown as jest.Mocked<
-      Pick<Repository<TEntity>, 'find' | 'findAndCount' | 'findOne'>
+      Pick<Repository<TEntity>, 'find' | 'findOne' | 'createQueryBuilder'>
     >,
   };
 }
 
+const raw = (id: string) => ({
+  id,
+  createdAt: new Date('2026-10-08'),
+  updatedAt: new Date('2026-10-08'),
+  version: 4,
+  title: id,
+  summary: 'Summary',
+  publishedAt: null,
+  status_key: 'draft',
+  status_label: 'Draft',
+  hero_id: 'hero-1',
+  hero_storage_key: 'hero.png',
+  hero_width: 1,
+  hero_height: 1,
+  hero_alt_text: null,
+  hero_decorative: 1,
+  author_id: null,
+  avatar_id: null,
+});
+
 describe('ArticleRepository', () => {
-  it('performs ordered reads through the supplied manager', async () => {
+  it('performs ordered and scoped reads through the supplied manager', async () => {
     const { dataSource, manager, persistence } = setup(ArticleEntity);
     const repository = new ArticleRepository(dataSource);
     persistence.find.mockResolvedValue([]);
-
     await repository.findAll(manager);
-
     expect(manager.getRepository).toHaveBeenCalledWith(ArticleEntity);
     expect(persistence.find).toHaveBeenCalledWith({
       order: { createdAt: 'DESC', id: 'DESC' },
     });
-  });
-
-  it('supports status and author-scoped reads', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.find.mockResolvedValue([]);
-
     await repository.findByStatusKey(manager, 'published');
     expect(persistence.find).toHaveBeenLastCalledWith(
       expect.objectContaining({
         where: { publication: { status: { key: 'published' } } },
       }),
     );
-
     await repository.findByAuthorId(manager, 'author-1');
     expect(persistence.find).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -67,58 +104,68 @@ describe('ArticleRepository', () => {
     );
   });
 
-  it('paginates only published articles for public collections', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findAndCount.mockResolvedValue([[], 0]);
-
-    await repository.paginatePublished(
-      manager,
-      { take: 10, skip: 20 } as never,
-      { search: '  architecture  ' },
-    );
-
-    expect(persistence.findAndCount).toHaveBeenCalledWith({
-      where: [
-        {
-          publication: { status: { key: 'published' } },
-          content: { title: expect.any(FindOperator) },
-        },
-        {
-          publication: { status: { key: 'published' } },
-          content: { summary: expect.any(FindOperator) },
-        },
-      ],
-      order: { publication: { publishedAt: 'DESC' }, id: 'DESC' },
-      take: 10,
-      skip: 20,
-    });
-    const branches = persistence.findAndCount.mock.calls[0][0]!.where as Array<{
-      content: { title?: FindOperator<string>; summary?: FindOperator<string> };
-    }>;
-    for (const branch of branches) {
-      const search = branch.content.title ?? branch.content.summary!;
-      expect(search.type).toBe('raw');
-      expect(search.objectLiteralParameters).toEqual({
-        articleSearch: '%architecture%',
-      });
-      expect(search.getSql!('article.title')).toBe(
-        "CONVERT(article.title USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE :articleSearch ESCAPE '!'",
+  it.each([Order.ASC, Order.DESC])(
+    'pages IDs before display loading and restores %s ordering',
+    async (order) => {
+      const { dataSource, manager, persistence, pageQuery, displayQuery } =
+        setup(ArticleEntity);
+      pageQuery.getRawMany.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      displayQuery.getRawMany.mockResolvedValue([raw('b'), raw('a')]);
+      const [rows, count] = await new ArticleRepository(
+        dataSource,
+      ).paginatePublished(
+        manager,
+        Object.assign(new PaginationOptions(), { take: 2, page: 3, order }),
+        { search: '  100%\t_!  ' },
       );
-    }
-  });
+      expect(rows.map((row) => row.id)).toEqual(['a', 'b']);
+      expect(count).toBe(2);
+      expect(persistence.createQueryBuilder).toHaveBeenCalledTimes(2);
+      expect(pageQuery.getCount).toHaveBeenCalledTimes(1);
+      expect(pageQuery.select).toHaveBeenCalledWith('article.id', 'id');
+      expect(pageQuery.orderBy).toHaveBeenCalledWith(
+        'article.publication.publishedAt',
+        order,
+      );
+      expect(pageQuery.addOrderBy).toHaveBeenCalledWith('article.id', order);
+      expect(pageQuery.limit).toHaveBeenCalledWith(2);
+      expect(pageQuery.offset).toHaveBeenCalledWith(4);
+      expect(pageQuery.leftJoin).not.toHaveBeenCalled();
+      for (const query of [pageQuery, displayQuery]) {
+        expect(query.andWhere).toHaveBeenCalledWith('status.key = :statusKey', {
+          statusKey: 'published',
+        });
+        expect(query.andWhere).toHaveBeenCalledWith(
+          expect.stringMatching(/^\(.* OR .*\)$/),
+          { articleSearch: '%100!% !_!!%' },
+        );
+      }
+      expect(displayQuery.andWhere).toHaveBeenCalledWith(
+        'article.id IN (:...pageIds)',
+        { pageIds: ['a', 'b'] },
+      );
+      const selected = JSON.stringify(displayQuery.select.mock.calls);
+      expect(selected).not.toMatch(/body|password|email|publisher/);
+      expect(JSON.stringify(displayQuery.leftJoin.mock.calls)).not.toMatch(
+        /roles|permissions|contact/,
+      );
+      expect(rows[0].media.hero.decorative).toBe(true);
+      expect(rows[0].attribution.author).toBeNull();
+      expect(rows[0].content).not.toHaveProperty('body');
+      expect(rows[0].publication).not.toHaveProperty('publisher');
+    },
+  );
 
   it.each(['creator', 'administration'])(
-    'keeps author/status restrictions in both %s search branches',
+    'retains author/status scope in all %s queries',
     async (audience) => {
-      const { dataSource, manager, persistence } = setup(ArticleEntity);
+      const { dataSource, manager, pageQuery, displayQuery } =
+        setup(ArticleEntity);
+      pageQuery.getRawMany.mockResolvedValue([{ id: 'a' }]);
+      displayQuery.getRawMany.mockResolvedValue([raw('a')]);
       const repository = new ArticleRepository(dataSource);
-      persistence.findAndCount.mockResolvedValue([[], 0]);
-      const page = { take: 25, skip: 0 } as never;
-      const query = {
-        statusKey: 'submitted' as const,
-        search: "  100%\t_! ' OR 1=1  ",
-      };
+      const page = new PaginationOptions();
+      const query = { statusKey: 'submitted' as const, search: "' OR 1=1" };
       if (audience === 'creator')
         await repository.paginateByAuthor(manager, 'author-1', page, query);
       else
@@ -126,173 +173,113 @@ describe('ArticleRepository', () => {
           ...query,
           authorId: 'author-1',
         });
-      const branches = persistence.findAndCount.mock.calls[0][0]!
-        .where as Array<{
-        content: {
-          title?: FindOperator<string>;
-          summary?: FindOperator<string>;
-        };
-      }>;
-      expect(branches).toHaveLength(2);
-      for (const branch of branches) {
-        expect(branch).toMatchObject({
-          attribution: { author: { id: 'author-1' } },
-          publication: { status: { key: 'submitted' } },
-        });
-        const search = branch.content.title ?? branch.content.summary!;
-        expect(search.objectLiteralParameters).toEqual({
-          articleSearch: "%100!% !_!! ' OR 1=1%",
-        });
-        expect(search.getSql!('article.title')).not.toContain('OR 1=1');
+      expect(pageQuery.orderBy).toHaveBeenCalledWith(
+        'article.createdAt',
+        Order.ASC,
+      );
+      for (const builder of [pageQuery, displayQuery]) {
+        expect(builder.andWhere).toHaveBeenCalledWith(
+          'article.attribution.author = :authorId',
+          { authorId: 'author-1' },
+        );
+        expect(builder.andWhere).toHaveBeenCalledWith(
+          'status.key = :statusKey',
+          { statusKey: 'submitted' },
+        );
+        expect(builder.andWhere).toHaveBeenCalledWith(
+          expect.not.stringContaining('OR 1=1'),
+          { articleSearch: "%' OR 1=1%" },
+        );
       }
     },
   );
 
   it.each([undefined, '', ' \t\n\u00a0 '])(
-    'keeps the public visibility scope unchanged for blank search %j',
+    'omits blank search %j without changing visibility',
     async (search) => {
-      const { dataSource, manager, persistence } = setup(ArticleEntity);
-      const repository = new ArticleRepository(dataSource);
-      persistence.findAndCount.mockResolvedValue([[], 0]);
-      await repository.paginatePublished(
-        manager,
-        { take: 25, skip: 0 } as never,
-        { search },
-      );
-      expect(persistence.findAndCount).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { publication: { status: { key: 'published' } } },
-        }),
-      );
+      const { dataSource, manager, pageQuery } = setup(ArticleEntity);
+      pageQuery.getCount.mockResolvedValue(0);
+      expect(
+        await new ArticleRepository(dataSource).paginatePublished(
+          manager,
+          new PaginationOptions(),
+          { search },
+        ),
+      ).toEqual([[], 0]);
+      expect(pageQuery.andWhere.mock.calls).toEqual([
+        ['status.key = :statusKey', { statusKey: 'published' }],
+      ]);
+      expect(pageQuery.getRawMany).not.toHaveBeenCalled();
     },
   );
 
-  it('finds public detail only when the article is published', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findOne.mockResolvedValue(null);
+  it('retains the total for an out-of-range page without a display query', async () => {
+    const { dataSource, manager, persistence, displayQuery } =
+      setup(ArticleEntity);
+    expect(
+      await new ArticleRepository(dataSource).paginateForAdministration(
+        manager,
+        new PaginationOptions(),
+      ),
+    ).toEqual([[], 2]);
+    expect(persistence.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(displayQuery.getRawMany).not.toHaveBeenCalled();
+  });
 
-    await repository.findPublishedById(manager, 'article-1');
-
-    expect(persistence.findOne).toHaveBeenCalledWith({
-      where: {
-        id: 'article-1',
-        publication: { status: { key: 'published' } },
+  it('maps only byline fields and handles an absent avatar', async () => {
+    const { dataSource, manager, pageQuery, displayQuery } =
+      setup(ArticleEntity);
+    pageQuery.getRawMany.mockResolvedValue([{ id: 'a' }]);
+    displayQuery.getRawMany.mockResolvedValue([
+      {
+        ...raw('a'),
+        author_id: 'author-1',
+        author_first: 'Pat',
+        author_last: 'Person',
+        author_preferred: 'P',
+      },
+    ]);
+    const [rows] = await new ArticleRepository(
+      dataSource,
+    ).paginateForAdministration(manager, new PaginationOptions());
+    expect(rows[0].attribution.author).toEqual({
+      id: 'author-1',
+      profile: {
+        name: { first: 'Pat', last: 'Person', preferred: 'P' },
+        media: { avatar: null },
       },
     });
   });
 
-  it('scopes creator collections and detail reads to the author', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findAndCount.mockResolvedValue([[], 0]);
-    persistence.findOne.mockResolvedValue(null);
-
-    await repository.paginateByAuthor(
-      manager,
-      'author-1',
-      { take: 25, skip: 0 } as never,
-      { statusKey: 'submitted' },
-    );
-    await repository.findByIdAndAuthor(manager, 'article-1', 'author-1');
-
-    expect(persistence.findAndCount).toHaveBeenCalledWith({
-      where: {
-        attribution: { author: { id: 'author-1' } },
-        publication: { status: { key: 'submitted' } },
-      },
-      order: { createdAt: 'DESC', id: 'DESC' },
-      take: 25,
-      skip: 0,
-    });
-    expect(persistence.findOne).toHaveBeenCalledWith({
-      where: {
-        id: 'article-1',
-        attribution: { author: { id: 'author-1' } },
-      },
-    });
-  });
-
-  it('locks creator-owned articles for mutation', async () => {
+  it('keeps detail scopes and mutation locks unchanged', async () => {
     const { dataSource, manager, persistence } = setup(ArticleEntity);
     const repository = new ArticleRepository(dataSource);
     persistence.findOne.mockResolvedValue(null);
-
-    await repository.findByIdAndAuthorForUpdate(
-      manager,
-      'article-1',
-      'author-1',
-    );
-
-    expect(persistence.findOne).toHaveBeenCalledWith({
-      where: {
-        id: 'article-1',
-        attribution: { author: { id: 'author-1' } },
-      },
+    await repository.findPublishedById(manager, 'a');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'a', publication: { status: { key: 'published' } } },
+    });
+    await repository.findByIdAndAuthor(manager, 'a', 'author-1');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'a', attribution: { author: { id: 'author-1' } } },
+    });
+    await repository.findByIdAndAuthorForUpdate(manager, 'a', 'author-1');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'a', attribution: { author: { id: 'author-1' } } },
       lock: { mode: 'pessimistic_write' },
     });
-  });
-
-  it('locks articles for administration mutations', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findOne.mockResolvedValue(null);
-
-    await repository.findByIdForUpdate(manager, 'article-1');
-
-    expect(persistence.findOne).toHaveBeenCalledWith({
-      where: { id: 'article-1' },
+    await repository.findByIdForUpdate(manager, 'a');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'a' },
       lock: { mode: 'pessimistic_write' },
     });
-  });
-
-  it('paginates administration results with bounded status and author filters', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findAndCount.mockResolvedValue([[], 0]);
-
-    await repository.paginateForAdministration(
-      manager,
-      { take: 50, skip: 100 } as never,
-      { authorId: 'author-1', statusKey: 'archived' },
-    );
-
-    expect(persistence.findAndCount).toHaveBeenCalledWith({
-      where: {
-        attribution: { author: { id: 'author-1' } },
-        publication: { status: { key: 'archived' } },
-      },
-      order: { createdAt: 'DESC', id: 'DESC' },
-      take: 50,
-      skip: 100,
-    });
-  });
-
-  it('treats whitespace-only searches as absent', async () => {
-    const { dataSource, manager, persistence } = setup(ArticleEntity);
-    const repository = new ArticleRepository(dataSource);
-    persistence.findAndCount.mockResolvedValue([[], 0]);
-
-    await repository.paginateForAdministration(
-      manager,
-      { take: 25, skip: 0 } as never,
-      { search: '   ' },
-    );
-
-    expect(persistence.findAndCount).toHaveBeenCalledWith(
-      expect.objectContaining({ where: {} }),
-    );
   });
 
   it('does not expose mutation methods', () => {
     const { dataSource } = setup(ArticleEntity);
     const repository = new ArticleRepository(dataSource);
-
-    expect(repository).not.toHaveProperty('create');
-    expect(repository).not.toHaveProperty('save');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('delete');
-    expect(repository).not.toHaveProperty('remove');
+    for (const method of ['create', 'save', 'update', 'delete', 'remove'])
+      expect(repository).not.toHaveProperty(method);
   });
 });
 
@@ -302,11 +289,9 @@ describe('ArticleStatusRepository', () => {
     const repository = new ArticleStatusRepository(dataSource);
     persistence.find.mockResolvedValue([]);
     persistence.findOne.mockResolvedValue(null);
-
     await repository.findAll(manager);
     await repository.findById(manager, 'status-1');
     await repository.findByKey(manager, 'draft');
-
     expect(persistence.find).toHaveBeenCalledWith({ order: { key: 'ASC' } });
     expect(persistence.findOne).toHaveBeenNthCalledWith(1, {
       where: { id: 'status-1' },

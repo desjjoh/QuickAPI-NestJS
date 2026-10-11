@@ -26,6 +26,8 @@ import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/regi
 
 // MEDIA
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+import { StorageDeletionIntentEntity } from '@/modules/system/storage-cleanup/entities/storage-deletion-intent.entity';
+import { StorageObjectEntity } from '@/modules/system/storage/entities/storage-object.entity';
 
 // AUDIT EVENTS
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
@@ -66,6 +68,8 @@ const dataSourceOptions: DataSourceOptions = {
     AccountStatusEntity,
     // MEDIA MODULE
     ImageEntity,
+    StorageDeletionIntentEntity,
+    StorageObjectEntity,
     // IDENTITY MODULE
     UserAddressEntity,
     UserPhoneEntity,

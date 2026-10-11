@@ -9,6 +9,7 @@ import { UserService } from './user.service';
 describe('UserService', () => {
   const user = {
     id: 'user-1',
+    administration_version: 1,
     identity: { email: 'user@example.test', password: 'hash' },
     metadata: { last_updated_at: null },
   };
@@ -17,6 +18,7 @@ describe('UserService', () => {
     create: jest.fn(),
     merge: jest.fn(),
     save: jest.fn(),
+    increment: jest.fn(),
     findOneOrFail: jest.fn(),
   };
   const repository = {
@@ -29,6 +31,7 @@ describe('UserService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    manager.increment.mockResolvedValue({ affected: 1 });
     manager.transaction.mockImplementation(async (work) => work(manager));
     manager.create.mockImplementation((_target, value) => ({ ...value }));
     manager.merge.mockImplementation((_target, entity, value) => ({
@@ -128,4 +131,41 @@ describe('UserService', () => {
       metadata: { last_updated_at: lastUpdatedAt },
     });
   });
+
+  it('never saves a caller-supplied revision or unrelated stale administration fields', async () => {
+    const stale = {
+      ...user,
+      status: { id: 'old-status' },
+      roles: [{ id: 'old-role' }],
+    };
+    await service.updateUser(
+      stale as never,
+      {
+        identity: { email: 'changed@example.test' },
+        administration_version: 99,
+      },
+      {},
+      manager as never,
+    );
+    const saved = manager.save.mock.calls[0][1];
+    expect(saved).not.toHaveProperty('administration_version');
+    expect(saved).not.toHaveProperty('status');
+    expect(saved).not.toHaveProperty('roles');
+    expect(manager.increment).not.toHaveBeenCalled();
+    expect(stale.administration_version).toBe(1);
+  });
+
+  it.each([{ status: { id: 'disabled' } }, { roles: [] }])(
+    'advances administration revision for another status/role write',
+    async (dto) => {
+      await service.updateUser(user as never, dto, {}, manager as never);
+      expect(manager.increment).toHaveBeenCalledWith(
+        UserEntity,
+        { id: 'user-1' },
+        'administration_version',
+        1,
+      );
+      expect(manager.transaction).toHaveBeenCalledTimes(1);
+    },
+  );
 });

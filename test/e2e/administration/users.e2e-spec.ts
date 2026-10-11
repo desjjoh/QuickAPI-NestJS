@@ -16,6 +16,7 @@ import { PermissionEntity } from '@/modules/domain/library/entities/permission.e
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { drainStorageCleanup } from '../../helpers/storage-cleanup';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
@@ -202,7 +203,11 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(auth)
-      .send({ role_ids: [], reason_code: 'access_review' })
+      .send({
+        expected_version: target.administration_version,
+        role_ids: [],
+        reason_code: 'access_review',
+      })
       .expect(403);
   });
   it('allows only update_users (or all permissions) to update users', async () => {
@@ -220,12 +225,20 @@ describe('user administration authorization and lifecycle', () => {
       .findOneByOrFail({ key: 'disabled' });
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
-      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        status_id: disabled.id,
+        reason_code: 'policy_enforcement',
+      })
       .expect(401);
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('update-reader@example.test'))
-      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        status_id: disabled.id,
+        reason_code: 'policy_enforcement',
+      })
       .expect(403);
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
@@ -236,6 +249,7 @@ describe('user administration authorization and lifecycle', () => {
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('updater@example.test'))
       .send({
+        expected_version: target.administration_version,
         status_id: disabled.id,
         role_ids: [],
         reason_code: 'policy_enforcement',
@@ -263,12 +277,18 @@ describe('user administration authorization and lifecycle', () => {
     await suite.dataSource.getRepository(UserSessionEntity).clear();
     await request(app.getHttpServer())
       .post(`${ROOT}/${target.id}/delete`)
-      .send({ reason_code: 'user_request' })
+      .send({
+        expected_version: target.administration_version,
+        reason_code: 'user_request',
+      })
       .expect(401);
     await request(app.getHttpServer())
       .post(`${ROOT}/${target.id}/delete`)
       .set(await signIn('reader@example.test'))
-      .send({ reason_code: 'user_request' })
+      .send({
+        expected_version: target.administration_version,
+        reason_code: 'user_request',
+      })
       .expect(403);
     await request(app.getHttpServer())
       .post(`${ROOT}/${target.id}/delete`)
@@ -278,7 +298,10 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .post(`${ROOT}/${target.id}/delete`)
       .set(await signIn('deleter@example.test'))
-      .send({ reason_code: 'user_request' })
+      .send({
+        expected_version: target.administration_version,
+        reason_code: 'user_request',
+      })
       .expect(204);
     expect(
       await suite.dataSource
@@ -297,6 +320,7 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(AccountStatusEntity)
       .findOneByOrFail({ key: 'disabled' });
     const payload = {
+      expected_version: target.administration_version,
       status_id: disabled.id,
       role_ids: [],
       reason_code: 'policy_enforcement',
@@ -311,6 +335,7 @@ describe('user administration authorization and lifecycle', () => {
     expect((await update().expect(200)).body).toEqual(first.body);
     const newer = {
       ...payload,
+      expected_version: first.body.version,
       status_id: target.status.id,
       reason_code: 'access_review',
     };
@@ -325,7 +350,10 @@ describe('user administration authorization and lifecycle', () => {
     ).toBe(target.status.id);
     await update(target.id, newer).expect(409);
     // Same actor/key is independent for a different target route.
-    await update(other.id).expect(200);
+    await update(other.id, {
+      ...payload,
+      expected_version: other.administration_version,
+    }).expect(200);
     expect(
       await suite.dataSource.getRepository(AuditEventEntity).count({
         where: {
@@ -339,6 +367,156 @@ describe('user administration authorization and lifecycle', () => {
     ).toBe(3);
   });
 
+  it.each([false, true])(
+    'rejects competing administrator edits and stale deletion (keyed=%s)',
+    async (keyed) => {
+      const first = await register('version-first@example.test');
+      const second = await register('version-second@example.test');
+      const target = await register('version-target@example.test');
+      await grant(first, `e2e-version-first-${keyed}`, [
+        'read_users',
+        'update_users',
+        'delete_users',
+      ]);
+      await grant(second, `e2e-version-second-${keyed}`, [
+        'read_users',
+        'update_users',
+        'delete_users',
+      ]);
+      const auth = await signIn('version-first@example.test');
+      const otherAuth = await signIn('version-second@example.test');
+      const { key, image } = await assignAvatar(target);
+      const cleanup = jest.spyOn(storage, 'deleteObject');
+      const detail = await request(app.getHttpServer())
+        .get(`${ROOT}/${target.id}`)
+        .set(auth)
+        .expect(200);
+      const version = detail.body.version as number;
+      expect(version).toBe(target.administration_version);
+      const list = await request(app.getHttpServer())
+        .get(ROOT)
+        .set(auth)
+        .expect(200);
+      expect(list.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: target.id, version }),
+        ]),
+      );
+      await request(app.getHttpServer())
+        .patch(`${ROOT}/${target.id}`)
+        .set(auth)
+        .send({ reason_code: 'access_review' })
+        .expect(422);
+      await request(app.getHttpServer())
+        .post(`${ROOT}/${target.id}/delete`)
+        .set(auth)
+        .send({ reason_code: 'user_request' })
+        .expect(422);
+      const disabled = await suite.dataSource
+        .getRepository(AccountStatusEntity)
+        .findOneByOrFail({ key: 'disabled' });
+      const payloads = [
+        {
+          expected_version: version,
+          role_ids: [],
+          status_id: disabled.id,
+          reason_code: 'policy_enforcement',
+        },
+        {
+          expected_version: version,
+          role_ids: target.roles!.map((role) => role.id),
+          status_id: target.status.id,
+          reason_code: 'access_review',
+        },
+      ];
+      const responses = await Promise.all(
+        [auth, otherAuth].map((headers, index) => {
+          const requestBuilder = request(app.getHttpServer())
+            .patch(`${ROOT}/${target.id}`)
+            .set(headers);
+          if (keyed)
+            requestBuilder.set('Idempotency-Key', `version-edit-${index}`);
+          return requestBuilder.send(payloads[index]);
+        }),
+      );
+      // Include failure bodies in the assertion so unexpected database errors are visible.
+      expect(
+        responses
+          .filter((response) => ![200, 409].includes(response.status))
+          .map((response) => ({
+            status: response.status,
+            body: response.body,
+          })),
+      ).toEqual([]);
+      expect(responses.map((response) => response.status).sort()).toEqual([
+        200, 409,
+      ]);
+      const winner = responses.find((response) => response.status === 200)!;
+      expect(winner.body.version).toBe(version + 1);
+      const audits = suite.dataSource.getRepository(AuditEventEntity);
+      expect(
+        await audits.countBy({
+          event: IdentityAuditEvents.ADMIN_USER_UPDATED,
+          resource_id: target.id,
+        }),
+      ).toBe(1);
+      const committed = await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneByOrFail({ id: target.id });
+      expect(committed.status.key).toBe(winner.body.status.key);
+      expect(committed.roles!.map((role) => role.key).sort()).toEqual(
+        winner.body.roles.map((role: { key: string }) => role.key).sort(),
+      );
+
+      // An unrelated write from a stale object must not rewind administration state.
+      await app
+        .get(UserService)
+        .updateUser(target, { metadata: { last_updated_at: new Date() } });
+      const afterActivity = await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneByOrFail({ id: target.id });
+      expect(afterActivity.administration_version).toBe(version + 1);
+      expect(afterActivity.status.id).toBe(committed.status.id);
+      expect(afterActivity.roles!.map((role) => role.id).sort()).toEqual(
+        committed.roles!.map((role) => role.id).sort(),
+      );
+      expect(afterActivity.profile.media.avatar!.id).toBe(image.id);
+
+      const remove = (expected_version: number) =>
+        request(app.getHttpServer())
+          .post(`${ROOT}/${target.id}/delete`)
+          .set(auth)
+          .set('Idempotency-Key', 'version-delete')
+          .send({ expected_version, reason_code: 'user_request' });
+      await remove(version).expect(409);
+      expect(cleanup).not.toHaveBeenCalled();
+      expect(storage.objects.has(key)).toBe(true);
+      expect(
+        await audits.countBy({
+          event: IdentityAuditEvents.ADMIN_USER_DELETED,
+          resource_id: target.id,
+        }),
+      ).toBe(0);
+      expect(
+        await suite.dataSource
+          .getRepository(IdempotencyEntity)
+          .countBy({ operation: 'identity.administration.user.delete' }),
+      ).toBe(0);
+      await remove(version + 1).expect(204);
+      expect((await remove(version + 1).expect(204)).text).toBe('');
+      await drainStorageCleanup(app);
+      expect(cleanup).toHaveBeenCalledTimes(1);
+      expect(storage.objects.has(key)).toBe(false);
+      expect(
+        await audits.countBy({
+          event: IdentityAuditEvents.ADMIN_USER_DELETED,
+          resource_id: target.id,
+        }),
+      ).toBe(1);
+    },
+    30_000,
+  );
+
   it('executes concurrent keyed updates only once and checks permissions again on replay', async () => {
     const admin = await register('concurrent-admin@example.test');
     const target = await register('concurrent-target@example.test');
@@ -351,7 +529,11 @@ describe('user administration authorization and lifecycle', () => {
         .patch(`${ROOT}/${target.id}`)
         .set(auth)
         .set('Idempotency-Key', 'concurrent')
-        .send({ role_ids: [], reason_code: 'access_review' });
+        .send({
+          expected_version: target.administration_version,
+          role_ids: [],
+          reason_code: 'access_review',
+        });
     const responses = await Promise.all([update(), update()]);
     expect(
       responses.every((response) => [200, 409].includes(response.status)),
@@ -406,7 +588,10 @@ describe('user administration authorization and lifecycle', () => {
         .post(`${ROOT}/${target.id}/delete`)
         .set(auth)
         .set('Idempotency-Key', 'delete')
-        .send({ reason_code: 'user_request' });
+        .send({
+          expected_version: target.administration_version,
+          reason_code: 'user_request',
+        });
     const responses = await Promise.all([remove(), remove()]);
     expect(
       responses.every((response) => [204, 409].includes(response.status)),
@@ -423,6 +608,7 @@ describe('user administration authorization and lifecycle', () => {
         .getRepository(ImageEntity)
         .findOneBy({ id: image.id }),
     ).toBeNull();
+    await drainStorageCleanup(app);
     expect(storage.objects.has(key)).toBe(false);
     expect(cleanup).toHaveBeenCalledTimes(1);
     const events = await suite.dataSource
@@ -443,7 +629,10 @@ describe('user administration authorization and lifecycle', () => {
       .post(`${ROOT}/${target.id}/delete`)
       .set(auth)
       .set('Idempotency-Key', 'delete')
-      .send({ reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        reason_code: 'policy_enforcement',
+      })
       .expect(409);
   });
 
@@ -462,7 +651,10 @@ describe('user administration authorization and lifecycle', () => {
         .post(`${ROOT}/${target.id}/delete`)
         .set(auth)
         .set('Idempotency-Key', 'rollback')
-        .send({ reason_code: 'user_request' });
+        .send({
+          expected_version: target.administration_version,
+          reason_code: 'user_request',
+        });
     await remove().expect(500);
     audit.mockRestore();
     expect(
@@ -489,6 +681,7 @@ describe('user administration authorization and lifecycle', () => {
       }),
     ).toBe(0);
     await remove().expect(204);
+    await drainStorageCleanup(app);
     expect(cleanup).toHaveBeenCalledTimes(1);
   });
 
@@ -507,7 +700,11 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-commit-admin@example.test'))
-      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        status_id: disabled.id,
+        reason_code: 'policy_enforcement',
+      })
       .expect(200);
 
     const event = await suite.dataSource
@@ -561,7 +758,11 @@ describe('user administration authorization and lifecycle', () => {
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-rollback-admin@example.test'))
       .set('Idempotency-Key', 'failed-domain-update')
-      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        status_id: disabled.id,
+        reason_code: 'policy_enforcement',
+      })
       .expect(500);
     mutation.mockRestore();
 
@@ -569,6 +770,7 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(UserEntity)
       .findOneByOrFail({ id: target.id });
     expect(stored.status.id).toBe(originalStatus);
+    expect(stored.administration_version).toBe(target.administration_version);
     expect(
       await suite.dataSource.getRepository(IdempotencyEntity).count(),
     ).toBe(0);
@@ -603,7 +805,11 @@ describe('user administration authorization and lifecycle', () => {
       .patch(`${ROOT}/${target.id}`)
       .set(await signIn('audit-failure-admin@example.test'))
       .set('Idempotency-Key', 'failed-audit-update')
-      .send({ status_id: disabled.id, reason_code: 'policy_enforcement' })
+      .send({
+        expected_version: target.administration_version,
+        status_id: disabled.id,
+        reason_code: 'policy_enforcement',
+      })
       .expect(500);
     insertion.mockRestore();
 
@@ -611,6 +817,7 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(UserEntity)
       .findOneByOrFail({ id: target.id });
     expect(stored.status.id).toBe(originalStatus);
+    expect(stored.administration_version).toBe(target.administration_version);
     expect(
       await suite.dataSource.getRepository(IdempotencyEntity).count(),
     ).toBe(0);
@@ -635,7 +842,11 @@ describe('user administration authorization and lifecycle', () => {
         .patch(`${ROOT}/${target.id}`)
         .set(auth)
         .set('Idempotency-Key', 'safe-retry')
-        .send({ status_id: disabled.id, reason_code: 'policy_enforcement' });
+        .send({
+          expected_version: target.administration_version,
+          status_id: disabled.id,
+          reason_code: 'policy_enforcement',
+        });
     jest
       .spyOn(app.get(AuditService), 'record')
       .mockRejectedValueOnce(new Error('failed audit'));
@@ -662,15 +873,20 @@ describe('user administration authorization and lifecycle', () => {
     ).toBe(1);
   });
 
-  it('uses the request ID to correlate retries of an administrative mutation', async () => {
+  it('correlates distinct administration actions without treating request IDs as idempotency keys', async () => {
     const target = await register('audit-retry-target@example.test');
     const disabled = await suite.dataSource
       .getRepository(AccountStatusEntity)
       .findOneByOrFail({ key: 'disabled' });
     const service = app.get(UserAdminService);
     const context = app.get(RequestContext);
-    const invoke = () =>
-      context.run(
+    const invoke = async () => {
+      const currentVersion = (
+        await suite.dataSource
+          .getRepository(UserEntity)
+          .findOneByOrFail({ id: target.id })
+      ).administration_version;
+      return context.run(
         {
           requestId: 'retry-operation',
           actorType: AuditActorType.ADMIN,
@@ -678,20 +894,39 @@ describe('user administration authorization and lifecycle', () => {
         },
         () =>
           service.updateUser(target.id, {
+            expected_version: currentVersion,
             status_id: disabled.id,
             reason_code: 'policy_enforcement',
           }),
       );
-
+    };
     await invoke();
     await invoke();
 
-    expect(
-      await suite.dataSource.getRepository(AuditEventEntity).countBy({
+    const events = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findBy({
         event: IdentityAuditEvents.ADMIN_USER_UPDATED,
         request_id: 'retry-operation',
-      }),
-    ).toBe(1);
+        resource_id: target.id,
+      });
+    expect(events).toHaveLength(2);
+    expect(events.every((event) => Boolean(event.operation_id))).toBe(true);
+    expect(new Set(events.map((event) => event.operation_id)).size).toBe(2);
+    expect(events.map((event) => event.before?.version).sort()).toEqual([
+      target.administration_version,
+      target.administration_version + 1,
+    ]);
+    expect(events.map((event) => event.after?.version).sort()).toEqual([
+      target.administration_version + 1,
+      target.administration_version + 2,
+    ]);
+    const stored = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: target.id });
+    expect(stored.administration_version).toBe(
+      target.administration_version + 2,
+    );
   });
 
   it('requires the dedicated permission and returns only activity for the route subject', async () => {
@@ -831,7 +1066,10 @@ describe('user administration authorization and lifecycle', () => {
     await request(app.getHttpServer())
       .post(`${ROOT}/${target.id}/delete`)
       .set(auth)
-      .send({ reason_code: 'user_request' })
+      .send({
+        expected_version: target.administration_version,
+        reason_code: 'user_request',
+      })
       .expect(204);
     await expect(
       suite.dataSource.getRepository(UserEntity).findOneBy({ id: target.id }),

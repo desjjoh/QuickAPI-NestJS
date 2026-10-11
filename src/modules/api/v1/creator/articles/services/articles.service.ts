@@ -46,7 +46,7 @@ export class CreatorArticleApiService {
       { search: query.search, statusKey: query.statusKey },
     );
     const data = articles.map(
-      (article: ArticleEntity) => new ArticleManagementListItemDto(article),
+      (article) => new ArticleManagementListItemDto(article),
     );
 
     return new ArticleManagementPageDto(

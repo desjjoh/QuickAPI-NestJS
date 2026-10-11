@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 
 import {
   UserDto,
@@ -110,12 +114,35 @@ describe('UserAdminService', () => {
     await expect(service.findUser('missing-user')).rejects.toBe(error);
   });
 
+  it.each(['update', 'delete'])(
+    'rejects a stale %s before mutation, audit, or cleanup',
+    async (action) => {
+      const { service, manager, userSvc, audit } = setup();
+      manager.findOneOrFail.mockResolvedValue(
+        userFixture({ administration_version: 2 }),
+      );
+      const dto = {
+        expected_version: 1,
+        reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
+      };
+      await expect(
+        action === 'update'
+          ? service.updateUser('user-1', dto)
+          : service.removeUser('user-1', dto),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(userSvc.updateAdministration).not.toHaveBeenCalled();
+      expect(userSvc.deleteUser).not.toHaveBeenCalled();
+      expect(audit.record).not.toHaveBeenCalled();
+    },
+  );
+
   it('delegates user removal exactly once with the requested id', async () => {
     const { userSvc, service, audit, manager, lifecycle } = setup();
     userSvc.deleteUser.mockResolvedValue(undefined);
 
     await expect(
       service.removeUser('user-1', {
+        expected_version: 1,
         reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
       }),
     ).resolves.toBeUndefined();
@@ -154,6 +181,7 @@ describe('UserAdminService', () => {
     const dto = {
       status_id: 'status-id-000001',
       role_ids: ['role-id-0000001'],
+      expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     };
     const user = userFixture({
@@ -180,6 +208,7 @@ describe('UserAdminService', () => {
         resourceId: 'user-1',
         after: {
           id: user.id,
+          version: 1,
           status: { id: user.status.id },
           roles: [],
         },
@@ -195,6 +224,7 @@ describe('UserAdminService', () => {
       entity.id = undefined;
     });
     await service.removeUser('user-1', {
+      expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     });
     expect(audit.record).toHaveBeenCalledWith(
@@ -225,6 +255,7 @@ describe('UserAdminService', () => {
 
       await service.updateUser('user-1', {
         role_ids: afterIds,
+        expected_version: 1,
         reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
       });
 
@@ -256,6 +287,7 @@ describe('UserAdminService', () => {
 
     await service.updateUser('user-1', {
       role_ids: ['role-1', 'role-1'],
+      expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     });
 
@@ -273,6 +305,7 @@ describe('UserAdminService', () => {
 
     await service.updateUser('affected-user', {
       status_id: 'status-id-000001',
+      expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     });
 
@@ -300,6 +333,7 @@ describe('UserAdminService', () => {
     await expect(
       service.updateUser('user-1', {
         role_ids: ['role-1'],
+        expected_version: 1,
         reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
       }),
     ).rejects.toThrow('audit unavailable');
@@ -310,6 +344,7 @@ describe('UserAdminService', () => {
     const { userSvc, service, audit } = setup();
     const dto = {
       role_ids: ['missing-role-id'],
+      expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     };
     const error = new BadRequestException('One or more roles were not found.');

@@ -56,34 +56,57 @@ export class UserService {
     options: UpdateUserOptions = {},
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
-    const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
-    const dtoMetadata = dto.metadata as
-      | Partial<UserEntity['metadata']>
-      | undefined;
-    const metadata = shouldTouchLastUpdatedAt
-      ? createUserMetadata({
-          ...user.metadata,
-          ...(dtoMetadata ?? {}),
-          last_updated_at:
-            options.lastUpdatedAt ?? dtoMetadata?.last_updated_at ?? new Date(),
-        })
-      : dtoMetadata;
+    return runInTransaction(manager, async (manager) => {
+      const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
+      const dtoMetadata = dto.metadata as
+        | Partial<UserEntity['metadata']>
+        | undefined;
+      const metadata = shouldTouchLastUpdatedAt
+        ? createUserMetadata({
+            ...user.metadata,
+            ...(dtoMetadata ?? {}),
+            last_updated_at:
+              options.lastUpdatedAt ??
+              dtoMetadata?.last_updated_at ??
+              new Date(),
+          })
+        : dtoMetadata;
 
-    const detachedUser = manager.create(
-      UserEntity,
-      user as DeepPartial<UserEntity>,
-    );
-    const updatedUser = manager.merge(
-      UserEntity,
-      detachedUser,
-      omitUndefinedDeep({
-        ...dto,
-        ...(metadata ? { metadata } : {}),
-      }),
-    );
+      const detachedUser = manager.create(
+        UserEntity,
+        user as DeepPartial<UserEntity>,
+      );
+      const updatedUser = manager.merge(
+        UserEntity,
+        detachedUser,
+        omitUndefinedDeep({
+          ...dto,
+          ...(metadata ? { metadata } : {}),
+        }),
+      );
 
-    await manager.save(UserEntity, updatedUser);
+      // Persist only intended root fields, not stale status/roles copied from a
+      // request's user object. Revision is database-owned, never caller-supplied.
+      const fields = new Set([
+        'id',
+        ...Object.keys(omitUndefinedDeep(dto)),
+        ...(metadata ? ['metadata'] : []),
+      ]);
+      for (const field of Object.keys(updatedUser)) {
+        if (!fields.has(field) || field === 'administration_version')
+          Reflect.deleteProperty(updatedUser, field);
+      }
+      await manager.save(UserEntity, updatedUser);
+      if (dto.status !== undefined || dto.roles !== undefined) {
+        await manager.increment(
+          UserEntity,
+          { id: user.id },
+          'administration_version',
+          1,
+        );
+      }
 
-    return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+      return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+    });
   }
 }

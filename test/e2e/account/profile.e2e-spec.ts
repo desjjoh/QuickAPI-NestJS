@@ -16,6 +16,11 @@ import { UserAddressEntity } from '@/modules/domain/identity/entities/address.en
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
+import { StorageDeletionIntentEntity } from '@/modules/system/storage-cleanup/entities/storage-deletion-intent.entity';
+import { StorageObjectEntity } from '@/modules/system/storage/entities/storage-object.entity';
+import { StorageCleanupService } from '@/modules/system/storage-cleanup/services/storage-cleanup.service';
+import { STORAGE_CLEANUP_ATTEMPTS } from '@/modules/system/storage-cleanup/queues/storage-cleanup.queue';
+import { drainStorageCleanup } from '../../helpers/storage-cleanup';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import {
   acquireCsrf,
@@ -225,12 +230,15 @@ describe('authenticated account profile lifecycle', () => {
       .attach('avatar', PNG, { filename: 'two.png', contentType: 'image/png' })
       .expect(201);
     const secondKey = second.body.profile.media.avatar.storage_key as string;
+    expect(storage.objects.has(firstKey)).toBe(true);
+    await drainStorageCleanup(app);
     expect(storage.objects.has(firstKey)).toBe(false);
     expect(storage.objects.has(secondKey)).toBe(true);
     await auth.agent
       .delete(`${ACCOUNT}/profile/avatar`)
       .set(auth.headers)
       .expect(200);
+    await drainStorageCleanup(app);
     expect(storage.objects.size).toBe(0);
   });
 
@@ -272,6 +280,8 @@ describe('authenticated account profile lifecycle', () => {
     const second = await upload('replace').expect(201);
     expect((await upload('replace').expect(201)).body).toEqual(second.body);
     expect(put).toHaveBeenCalledTimes(2);
+    expect(remove).not.toHaveBeenCalled();
+    await drainStorageCleanup(app);
     expect(remove).toHaveBeenCalledTimes(1);
     expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
     expect(storage.objects.size).toBe(1);
@@ -290,6 +300,7 @@ describe('authenticated account profile lifecycle', () => {
     expect(persisted.profile.media.avatar?.storage_key).toBe(
       newest.body.profile.media.avatar.storage_key,
     );
+    await drainStorageCleanup(app);
     expect(storage.objects.size).toBe(1);
     expect(put).toHaveBeenCalledTimes(3);
     expect(remove).toHaveBeenCalledTimes(2);
@@ -427,6 +438,8 @@ describe('authenticated account profile lifecycle', () => {
       .spyOn(app.get(AuditService), 'record')
       .mockRejectedValueOnce(new Error('simulated audit failure'));
     await upload().expect(500);
+    expect(storage.objects.size).toBe(1);
+    await drainStorageCleanup(app);
     expect(storage.objects.size).toBe(0);
     expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(0);
     expect(
@@ -435,6 +448,46 @@ describe('authenticated account profile lifecycle', () => {
     expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
     await upload().expect(201);
     expect(storage.objects.size).toBe(1);
+  });
+
+  it('recovers an uncertain failed PUT while retrying the same HTTP key with a new object key', async () => {
+    const auth = await authenticated();
+    const upload = () =>
+      auth.agent
+        .post(`${ACCOUNT}/profile/avatar`)
+        .set(auth.headers)
+        .set('Idempotency-Key', 'uncertain-put')
+        .attach('avatar', PNG, 'avatar.png');
+    const put = storage.putObject.bind(storage);
+    jest.spyOn(storage, 'putObject').mockImplementationOnce(async (input) => {
+      await put(input);
+      throw new Error('secret provider response after acceptance');
+    });
+    const failed = await upload().expect(503);
+    expect(JSON.stringify(failed.body)).not.toContain('secret provider');
+    const orphan = await suite.dataSource
+      .getRepository(StorageObjectEntity)
+      .findOneByOrFail({ state: 'reserved' });
+    expect(storage.objects.has(orphan.storage_key)).toBe(true);
+    expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(0);
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(0);
+    expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+    const retried = await upload().expect(201);
+    const current = retried.body.profile.media.avatar.storage_key as string;
+    expect(current).not.toBe(orphan.storage_key);
+    const replayed = await upload().expect(201);
+    expect(replayed.body).toEqual(retried.body);
+    expect(storage.putObject).toHaveBeenCalledTimes(2);
+    await suite.dataSource.manager.update(
+      StorageObjectEntity,
+      { storage_key: orphan.storage_key },
+      { expires_at: new Date(0) },
+    );
+    await drainStorageCleanup(app);
+    expect([...storage.objects.keys()]).toEqual([current]);
+    expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
   });
 
   it('keeps committed replacement and replay state when old-object cleanup exhausts retries', async () => {
@@ -453,7 +506,15 @@ describe('authenticated account profile lifecycle', () => {
     const remove = jest
       .spyOn(storage, 'deleteObject')
       .mockRejectedValue(new Error('storage unavailable'));
-    await upload('cleanup-replacement').expect(500);
+    await upload('cleanup-replacement').expect(201);
+    expect(remove).not.toHaveBeenCalled();
+    const intent = await suite.dataSource
+      .getRepository(StorageDeletionIntentEntity)
+      .findOneByOrFail({ storage_key: oldKey });
+    for (let attempt = 0; attempt < STORAGE_CLEANUP_ATTEMPTS; attempt++)
+      await expect(
+        app.get(StorageCleanupService).deleteObject(intent.id),
+      ).rejects.toThrow();
     const persisted = await suite.dataSource
       .getRepository(UserEntity)
       .findOneByOrFail({ id: auth.user.id });
@@ -463,11 +524,11 @@ describe('authenticated account profile lifecycle', () => {
     expect(storage.objects.has(oldKey)).toBe(true);
     expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
     expect(await audits.count()).toBe(baseline + 1);
-    expect(remove).toHaveBeenCalledTimes(3);
+    expect(remove).toHaveBeenCalledTimes(STORAGE_CLEANUP_ATTEMPTS);
     const replay = await upload('cleanup-replacement').expect(201);
     expect(replay.body.profile.media.avatar.storage_key).toBe(newKey);
     expect(put).toHaveBeenCalledTimes(1);
-    expect(remove).toHaveBeenCalledTimes(3);
+    expect(remove).toHaveBeenCalledTimes(STORAGE_CLEANUP_ATTEMPTS);
     expect(await audits.count()).toBe(baseline + 1);
     expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
   });

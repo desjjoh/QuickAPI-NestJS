@@ -36,7 +36,7 @@ describe('administration article version preconditions', () => {
       ]),
     );
   });
-  it('does not add article version requirements to user administration actions', async () => {
+  it('does not add version requirements to generic reason-only administration actions', async () => {
     expect(
       await validate(
         plainToInstance(AdministrationActionDto, {
