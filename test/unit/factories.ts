@@ -105,6 +105,7 @@ export const buildUser = (
       account_tokens: [],
       mfa_settings: null,
       metadata: {
+        deleted_at: null,
         last_sign_in: null,
         last_changed_email: null,
         last_changed_password: null,

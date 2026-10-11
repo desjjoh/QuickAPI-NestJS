@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
@@ -84,6 +88,35 @@ describe('UserAdministrationService', () => {
       'user-1',
       manager,
     );
+  });
+
+  it('requires dedicated deletion rather than assigning the deleted status', async () => {
+    await expect(
+      service.updateUserStatusByKey(user as never, ACCOUNT_STATUS_KEYS.DELETED),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    manager.findOneBy.mockResolvedValue({
+      id: 'deleted-status',
+      key: 'deleted',
+    });
+    await expect(
+      service.updateAdministration(user as never, {
+        expected_version: 1,
+        status_id: 'deleted-status',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(manager.increment).not.toHaveBeenCalled();
+    expect(users.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('does not reactivate an account whose authoritative status is deleted', async () => {
+    await expect(
+      service.updateAdministration(
+        { ...user, status: { key: 'deleted' } } as never,
+        { expected_version: 1, status_id: 'active' },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(manager.increment).not.toHaveBeenCalled();
+    expect(query.relation).not.toHaveBeenCalled();
   });
 
   it('adds a seeded role without mutating the caller role array', async () => {

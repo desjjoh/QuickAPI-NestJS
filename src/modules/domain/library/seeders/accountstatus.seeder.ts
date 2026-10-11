@@ -6,6 +6,7 @@ import {
 } from '@/modules/system/seeder/types/seeder.types';
 
 import { AccountStatusEntity } from '../entities/accountstatus.entity';
+import { ACCOUNT_STATUSES } from '@/config/statuses.config';
 
 export type AccountStatusSeed = {
   key: string;
@@ -13,25 +14,7 @@ export type AccountStatusSeed = {
   description: string;
 };
 
-export const ACCOUNT_STATUS_SEEDS: AccountStatusSeed[] = [
-  {
-    key: 'active',
-    label: 'Active',
-    description: 'The account is active and may authenticate normally.',
-  },
-  {
-    key: 'disabled',
-    label: 'Disabled',
-    description:
-      'The account has been disabled by an administrator and may not authenticate.',
-  },
-  {
-    key: 'locked',
-    label: 'Locked',
-    description:
-      'The account is temporarily locked due to security or policy reasons.',
-  },
-];
+export const ACCOUNT_STATUS_SEEDS: AccountStatusSeed[] = ACCOUNT_STATUSES;
 
 export class AccountStatusSeeder implements Seeder {
   public readonly name: string = AccountStatusSeeder.name;

@@ -7,6 +7,18 @@ import { UserEntity } from '../entities/user.entity';
 import { UserService } from './user.service';
 
 describe('UserService', () => {
+  it('rejects a stale personal update after the account was tombstoned', async () => {
+    manager.findOneOrFail.mockResolvedValue({
+      ...user,
+      status: { key: 'deleted' },
+    });
+    await expect(
+      service.updateUser(user as never, {
+        identity: { password: 'stale-hash' },
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(manager.save).not.toHaveBeenCalled();
+  });
   const user = {
     id: 'user-1',
     administration_version: 1,

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { Brackets, DataSource, EntityManager, Not } from 'typeorm';
+import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 
 import { DomainRepository } from '@/common/repositories/domain.repository';
 
@@ -33,9 +34,16 @@ export class UserRepository extends DomainRepository<UserEntity> {
       .leftJoinAndSelect('profile.contact.address', 'address')
       .leftJoinAndSelect('address.region', 'region')
       .leftJoinAndSelect('address.country', 'addressCountry')
-      .where(
-        "user.email like :query OR CONCAT(profile.name.first, ' ', profile.name.last) like :query",
-        { query: `%${search}%` },
+      .where('status.key != :deletedStatus', {
+        deletedStatus: ACCOUNT_STATUS_KEYS.DELETED,
+      })
+      .andWhere(
+        new Brackets((query) =>
+          query.where(
+            "user.email like :query OR CONCAT(profile.name.first, ' ', profile.name.last) like :query",
+            { query: `%${search}%` },
+          ),
+        ),
       )
       .addSelect(
         "CONCAT(profile.name.first, ' ', profile.name.last)",
@@ -49,6 +57,7 @@ export class UserRepository extends DomainRepository<UserEntity> {
 
   public findAll(manager: EntityManager): Promise<UserEntity[]> {
     return this.getRepository(manager).find({
+      where: { status: { key: Not(ACCOUNT_STATUS_KEYS.DELETED) } },
       order: { createdAt: 'ASC' },
     });
   }
@@ -58,6 +67,7 @@ export class UserRepository extends DomainRepository<UserEntity> {
     email: string,
   ): Promise<UserEntity | null> {
     return this.getRepository(manager).findOne({
+      // Deleted accounts have unique internal emails; their original email is reusable.
       where: { identity: { email } },
     });
   }
@@ -68,8 +78,18 @@ export class UserRepository extends DomainRepository<UserEntity> {
   ): Promise<UserEntity | null> {
     return this.getRepository(manager).findOne({
       where: {
+        status: { key: Not(ACCOUNT_STATUS_KEYS.DELETED) },
         profile: { contact: { phone: { phone_e164: phoneE164 } } },
       },
+    });
+  }
+
+  public findById(
+    manager: EntityManager,
+    id: string,
+  ): Promise<UserEntity | null> {
+    return this.getRepository(manager).findOne({
+      where: { id, status: { key: Not(ACCOUNT_STATUS_KEYS.DELETED) } },
     });
   }
 }

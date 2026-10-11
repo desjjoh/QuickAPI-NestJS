@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import {
@@ -27,6 +28,7 @@ import { UpdateUserAdministrationDto } from '../models/update-user.model';
 import { UserAdministrationActionDto } from '../models/user-action.model';
 import { UserAdministrationDto } from '@/modules/domain/identity/models/user-administration.model';
 import { assertUserAdministrationVersion } from '@/modules/domain/identity/policies/user-administration-version.policy';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 
 @Injectable()
 export class UserAdminService {
@@ -62,12 +64,13 @@ export class UserAdminService {
       assertUserAdministrationVersion(before, dto.expected_version);
       const beforeSnapshot = this.auditSnapshot(before);
       await this.lifecycle.deleteUser(before, manager, lifecycle);
+      const after = await manager.findOneOrFail(UserEntity, { where: { id } });
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,
           id,
           beforeSnapshot,
-          null,
+          this.auditSnapshot(after),
           dto.reason_code,
         ),
         manager,
@@ -108,10 +111,12 @@ export class UserAdminService {
     manager: EntityManager,
     id: string,
   ): Promise<UserEntity> {
-    return manager.findOneOrFail(UserEntity, {
+    const user = await manager.findOneOrFail(UserEntity, {
       where: { id },
       lock: { mode: 'pessimistic_write' },
     });
+    if (isUserDeleted(user)) throw new NotFoundException('User not found.');
+    return user;
   }
 
   private successInput(
@@ -138,15 +143,11 @@ export class UserAdminService {
       },
       before,
       after,
+      includeSnapshotContext: event === IdentityAuditEvents.ADMIN_USER_DELETED,
     };
   }
 
   private auditSnapshot(user: UserEntity) {
-    return {
-      id: user.id,
-      version: user.administration_version,
-      status: { id: user.status.id },
-      roles: user.roles?.map(({ id }) => id) ?? [],
-    };
+    return identityUserSnapshot(user);
   }
 }

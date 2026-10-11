@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { createHash } from 'node:crypto';
-import { LessThanOrEqual } from 'typeorm';
+import { EntityManager, LessThanOrEqual } from 'typeorm';
 import {
   runInTransaction,
   withApplicationTransaction,
@@ -29,6 +29,23 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
   private sweepTimer?: NodeJS.Timeout;
 
   public constructor(private readonly repository: IdempotencyRepository) {}
+
+  /** Keep the duplicate-execution fence, but erase historical personal responses. */
+  public async eraseUserResponses(
+    userId: string,
+    manager: EntityManager,
+  ): Promise<void> {
+    await manager
+      .createQueryBuilder()
+      .update(IdempotencyEntity)
+      .set({ state: 'erased', response_body: null })
+      .where("state IN ('completed', 'erased')")
+      .andWhere(
+        "(actor_id = :userId OR response_identity = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.user.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.author.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.publisher.id')) = :userId)",
+        { userId },
+      )
+      .execute();
+  }
 
   public onModuleInit(): void {
     this.sweepTimer = setInterval(() => {
@@ -97,6 +114,10 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
             if (existing.fingerprint !== fingerprint)
               throw new ConflictException(
                 'Idempotency-Key was already used with a different payload.',
+              );
+            if (existing.state === 'erased')
+              throw new ConflictException(
+                'The stored response was erased after account deletion. Reload the resource; this request will not be executed again.',
               );
             if (existing.state !== 'completed')
               throw new ConflictException(

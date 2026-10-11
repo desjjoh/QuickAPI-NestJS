@@ -97,6 +97,6 @@ const bullBoardImports = env.BULL_BOARD_ENABLED
         }),
     },
   ],
-  exports: [EmailService],
+  exports: [EmailService, EmailOutboxService],
 })
 export class EmailModule {}

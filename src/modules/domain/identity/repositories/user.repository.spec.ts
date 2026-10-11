@@ -1,4 +1,10 @@
-import type { DataSource, EntityManager, Repository } from 'typeorm';
+import {
+  Brackets,
+  Not,
+  type DataSource,
+  type EntityManager,
+  type Repository,
+} from 'typeorm';
 
 import { UserPaginationOptions } from '../models/user.model';
 import { UserRepository } from './user.repository';
@@ -7,6 +13,7 @@ const setup = () => {
   const builder = {
     leftJoinAndSelect: jest.fn(),
     where: jest.fn(),
+    andWhere: jest.fn(),
     addSelect: jest.fn(),
     orderBy: jest.fn(),
     take: jest.fn(),
@@ -52,7 +59,13 @@ describe('UserRepository', () => {
     } as unknown as UserPaginationOptions);
 
     expect(builder.leftJoinAndSelect).toHaveBeenCalledTimes(13);
-    expect(builder.where).toHaveBeenCalledWith(expect.any(String), {
+    expect(builder.where).toHaveBeenCalledWith('status.key != :deletedStatus', {
+      deletedStatus: 'deleted',
+    });
+    const bracket = builder.andWhere.mock.calls[0][0] as Brackets;
+    const nested = { where: jest.fn() };
+    bracket.whereFactory(nested as never);
+    expect(nested.where).toHaveBeenCalledWith(expect.any(String), {
       query: '%Ada%',
     });
     expect(builder.addSelect).toHaveBeenCalledWith(
@@ -92,6 +105,7 @@ describe('UserRepository', () => {
     await repository.findById(manager, 'user-1');
 
     expect(persistence.find).toHaveBeenCalledWith({
+      where: { status: { key: Not('deleted') } },
       order: { createdAt: 'ASC' },
     });
     expect(persistence.findOne).toHaveBeenNthCalledWith(1, {
@@ -99,11 +113,12 @@ describe('UserRepository', () => {
     });
     expect(persistence.findOne).toHaveBeenNthCalledWith(2, {
       where: {
+        status: { key: Not('deleted') },
         profile: { contact: { phone: { phone_e164: '+15555550100' } } },
       },
     });
     expect(persistence.findOne).toHaveBeenNthCalledWith(3, {
-      where: { id: 'user-1' },
+      where: { id: 'user-1', status: { key: Not('deleted') } },
     });
   });
 

@@ -63,7 +63,9 @@ describe('UserRepository (disposable MySQL)', () => {
       userService,
       repository,
       references,
-      imageService as unknown as ImageService,
+      { cancelForUser: async () => {} } as never,
+      { eraseUserResponses: async () => {} } as never,
+      imageService as never,
     );
     userProfile = new UserProfileService(repository);
     refresh = new RefreshService(
@@ -103,12 +105,13 @@ describe('UserRepository (disposable MySQL)', () => {
 
   async function createUser(
     avatar: ImageEntity | null = null,
+    email?: string,
   ): Promise<UserEntity> {
     const refs = await referenceData();
     sequence += 1;
     return lifecycle.createUser({
       identity: {
-        email: `repository-${sequence}@example.test`,
+        email: email ?? `repository-${sequence}@example.test`,
         password: 'hash',
       },
       profile: {
@@ -240,7 +243,7 @@ describe('UserRepository (disposable MySQL)', () => {
   });
 
   it.each([false, true])(
-    'transactionally removes user/profile and removes storage only with an avatar (%s)',
+    'soft deletes by status and preserves historical user/profile data (%s)',
     async (withAvatar) => {
       const image = withAvatar ? await createImage('avatars/delete.png') : null;
       const user = await createUser(image);
@@ -264,23 +267,59 @@ describe('UserRepository (disposable MySQL)', () => {
 
       await expect(
         dataSource.getRepository(UserEntity).findOneBy({ id: userId }),
-      ).resolves.toBeNull();
+      ).resolves.toMatchObject({
+        metadata: { deleted_at: expect.any(Date) },
+        identity: { password: null },
+        roles: [],
+      });
       await expect(
         dataSource
           .getRepository(UserProfileEntity)
           .findOneBy({ id: profileId }),
-      ).resolves.toBeNull();
+      ).resolves.toMatchObject({
+        name: user.profile.name,
+        personal: user.profile.personal,
+        region: user.profile.region,
+        media: { avatar: null },
+      });
+      expect(await repository.findById(dataSource.manager, userId)).toBeNull();
+      expect(
+        await repository.findByEmail(dataSource.manager, user.identity.email),
+      ).toBeNull();
+      const replacement = await createUser(null, user.identity.email);
+      expect(replacement.id).not.toBe(userId);
+      expect(
+        (await repository.findByEmail(dataSource.manager, user.identity.email))
+          ?.id,
+      ).toBe(replacement.id);
+      await expect(
+        userService.updateUser(user, { identity: { password: 'resurrect' } }),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(imageService.remove).toHaveBeenCalledTimes(withAvatar ? 1 : 0);
-      if (image) {
-        const call = imageService.remove.mock.calls[0];
-        expect(call.length).toBe(3);
-        expect(call[0].id).toBe(image.id);
-        expect(call[1]?.queryRunner?.isReleased).toBe(true);
-      }
     },
   );
 
   describe('administrative updates', () => {
+    it('keeps an active account visible even when its name resembles a deletion label', async () => {
+      const user = await createUser();
+      await dataSource.manager.update(
+        UserProfileEntity,
+        { id: user.profile.id },
+        { name: { first: 'Deleted user', last: '' } },
+      );
+      await dataSource.manager.update(
+        UserEntity,
+        { id: user.id },
+        { metadata: { deleted_at: new Date() } },
+      );
+      const visible = await repository.findById(dataSource.manager, user.id);
+      expect(visible?.status.key).toBe('active');
+      expect(visible?.profile.name.first).toBe('Deleted user');
+      expect(
+        (await repository.findAll(dataSource.manager)).map((entry) => entry.id),
+      ).toContain(user.id);
+    });
+
     it('replaces a valid status', async () => {
       const user = await createUser();
       const disabled = await dataSource

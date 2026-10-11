@@ -1,6 +1,8 @@
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { createHash } from 'crypto';
+import { userFixture } from '@/../test/helpers/identity.fixtures';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 
 import { AccountTokenType } from '@/config/token.config';
@@ -10,11 +12,11 @@ import {
 } from './password-reset.service';
 
 describe('PasswordResetService', () => {
-  const user = {
+  const user = userFixture({
     id: 'u1',
     identity: { email: 'user@test.dev' },
     profile: { name: { first: 'Ada', preferred: null } },
-  };
+  });
   const tokenSvc = {
     createToken: jest.fn(),
     authorizeMfaCode: jest.fn(),
@@ -28,6 +30,7 @@ describe('PasswordResetService', () => {
   };
   const credentials = {
     canAuthenticate: jest.fn(),
+    currentUser: jest.fn(),
     assertCanAuthenticate: jest.fn(),
     hashPassword: jest.fn(),
     recordPasswordChanged: jest.fn(),
@@ -41,6 +44,8 @@ describe('PasswordResetService', () => {
     jest.clearAllMocks();
     userSvc.findByEmail.mockResolvedValue(user);
     credentials.canAuthenticate.mockReturnValue(true);
+    credentials.currentUser.mockResolvedValue(user);
+    credentials.recordPasswordChanged.mockResolvedValue(user);
     tokenSvc.createToken.mockResolvedValue({
       id: 't1',
       token: 'opaque',
@@ -82,14 +87,6 @@ describe('PasswordResetService', () => {
       resourceId: 'u1',
       source: 'http',
       metadata: {},
-      before: {
-        id: 'u1',
-        metadata: { password_reset_requested: false },
-      },
-      after: {
-        id: 'u1',
-        metadata: { password_reset_requested: true },
-      },
     });
   });
 
@@ -162,8 +159,9 @@ describe('PasswordResetService', () => {
       resourceId: 'u1',
       source: 'http',
       metadata: {},
-      before: { id: 'u1' },
-      after: { id: 'u1', identity: { password: true } },
+      before: identityUserSnapshot(user),
+      after: identityUserSnapshot(user),
+      meaningfulWithoutChanges: true,
     });
   });
 

@@ -44,6 +44,57 @@ describe(AuditRedactionService.name, () => {
     ).toEqual({ id: 'ticket-1', state: 'open' });
   });
 
+  it('records safe security-state diffs without recording credentials', () => {
+    const when = '2026-10-11T12:00:00.123Z';
+    const diff = new AuditRedactionService().redactDiff(
+      'identity.user',
+      {
+        metadata: {
+          last_changed_password: null,
+          last_changed_mfa: null,
+          mfa_enabled: false,
+        },
+      },
+      {
+        identity: { password: 'private-hash' },
+        metadata: {
+          last_changed_password: when,
+          last_changed_mfa: when,
+          mfa_enabled: true,
+          mfa_secret: 'private-secret',
+        },
+      },
+    );
+    expect(diff.changes).toMatchObject({
+      metadata: {
+        last_changed_password: { before: null, after: when },
+        last_changed_mfa: { before: null, after: when },
+        mfa_enabled: { before: false, after: true },
+      },
+    });
+    expect(JSON.stringify(diff)).not.toMatch(/private-hash|private-secret/);
+  });
+
+  it('does not let malicious values bypass security-state redaction', () => {
+    const snapshot = new AuditRedactionService().redactSnapshot(
+      'identity.user',
+      {
+        metadata: {
+          last_changed_password: 'private-password',
+          last_changed_mfa: new Date(NaN),
+          mfa_enabled: 'private-mfa-secret',
+        },
+      },
+    );
+    expect(snapshot).toEqual({
+      metadata: {
+        last_changed_password: '[REDACTED]',
+        last_changed_mfa: '[REDACTED]',
+        mfa_enabled: '[REDACTED]',
+      },
+    });
+  });
+
   it('preserves explicit decorative choices in image audit snapshots', () => {
     expect(
       new AuditRedactionService().redactSnapshot('media.image', {
@@ -126,7 +177,7 @@ describe(AuditRedactionService.name, () => {
     expect(snapshot).toEqual({
       id: 'user-1',
       identity: { email: '[CHANGED]' },
-      metadata: { mfa_enabled: '[CHANGED]' },
+      metadata: { mfa_enabled: true },
     });
     expect(JSON.stringify(snapshot)).not.toContain('must-not-appear');
     expect(JSON.stringify(snapshot)).not.toContain('registered-hash');

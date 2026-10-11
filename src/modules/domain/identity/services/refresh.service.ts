@@ -1,3 +1,4 @@
+import { isUserDeleted } from '../policies/user-deletion.policy';
 import { applicationManager } from '@/common/helpers/transaction.helper';
 import {
   Injectable,
@@ -40,6 +41,14 @@ export class RefreshService {
     req?: Request,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<JWTDto> {
+    if (manager.queryRunner?.isTransactionActive) {
+      const current = await manager.findOne(UserEntity, {
+        where: { id: user.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!current || isUserDeleted(current))
+        throw new UnauthorizedException('Account is no longer available.');
+    }
     if (manager.queryRunner?.isTransactionActive && existingSession?.refresh) {
       const current = await manager.findOne(UserSessionEntity, {
         where: { id: existingSession.id, user: { id: user.id }, active: true },
@@ -188,6 +197,20 @@ export class RefreshService {
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<UserSessionEntity | null> {
     return this.sessionRepo.findByUser(manager, userId, sessionId, true);
+  }
+
+  /** Audit reload includes revoked sessions; normal session reads exclude them. */
+  public sessionForAudit(
+    userId: string,
+    id: string,
+    manager: EntityManager = applicationManager(this.sessionRepo.manager),
+  ): Promise<UserSessionEntity | null> {
+    return manager.findOne(UserSessionEntity, {
+      where: { id, user: { id: userId } },
+      ...(manager.queryRunner?.isTransactionActive
+        ? { lock: { mode: 'pessimistic_write' as const } }
+        : {}),
+    });
   }
 
   private async createSession(

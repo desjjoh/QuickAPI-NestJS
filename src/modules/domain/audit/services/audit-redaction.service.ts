@@ -48,6 +48,11 @@ const TRUNCATED = '[TRUNCATED]';
 const CIRCULAR = '[CIRCULAR]';
 const SAFE_ERROR_TYPE = /^(?:Error|[A-Za-z][A-Za-z0-9]*(?:Error|Exception))$/;
 const SAFE_CODE_FIELDS = new Set(['reason_code']);
+const SAFE_SECURITY_STATE_FIELDS = new Map<string, FieldPolicy['kind']>([
+  ['last_changed_password', 'timestamp'],
+  ['last_changed_mfa', 'timestamp'],
+  ['mfa_enabled', 'boolean'],
+]);
 
 export interface AuditRedactionOptions {
   readonly maxDepth?: number;
@@ -158,7 +163,9 @@ export class AuditRedactionService {
       const policy = tree[key];
       // This guard is deliberately applied even to allowlisted future fields.
       if (
-        (SECRET_KEY.test(key) && !SAFE_CODE_FIELDS.has(key)) ||
+        (SECRET_KEY.test(key) &&
+          !SAFE_CODE_FIELDS.has(key) &&
+          SAFE_SECURITY_STATE_FIELDS.get(key) !== policy.kind) ||
         RAW_CONTAINER_KEY.test(key)
       ) {
         result[key] = policy.kind === 'changed-only' ? CHANGED : OMITTED;
@@ -176,6 +183,25 @@ export class AuditRedactionService {
     seen: WeakSet<object>,
     depth: number,
   ): AuditValue {
+    if (policy.kind === 'boolean')
+      return typeof value === 'boolean' ? value : OMITTED;
+    if (policy.kind === 'timestamp') {
+      if (value === null) return null;
+      const candidate =
+        value instanceof Date && Number.isFinite(value.getTime())
+          ? value.toISOString()
+          : value;
+      if (
+        typeof candidate !== 'string' ||
+        !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(candidate)
+      )
+        return OMITTED;
+      const parsed = new Date(candidate);
+      return Number.isFinite(parsed.getTime()) &&
+        parsed.toISOString() === candidate
+        ? candidate
+        : OMITTED;
+    }
     if (policy.kind === 'changed-only') return CHANGED;
     if (policy.kind === 'masked')
       return policy.mask === 'email' ? this.maskEmail(value) : this.hash(value);

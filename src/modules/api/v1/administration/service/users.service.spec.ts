@@ -11,6 +11,7 @@ import {
 import { userFixture } from '@/../test/helpers/identity.fixtures';
 import { ADMINISTRATION_REASON_CODES } from '@/config/administration.config';
 import { UserAdminService } from './users.service';
+import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-audit.snapshot';
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('UserAdminService', () => {
@@ -104,6 +105,17 @@ describe('UserAdminService', () => {
     expect(result).toBeInstanceOf(UserDto);
     expect(result.id).toBe(user.id);
     expect(result.metadata.lastChangedMfa).toBe(lastChangedMfa.toISOString());
+    expect(result.metadata.deletedAt).toBeNull();
+  });
+
+  it('serializes the recorded deletion time into nullable user metadata', () => {
+    const deletedAt = new Date('2026-10-11T14:30:00.123Z');
+    const result = new UserDto(
+      userFixture({
+        metadata: { ...userFixture().metadata, deleted_at: deletedAt },
+      }),
+    );
+    expect(result.metadata.deletedAt).toBe(deletedAt.toISOString());
   });
 
   it('propagates repository not-found errors when finding a user', async () => {
@@ -163,7 +175,8 @@ describe('UserAdminService', () => {
         metadata: expect.objectContaining({
           reason_code: 'policy_enforcement',
         }),
-        after: null,
+        after: expect.objectContaining({ id: 'user-1' }),
+        includeSnapshotContext: true,
       }),
       manager,
     );
@@ -206,30 +219,30 @@ describe('UserAdminService', () => {
         actorId: 'administrator-1',
         subjectId: 'user-1',
         resourceId: 'user-1',
-        after: {
-          id: user.id,
-          version: 1,
-          status: { id: user.status.id },
-          roles: [],
-        },
+        after: identityUserSnapshot(user),
       }),
       manager,
     );
   });
-  it('captures the deletion snapshot before TypeORM clears the removed entity ID', async () => {
-    const { service, userSvc, audit, manager } = setup();
+  it('captures before from the locked row and after from the persisted tombstone', async () => {
+    const { service, audit, manager } = setup();
     const before = userFixture();
-    manager.findOneOrFail.mockResolvedValue(before);
-    userSvc.deleteUser.mockImplementation(async (entity) => {
-      entity.id = undefined;
+    const after = userFixture({
+      status: { key: 'deleted' },
+      metadata: { deleted_at: new Date('2026-10-11T12:00:00.123Z') },
     });
+    manager.findOneOrFail
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce(after);
     await service.removeUser('user-1', {
       expected_version: 1,
       reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
-        before: expect.objectContaining({ id: 'user-1' }),
+        before: identityUserSnapshot(before),
+        after: identityUserSnapshot(after),
+        includeSnapshotContext: true,
         resourceId: 'user-1',
       }),
       manager,

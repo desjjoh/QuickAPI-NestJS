@@ -17,6 +17,13 @@ describe('SessionsApiService', () => {
   const setup = () => {
     const refreshSvc = {
       findSessions: jest.fn().mockResolvedValue([current]),
+      sessionForAudit: jest.fn().mockImplementation(async (_userId, id) =>
+        sessionFixture({
+          id,
+          user,
+          active: refreshSvc.sessionForAudit.mock.calls.length % 2 === 1,
+        }),
+      ),
       revokeTokens: jest.fn(),
       revokeSessionById: jest.fn(),
       revokeAllSessions: jest.fn(),
@@ -53,7 +60,10 @@ describe('SessionsApiService', () => {
   it('protects current-session semantics by revoking its tokens and cookies', async () => {
     const { service, refreshSvc, auditSvc } = setup();
     await service.revoke(user, current, current.id, res);
-    expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(current, res);
+    expect(refreshSvc.revokeTokens).toHaveBeenCalledWith(
+      expect.objectContaining({ id: current.id, active: true }),
+      res,
+    );
     expect(refreshSvc.revokeSessionById).not.toHaveBeenCalled();
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -81,7 +91,7 @@ describe('SessionsApiService', () => {
       user.id,
       'other-session',
     );
-    expect(refreshSvc.findSessionById).toHaveBeenCalledWith(
+    expect(refreshSvc.sessionForAudit).toHaveBeenCalledWith(
       user.id,
       'other-session',
     );
@@ -126,6 +136,7 @@ describe('SessionsApiService', () => {
       metadata: {},
       before: { id: user.id, sessions: [current.id] },
       after: { id: user.id, sessions: [] },
+      meaningfulWithoutChanges: true,
     });
     const input = auditSvc.record.mock.calls[0][0];
     expect(

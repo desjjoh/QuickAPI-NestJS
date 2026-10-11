@@ -58,11 +58,50 @@ describe('UserCredentialsService', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('reloads current state under the transaction lock rather than using a stale user', async () => {
+    const fresh = { ...user, metadata: { last_sign_in: new Date() } };
+    const transactional = {
+      queryRunner: { isTransactionActive: true },
+      findOneOrFail: jest.fn().mockResolvedValue(fresh),
+    };
+    await expect(
+      service.currentUser(user as never, transactional as never),
+    ).resolves.toBe(fresh);
+    expect(transactional.findOneOrFail).toHaveBeenCalledWith(
+      expect.any(Function),
+      {
+        where: { id: user.id },
+        lock: { mode: 'pessimistic_write' },
+      },
+    );
+    expect(users.findByIdOrFail).not.toHaveBeenCalled();
+  });
+
+  it('rejects inactive reloaded state even without a request transaction', async () => {
+    users.findByIdOrFail.mockResolvedValue({
+      ...user,
+      status: { key: ACCOUNT_STATUS_KEYS.DELETED },
+    });
+    await expect(service.currentUser(user as never)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
   it('hashes passwords with the configured work factor', async () => {
     jest.mocked(bcrypt.hash).mockResolvedValue('new-hash' as never);
 
     await expect(service.hashPassword('plain')).resolves.toBe('new-hash');
     expect(bcrypt.hash).toHaveBeenCalledWith('plain', 12);
+  });
+
+  it('rejects a deleted status even when historical identity and a password are present', async () => {
+    const deleted = { ...user, status: { key: ACCOUNT_STATUS_KEYS.DELETED } };
+    users.findByEmail.mockResolvedValue(deleted);
+    expect(service.canAuthenticate(deleted as never)).toBe(false);
+    await expect(
+      service.validateUser(user.identity.email, 'plain'),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(bcrypt.compare).not.toHaveBeenCalled();
   });
 
   it('accepts only active accounts for authentication', () => {

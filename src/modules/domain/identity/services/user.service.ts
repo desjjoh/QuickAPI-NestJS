@@ -1,3 +1,4 @@
+import { isUserDeleted } from '../policies/user-deletion.policy';
 import { applicationManager } from '@/common/helpers/transaction.helper';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
@@ -57,13 +58,23 @@ export class UserService {
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     return runInTransaction(manager, async (manager) => {
+      // Serialize account mutations against soft deletion; stale request objects
+      // must never reintroduce credentials or personal data into a tombstone.
+      const current = await manager.findOneOrFail(UserEntity, {
+        where: { id: user.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (isUserDeleted(current))
+        throw new NotFoundException('User not found.');
       const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
-      const dtoMetadata = dto.metadata as
+      const dtoMetadata = (dto.metadata ? { ...dto.metadata } : undefined) as
         | Partial<UserEntity['metadata']>
         | undefined;
+      // Only the deletion lifecycle can assign this historical timestamp.
+      if (dtoMetadata) Reflect.deleteProperty(dtoMetadata, 'deleted_at');
       const metadata = shouldTouchLastUpdatedAt
         ? createUserMetadata({
-            ...user.metadata,
+            ...current.metadata,
             ...(dtoMetadata ?? {}),
             last_updated_at:
               options.lastUpdatedAt ??
@@ -74,7 +85,7 @@ export class UserService {
 
       const detachedUser = manager.create(
         UserEntity,
-        user as DeepPartial<UserEntity>,
+        current as DeepPartial<UserEntity>,
       );
       const updatedUser = manager.merge(
         UserEntity,

@@ -1,24 +1,35 @@
 import { applicationManager } from '@/common/helpers/transaction.helper';
+import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
-import { ImageService } from '@/modules/domain/media/services/image.service';
 import {
   runInTransaction,
   TransactionLifecycle,
 } from '@/common/helpers/transaction.helper';
 
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
-import { UserProfileEntity } from '../entities/profile.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { IdentityReferenceService } from './identity-reference.service';
 import { UserService } from './user.service';
+import { UserSessionEntity } from '../entities/session.entity';
+import { AccountTokenEntity } from '../entities/account-token.entity';
+import { UserMfaSettingsEntity } from '../entities/mfa.entity';
+import { UserPhoneEntity } from '../entities/phone.entity';
+import { UserAddressEntity } from '../entities/address.entity';
+import { RegistrationTokenEntity } from '../entities/registration-token.entity';
+import { EmailOutboxService } from '@/modules/system/email/services/email-outbox.service';
+import { IdempotencyService } from '@/modules/system/idempotency/services/idempotency.service';
+import { isUserDeleted } from '../policies/user-deletion.policy';
+import { UserProfileEntity } from '../entities/profile.entity';
+import { ImageService } from '@/modules/domain/media/services/image.service';
 
 @Injectable()
 export class UserLifecycleService {
@@ -26,6 +37,8 @@ export class UserLifecycleService {
     private readonly users: UserService,
     private readonly userRepo: UserRepository,
     private readonly references: IdentityReferenceService,
+    private readonly emails: EmailOutboxService,
+    private readonly idempotency: IdempotencyService,
     private readonly images: ImageService,
   ) {}
 
@@ -70,11 +83,62 @@ export class UserLifecycleService {
           this.deleteUser(user, transactionManager, transactionLifecycle),
       );
 
-    const avatar = user.profile.media.avatar;
+    const current = await manager.findOneOrFail(UserEntity, {
+      where: { id: user.id },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (isUserDeleted(current)) throw new NotFoundException('User not found.');
+    const deleted = await this.references.getAccountStatus(
+      ACCOUNT_STATUS_KEYS.DELETED,
+      manager,
+    );
 
-    await manager.remove(UserEntity, user);
-    await manager.delete(UserProfileEntity, { id: user.profile.id });
-
-    if (avatar) await this.images.remove(avatar, manager, lifecycle);
+    await manager.update(
+      UserEntity,
+      { id: current.id },
+      {
+        // Random, non-deliverable address releases the original email without
+        // exposing it or permitting a predictable-address uniqueness attack.
+        identity: {
+          email: `deleted-${randomUUID()}@users.invalid`,
+          password: null,
+        },
+        metadata: { deleted_at: new Date(), mfa_enabled: false },
+        status: { id: deleted.id },
+        administration_version: () => '`administration_version` + 1',
+      },
+    );
+    await manager
+      .createQueryBuilder()
+      .relation(UserEntity, 'roles')
+      .of(current.id)
+      .remove(current.roles ?? []);
+    await manager.delete(UserSessionEntity, { user: { id: current.id } });
+    await manager.delete(AccountTokenEntity, { user: { id: current.id } });
+    await manager.delete(RegistrationTokenEntity, {
+      email: current.identity.email,
+    });
+    await manager.delete(UserMfaSettingsEntity, { user: { id: current.id } });
+    await manager.delete(UserPhoneEntity, {
+      profile: { id: current.profile.id },
+    });
+    await manager.delete(UserAddressEntity, {
+      profile: { id: current.profile.id },
+    });
+    await this.emails.cancelForUser(
+      current.id,
+      current.identity.email,
+      manager,
+    );
+    await this.idempotency.eraseUserResponses(current.id, manager);
+    const avatar = current.profile.media.avatar;
+    if (avatar) {
+      await manager.update(
+        UserProfileEntity,
+        { id: current.profile.id },
+        { media: { avatar: null } },
+      );
+      await this.images.remove(avatar, manager, lifecycle);
+    }
   }
 }

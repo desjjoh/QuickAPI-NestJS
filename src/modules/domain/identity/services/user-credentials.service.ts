@@ -1,3 +1,4 @@
+import { isUserDeleted } from '../policies/user-deletion.policy';
 import { applicationManager } from '@/common/helpers/transaction.helper';
 import {
   ForbiddenException,
@@ -25,9 +26,15 @@ export class UserCredentialsService {
     password: string,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
-    const user = await this.users.findByEmail(email, manager);
+    let user = await this.users.findByEmail(email, manager);
+    if (user && manager.queryRunner?.isTransactionActive) {
+      user = await manager.findOne(UserEntity, {
+        where: { id: user.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+    }
 
-    if (!user?.identity?.password)
+    if (!user?.identity?.password || isUserDeleted(user))
       throw new UnauthorizedException('Invalid credentials');
 
     const isMatch = await bcrypt.compare(password, user.identity.password);
@@ -38,7 +45,24 @@ export class UserCredentialsService {
   }
 
   public canAuthenticate(user: UserEntity): boolean {
-    return user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE;
+    return (
+      !isUserDeleted(user) && user.status?.key === ACCOUNT_STATUS_KEYS.ACTIVE
+    );
+  }
+
+  /** Reload under the request transaction's root lock before taking a snapshot. */
+  public async currentUser(
+    user: UserEntity,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
+  ): Promise<UserEntity> {
+    const current = manager.queryRunner?.isTransactionActive
+      ? await manager.findOneOrFail(UserEntity, {
+          where: { id: user.id },
+          lock: { mode: 'pessimistic_write' },
+        })
+      : await this.users.findByIdOrFail(user.id, manager);
+    this.assertCanAuthenticate(current);
+    return current;
   }
 
   public assertCanAuthenticate(user: UserEntity): void {

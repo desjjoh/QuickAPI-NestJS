@@ -70,6 +70,51 @@ describe(AuditService.name, () => {
     expect(repository.insert).toHaveBeenCalledWith(AuditEventEntity, result);
   });
 
+  it('retains redacted snapshot context for tombstones while diffing only changed fields', async () => {
+    const before = {
+      id: 'user-1',
+      profile: { name: { first: 'Pat', last: 'Person' } },
+      identity: { email: 'original@example.test', password: 'private-hash' },
+      status: { key: 'active' },
+      metadata: { deleted_at: null },
+    };
+    const after = {
+      ...before,
+      identity: { email: 'deleted-random@users.invalid', password: null },
+      status: { key: 'deleted' },
+      metadata: { deleted_at: '2026-10-11T12:00:00.123Z' },
+    };
+    const result = await service.record({
+      ...activity,
+      event: 'identity.account.deleted',
+      resourceType: AuditResourceType.IDENTITY_USER,
+      resourceId: 'user-1',
+      before,
+      after,
+      includeSnapshotContext: true,
+    });
+    expect(result?.before).toMatchObject({
+      id: 'user-1',
+      profile: before.profile,
+      status: { key: 'active' },
+      identity: { email: '[CHANGED]' },
+    });
+    expect(result?.after).toMatchObject({
+      id: 'user-1',
+      profile: before.profile,
+      status: { key: 'deleted' },
+      metadata: after.metadata,
+    });
+    expect(result?.changes).toMatchObject({
+      status: { key: { before: 'active', after: 'deleted' } },
+      identity: { email: { before: '[CHANGED]', after: '[CHANGED]' } },
+    });
+    expect(result?.changes).not.toHaveProperty('profile');
+    expect(JSON.stringify(result)).not.toMatch(
+      /original@example|deleted-random|private-hash/,
+    );
+  });
+
   it('generates a unique operation ID instead of reusing the request ID', async () => {
     jest
       .spyOn(nanoidHelper, 'generateOperationId')
@@ -202,11 +247,11 @@ describe(AuditService.name, () => {
     }
     expect(stored.before).toEqual({
       identity: { email: '[CHANGED]' },
-      metadata: { mfa_enabled: '[CHANGED]' },
+      metadata: { mfa_enabled: false },
     });
     expect(stored.after).toEqual({
       identity: { email: '[CHANGED]' },
-      metadata: { mfa_enabled: '[CHANGED]' },
+      metadata: { mfa_enabled: true },
     });
 
     expect(stored.metadata).toMatchObject({

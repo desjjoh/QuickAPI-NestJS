@@ -105,8 +105,10 @@ export class RegistrationService {
     issueSession: (user: UserEntity) => Promise<JWTDto>,
   ): Promise<JWTDto> {
     const user = await this.emailSvc.verifyRegistrationToken(challengeId, code);
-    const after = identityUserSnapshot(user);
     const tokens = await issueSession(user);
+    const after = identityUserSnapshot(
+      await this.userSvc.findByIdOrFail(user.id),
+    );
     const sessionId = tokens.user.session!.id;
 
     await this.auditSvc.record({

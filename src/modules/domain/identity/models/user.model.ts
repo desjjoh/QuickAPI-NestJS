@@ -253,6 +253,14 @@ export class MetadataDto {
   })
   public readonly lastUpdatedAt: string | null;
 
+  @ApiProperty({
+    example: '2026-10-11T14:30:00.000Z',
+    description:
+      'Account deletion timestamp in ISO 8601 format, or null if never deleted. The account status is authoritative for deletion state.',
+    nullable: true,
+  })
+  public readonly deletedAt: string | null;
+
   public constructor(user: UserEntity) {
     const metadata = createUserMetadata(user.metadata);
 
@@ -262,6 +270,7 @@ export class MetadataDto {
       metadata.last_changed_password?.toISOString() ?? null;
     this.lastChangedMfa = metadata.last_changed_mfa?.toISOString() ?? null;
     this.lastUpdatedAt = metadata.last_updated_at?.toISOString() ?? null;
+    this.deletedAt = metadata.deleted_at?.toISOString() ?? null;
     this.mfaEnabled = metadata.mfa_enabled ?? false;
   }
 }

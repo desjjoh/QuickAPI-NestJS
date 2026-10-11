@@ -533,7 +533,153 @@ describe('authenticated account profile lifecycle', () => {
     expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
   });
 
-  it('requires authentication and permanently deletes the current account', async () => {
+  it('retries deleted-account avatar cleanup without touching a replacement account using the same email', async () => {
+    const original = await authenticated();
+    const uploaded = await original.agent
+      .post(`${ACCOUNT}/profile/avatar`)
+      .set(original.headers)
+      .attach('avatar', PNG, 'original.png')
+      .expect(201);
+    const oldAvatar = uploaded.body.profile.media.avatar;
+    const originalImage = await suite.dataSource
+      .getRepository(ImageEntity)
+      .findOneByOrFail({ storage_key: oldAvatar.storage_key });
+    await original.agent
+      .post(`${ACCOUNT}/delete`)
+      .set(original.headers)
+      .send({ password: 'Valid!Pass1' })
+      .expect(204);
+    const tombstone = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: original.user.id });
+    expect(tombstone.status.key).toBe('deleted');
+    expect(tombstone.identity.email).toMatch(
+      /^deleted-[0-9a-f-]+@users\.invalid$/,
+    );
+    expect(tombstone.profile.media.avatar).toBeNull();
+    expect(tombstone.profile.personal).toEqual(original.user.profile.personal);
+    const events = await suite.dataSource
+      .getRepository(AuditEventEntity)
+      .findBy({
+        event: 'identity.account.deleted',
+        subject_id: original.user.id,
+      });
+    expect(events).toHaveLength(1);
+    const event = events[0];
+    expect(event).toMatchObject({
+      actor_id: original.user.id,
+      subject_id: original.user.id,
+      resource_id: original.user.id,
+      before: {
+        id: original.user.id,
+        status: { key: 'active' },
+        identity: { email: '[CHANGED]' },
+        profile: { media: { avatar_id: originalImage.id } },
+        metadata: { deleted_at: null },
+      },
+      after: {
+        id: original.user.id,
+        status: { key: 'deleted' },
+        identity: { email: '[CHANGED]' },
+        profile: { media: { avatar_id: null } },
+        metadata: { deleted_at: tombstone.metadata.deleted_at!.toISOString() },
+      },
+      changes: {
+        status: { key: { before: 'active', after: 'deleted' } },
+        profile: {
+          media: { avatar_id: { before: originalImage.id, after: null } },
+        },
+        metadata: {
+          deleted_at: {
+            before: null,
+            after: tombstone.metadata.deleted_at!.toISOString(),
+          },
+        },
+        identity: { email: { before: '[CHANGED]', after: '[CHANGED]' } },
+      },
+    });
+    expect(JSON.stringify(event)).not.toContain(original.user.identity.email);
+    expect(
+      await suite.dataSource
+        .getRepository(ImageEntity)
+        .findOneBy({ storage_key: oldAvatar.storage_key }),
+    ).toBeNull();
+    const deletion = jest
+      .spyOn(storage, 'deleteObject')
+      .mockRejectedValueOnce(new Error('provider unavailable'));
+    await expect(drainStorageCleanup(app)).rejects.toThrow();
+    expect(storage.objects.has(oldAvatar.storage_key)).toBe(true);
+    const intent = await suite.dataSource
+      .getRepository(StorageDeletionIntentEntity)
+      .findOneByOrFail({ storage_key: oldAvatar.storage_key });
+    expect(intent).toMatchObject({ state: 'pending', attempts: 1 });
+
+    const replacement = await authenticated();
+    expect(replacement.user.id).not.toBe(original.user.id);
+    expect(replacement.user.identity.email).toBe(original.user.identity.email);
+    const newest = await replacement.agent
+      .post(`${ACCOUNT}/profile/avatar`)
+      .set(replacement.headers)
+      .attach('avatar', PNG, 'replacement.png')
+      .expect(201);
+    const newAvatar = newest.body.profile.media.avatar;
+    await drainStorageCleanup(app);
+    expect(deletion).toHaveBeenCalledTimes(2);
+    expect(storage.objects.has(oldAvatar.storage_key)).toBe(false);
+    expect(storage.objects.has(newAvatar.storage_key)).toBe(true);
+    const current = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: replacement.user.id });
+    expect(current.status.key).toBe('active');
+    expect(current.metadata.deleted_at).toBeNull();
+    expect(current.profile.media.avatar?.storage_key).toBe(
+      newAvatar.storage_key,
+    );
+  });
+
+  it('rolls back self-deletion and its avatar/email changes if the success audit fails', async () => {
+    const auth = await authenticated();
+    const uploaded = await auth.agent
+      .post(`${ACCOUNT}/profile/avatar`)
+      .set(auth.headers)
+      .attach('avatar', PNG, 'audit-rollback.png')
+      .expect(201);
+    const key = uploaded.body.profile.media.avatar.storage_key as string;
+    const audit = jest
+      .spyOn(app.get(AuditService), 'record')
+      .mockRejectedValueOnce(new Error('audit unavailable'));
+    const remove = () =>
+      auth.agent
+        .post(`${ACCOUNT}/delete`)
+        .set(auth.headers)
+        .send({ password: 'Valid!Pass1' });
+    await remove().expect(500);
+    audit.mockRestore();
+    const current = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: auth.user.id });
+    expect(current.status.key).toBe('active');
+    expect(current.metadata.deleted_at).toBeNull();
+    expect(current.identity.email).toBe(auth.user.identity.email);
+    expect(current.identity.password).toBeTruthy();
+    expect(current.profile.media.avatar?.storage_key).toBe(key);
+    expect(storage.objects.has(key)).toBe(true);
+    expect(
+      await suite.dataSource.getRepository(StorageDeletionIntentEntity).count(),
+    ).toBe(0);
+    const events = suite.dataSource.getRepository(AuditEventEntity);
+    const where = {
+      event: 'identity.account.deleted',
+      subject_id: auth.user.id,
+    };
+    expect(await events.countBy(where)).toBe(0);
+    await remove().expect(204);
+    expect(await events.countBy(where)).toBe(1);
+    await remove().expect(404);
+    expect(await events.countBy(where)).toBe(1);
+  });
+
+  it('requires authentication and soft deletes the current account while preserving historical data', async () => {
     await request(app.getHttpServer())
       .patch(`${ACCOUNT}/profile`)
       .send({})
@@ -554,6 +700,18 @@ describe('authenticated account profile lifecycle', () => {
       await suite.dataSource
         .getRepository(UserEntity)
         .findOneBy({ id: auth.user.id }),
-    ).toBeNull();
+    ).toMatchObject({
+      metadata: { deleted_at: expect.any(Date) },
+      identity: { password: null },
+      profile: {
+        name: auth.user.profile.name,
+        personal: auth.user.profile.personal,
+        region: auth.user.profile.region,
+        media: { avatar: null },
+      },
+      status: { key: 'deleted' },
+      roles: [],
+    });
+    await auth.agent.get(`${ACCOUNT}/profile`).set(auth.headers).expect(404);
   });
 });

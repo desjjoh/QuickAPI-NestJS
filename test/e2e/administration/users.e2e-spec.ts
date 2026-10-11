@@ -307,7 +307,10 @@ describe('user administration authorization and lifecycle', () => {
       await suite.dataSource
         .getRepository(UserEntity)
         .findOneBy({ id: target.id }),
-    ).toBeNull();
+    ).toMatchObject({
+      metadata: { deleted_at: expect.any(Date) },
+      identity: { password: null },
+    });
   });
 
   it('replays keyed updates without reapplying an older action over a newer one', async () => {
@@ -576,7 +579,7 @@ describe('user administration authorization and lifecycle', () => {
     return { key, image };
   }
 
-  it('replays concurrent deletion as bodyless 204 with one retained audit and one storage cleanup', async () => {
+  it('replays concurrent deletion as bodyless 204 with one retained audit and one durable avatar cleanup', async () => {
     const admin = await register('delete-replay-admin@example.test');
     const target = await register('delete-replay-target@example.test');
     await grant(admin, 'e2e-idempotent-delete', ['delete_users']);
@@ -602,7 +605,10 @@ describe('user administration authorization and lifecycle', () => {
       await suite.dataSource
         .getRepository(UserEntity)
         .findOneBy({ id: target.id }),
-    ).toBeNull();
+    ).toMatchObject({
+      metadata: { deleted_at: expect.any(Date) },
+      identity: { password: null },
+    });
     expect(
       await suite.dataSource
         .getRepository(ImageEntity)
@@ -620,6 +626,31 @@ describe('user administration authorization and lifecycle', () => {
     expect(events).toHaveLength(1);
     expect(events[0].before).toMatchObject({ id: target.id });
     expect(events[0].actor_id).toBe(admin.id);
+    const tombstone = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: target.id });
+    expect(events[0]).toMatchObject({
+      subject_id: target.id,
+      resource_id: target.id,
+      before: {
+        status: { key: 'active' },
+        identity: { email: '[CHANGED]' },
+        metadata: { deleted_at: null },
+        profile: { media: { avatar_id: image.id } },
+      },
+      after: {
+        id: target.id,
+        status: { key: 'deleted' },
+        identity: { email: '[CHANGED]' },
+        metadata: { deleted_at: tombstone.metadata.deleted_at!.toISOString() },
+        profile: { media: { avatar_id: null } },
+      },
+      changes: {
+        profile: { media: { avatar_id: { before: image.id, after: null } } },
+        identity: { email: { before: '[CHANGED]', after: '[CHANGED]' } },
+      },
+    });
+    expect(JSON.stringify(events[0])).not.toContain(target.identity.email);
     const record = await suite.dataSource
       .getRepository(IdempotencyEntity)
       .findOneByOrFail({ operation: 'identity.administration.user.delete' });
@@ -661,7 +692,11 @@ describe('user administration authorization and lifecycle', () => {
       await suite.dataSource
         .getRepository(UserEntity)
         .findOneBy({ id: target.id }),
-    ).not.toBeNull();
+    ).toMatchObject({
+      identity: { email: target.identity.email },
+      status: { key: 'active' },
+      metadata: { deleted_at: null },
+    });
     expect(
       await suite.dataSource
         .getRepository(ImageEntity)
@@ -1073,7 +1108,10 @@ describe('user administration authorization and lifecycle', () => {
       .expect(204);
     await expect(
       suite.dataSource.getRepository(UserEntity).findOneBy({ id: target.id }),
-    ).resolves.toBeNull();
+    ).resolves.toMatchObject({
+      metadata: { deleted_at: expect.any(Date) },
+      identity: { password: null },
+    });
     const retained = await request(app.getHttpServer())
       .get(
         `${ROOT}/${target.id}/activity?event=${IdentityAuditEvents.ADMIN_USER_DELETED}`,
