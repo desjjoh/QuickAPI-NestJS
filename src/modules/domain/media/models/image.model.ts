@@ -73,7 +73,7 @@ export class ImageDto {
     this.alt_text = image.alt_text ?? null;
   }
 
-  private static buildPublicUrl(storageKey: string): string {
+  public static buildPublicUrl(storageKey: string): string {
     const baseUrl = env.R2_PUBLIC_BASE_URL!.replace(/\/$/, '');
     const normalizedKey = storageKey.replace(/^\/+/, '');
 

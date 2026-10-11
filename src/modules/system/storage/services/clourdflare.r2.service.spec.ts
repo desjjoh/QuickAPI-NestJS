@@ -26,12 +26,15 @@ describe('CloudflareStorageService', () => {
 
   it('uploads mapped content and returns normalized metadata', async () => {
     send.mockResolvedValue({});
+    const signal = AbortSignal.timeout(60000);
     const result = await new CloudflareStorageService().putObject({
       key: '/images/a.png',
       body: 'hello',
       contentType: 'image/png',
       metadata: { source: 'test' },
+      signal,
     });
+    expect(send.mock.calls[0][1]).toEqual({ abortSignal: signal });
     expect(send.mock.calls[0][0].input).toEqual({
       Bucket: 'bucket',
       Key: '/images/a.png',
@@ -65,11 +68,24 @@ describe('CloudflareStorageService', () => {
     },
   );
 
-  it('maps head success and any client error to existence', async () => {
+  it('maps head success and explicit not-found responses to existence', async () => {
     const service = new CloudflareStorageService();
     send.mockResolvedValueOnce({});
     await expect(service.objectExists('a')).resolves.toBe(true);
-    send.mockRejectedValueOnce(new Error('not found'));
+    send.mockRejectedValueOnce({ $metadata: { httpStatusCode: 404 } });
     await expect(service.objectExists('missing')).resolves.toBe(false);
   });
+
+  it.each([401, 403, 500, undefined])(
+    'does not mistake HEAD failure %s for a missing object',
+    async (status) => {
+      const error = Object.assign(new Error('provider unavailable'), {
+        $metadata: { httpStatusCode: status },
+      });
+      send.mockRejectedValueOnce(error);
+      await expect(
+        new CloudflareStorageService().objectExists('a'),
+      ).rejects.toBe(error);
+    },
+  );
 });

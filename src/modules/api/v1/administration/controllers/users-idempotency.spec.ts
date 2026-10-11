@@ -1,6 +1,7 @@
 import {
   ExecutionContext,
   ForbiddenException,
+  ConflictException,
   INestApplication,
   NotFoundException,
   UnauthorizedException,
@@ -23,19 +24,27 @@ describe('user administration idempotency HTTP contracts', () => {
   let permitted = true;
   let deleted = false;
   let status = 'active';
+  let version = 1;
   const id = '1234567890ABCDEF';
   const store = idempotencyTestStore();
   const service = {
     updateUser: jest.fn(
-      async (userId: string, body: { status_id?: string }) => {
+      async (
+        userId: string,
+        body: { status_id?: string; expected_version: number },
+      ) => {
+        if (body.expected_version !== version) throw new ConflictException();
         status = body.status_id ?? status;
-        return { id: userId, status };
+        return { id: userId, status, version: ++version };
       },
     ),
-    removeUser: jest.fn(async () => {
-      if (deleted) throw new NotFoundException();
-      deleted = true;
-    }),
+    removeUser: jest.fn(
+      async (_id: string, body: { expected_version: number }) => {
+        if (deleted) throw new NotFoundException();
+        if (body.expected_version !== version) throw new ConflictException();
+        deleted = true;
+      },
+    ),
   };
   beforeAll(async () => {
     const module = await Test.createTestingModule({
@@ -84,13 +93,18 @@ describe('user administration idempotency HTTP contracts', () => {
     permitted = true;
     deleted = false;
     status = 'active';
+    version = 1;
   });
   afterAll(async () => {
     await app?.close();
   });
   const update = (
     key: string,
-    body = { status_id: 'DISABLED12345678', reason_code: 'policy_enforcement' },
+    body = {
+      expected_version: 1,
+      status_id: 'DISABLED12345678',
+      reason_code: 'policy_enforcement',
+    },
     actor = 'admin',
   ) =>
     request(app.getHttpServer())
@@ -103,11 +117,12 @@ describe('user administration idempotency HTTP contracts', () => {
       .post(`/users/${id}/delete`)
       .set('Authorization', 'admin')
       .set('Idempotency-Key', 'remove')
-      .send({ reason_code: 'user_request' });
+      .send({ expected_version: 1, reason_code: 'user_request' });
 
   it('replays the original update without overwriting a later, distinct action', async () => {
     const original = await update('first').expect(200);
     const newer = {
+      expected_version: 2,
       status_id: 'ACTIVE1234567890',
       reason_code: 'access_review',
     };
@@ -125,13 +140,21 @@ describe('user administration idempotency HTTP contracts', () => {
       .post(`/users/${id}/delete`)
       .set('Authorization', 'admin')
       .set('Idempotency-Key', 'remove')
-      .send({ reason_code: 'policy_enforcement' })
+      .send({ expected_version: 1, reason_code: 'policy_enforcement' })
       .expect(409);
     expect(service.removeUser).toHaveBeenCalledTimes(1);
   });
   it('isolates actor scopes and still checks permissions and authentication before replay', async () => {
     await update('key').expect(200);
-    await update('key', undefined, 'other-admin').expect(200);
+    await update(
+      'key',
+      {
+        expected_version: 2,
+        status_id: 'DISABLED12345678',
+        reason_code: 'policy_enforcement',
+      },
+      'other-admin',
+    ).expect(200);
     await request(app.getHttpServer())
       .patch(`/users/${id}`)
       .set('Idempotency-Key', 'key')
@@ -143,6 +166,7 @@ describe('user administration idempotency HTTP contracts', () => {
   });
   it('does not retain invalid requests and leaves unkeyed actions unchanged', async () => {
     await update('invalid', {
+      expected_version: 1,
       status_id: 'bad',
       reason_code: 'policy_enforcement',
     }).expect(400);
@@ -151,7 +175,7 @@ describe('user administration idempotency HTTP contracts', () => {
       await request(app.getHttpServer())
         .patch(`/users/${id}`)
         .set('Authorization', 'admin')
-        .send({ reason_code: 'access_review' })
+        .send({ expected_version: attempt + 1, reason_code: 'access_review' })
         .expect(200);
     expect(service.updateUser).toHaveBeenCalledTimes(2);
     expect(store.rows.size).toBe(0);

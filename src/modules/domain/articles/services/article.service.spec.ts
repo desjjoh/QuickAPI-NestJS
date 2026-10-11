@@ -5,7 +5,11 @@ import {
 } from '@nestjs/common';
 
 import { ArticleEntity } from '../entities/article.entity';
-import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
+import {
+  TransactionLifecycle,
+  withApplicationTransaction,
+} from '@/common/helpers/transaction.helper';
+import type { EntityManager } from 'typeorm';
 import {
   ARTICLE_STATUS_KEYS,
   ArticleStatusKey,
@@ -75,7 +79,9 @@ describe('ArticleService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    manager.transaction.mockImplementation(async (work) => work(manager));
+    manager.transaction.mockImplementation(async (isolationOrWork, work) =>
+      (work ?? isolationOrWork)(manager),
+    );
     manager.create.mockImplementation((_entity, value) => ({
       ...value,
       content: { ...(value.content ?? {}) },
@@ -163,6 +169,72 @@ describe('ArticleService', () => {
     articleRepo.findById.mockResolvedValue(null);
     await expect(service.findByIdOrFail('missing')).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it('uses a repeatable-read transaction for each independent listing', async () => {
+    for (const method of [
+      'paginatePublished',
+      'paginateByAuthor',
+      'paginateForAdministration',
+    ])
+      articleRepo[method].mockResolvedValue([[], 0]);
+    await service.paginatePublished({} as never);
+    await service.paginateByAuthor('author-1', {} as never);
+    await service.paginateForAdministration({} as never);
+    expect(manager.transaction).toHaveBeenCalledTimes(3);
+    for (const call of manager.transaction.mock.calls)
+      expect(call).toEqual(['REPEATABLE READ', expect.any(Function)]);
+  });
+
+  it('reuses the supplied active transaction rather than opening a nested snapshot', async () => {
+    const snapshot = {
+      queryRunner: { isTransactionActive: true },
+      transaction: jest.fn(),
+    } as unknown as EntityManager;
+    articleRepo.paginatePublished.mockResolvedValue([[], 0]);
+    await service.paginatePublished({} as never, {}, snapshot);
+    expect(snapshot.transaction).not.toHaveBeenCalled();
+    expect(manager.transaction).not.toHaveBeenCalled();
+    expect(articleRepo.paginatePublished).toHaveBeenCalledWith(
+      snapshot,
+      {},
+      {},
+    );
+  });
+
+  it('uses the transaction callback manager and propagates query failure', async () => {
+    const snapshot = {
+      queryRunner: { isTransactionActive: true },
+    } as unknown as EntityManager;
+    manager.transaction.mockImplementation(async (_isolation, work) =>
+      work(snapshot),
+    );
+    const failure = new Error('Listing failed');
+    articleRepo.paginatePublished.mockRejectedValueOnce(failure);
+    await expect(service.paginatePublished({} as never)).rejects.toBe(failure);
+    expect(articleRepo.paginatePublished).toHaveBeenCalledWith(
+      snapshot,
+      {},
+      {},
+    );
+  });
+
+  it('joins an active application transaction without starting another transaction', async () => {
+    const snapshot = {
+      queryRunner: { isTransactionActive: true },
+      transaction: jest.fn(),
+    } as unknown as EntityManager;
+    articleRepo.paginatePublished.mockResolvedValue([[], 0]);
+    await withApplicationTransaction(snapshot, new TransactionLifecycle(), () =>
+      service.paginatePublished({} as never),
+    );
+    expect(manager.transaction).not.toHaveBeenCalled();
+    expect(snapshot.transaction).not.toHaveBeenCalled();
+    expect(articleRepo.paginatePublished).toHaveBeenCalledWith(
+      snapshot,
+      {},
+      {},
     );
   });
 

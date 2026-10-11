@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ArticleEntity } from '../entities/article.entity';
+import type { ArticleListRead } from './article-list.read-model';
 import {
   ArticleDto,
   ArticleListItemDto,
@@ -15,7 +16,7 @@ export class ArticleManagementListItemDto extends ArticleListItemDto {
   })
   public readonly version: number;
 
-  public constructor(article: ArticleEntity) {
+  public constructor(article: ArticleListRead) {
     super(article);
     this.version = article.version;
   }

@@ -6,10 +6,7 @@ import {
   PERMISSION_MATRIX,
   PermissionDomain,
 } from '@/config/permissions.config';
-import {
-  UserDto,
-  UserPaginationOptions,
-} from '@/modules/domain/identity/models/user.model';
+import { UserPaginationOptions } from '@/modules/domain/identity/models/user.model';
 import {
   Body,
   Controller,
@@ -28,6 +25,8 @@ import {
   ApiBearerAuth,
   ApiNotFoundResponse,
   ApiNoContentResponse,
+  ApiConflictResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { Permissions } from '@/common/decorators/permissions.decorator';
 import { EntityIdParam } from '@/common/decorators/id-param.decorator';
@@ -37,7 +36,8 @@ import { UserAdminService } from '../service/users.service';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
-import { AdministrationActionDto } from '../models/administration-action.model';
+import { UserAdministrationActionDto } from '../models/user-action.model';
+import { UserAdministrationDto } from '@/modules/domain/identity/models/user-administration.model';
 import { UserActivityAdminService } from '../service/user-activity.service';
 
 import {
@@ -61,18 +61,18 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'List paginated users',
     description:
-      'Returns a paginated set of user account records for administration, including identity, profile, roles, and permission data. Supports pagination, sorting, and search through query parameters.',
+      'Returns paginated user records with identity, profile, roles, permission data and the administration version required for edits/deletion. Supports pagination, sorting and search.',
   })
   @ApiOkResponse({
     description: 'Paginated user records returned successfully.',
-    type: PaginationDto<UserDto>,
+    type: PaginationDto<UserAdministrationDto>,
   })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].READ_USERS,
   )
   public async getPaginatedUsers(
     @Query() pageOptions: UserPaginationOptions,
-  ): Promise<PaginationDto<UserDto>> {
+  ): Promise<PaginationDto<UserAdministrationDto>> {
     return this.svc.paginateUsers(pageOptions);
   }
 
@@ -82,9 +82,16 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'Update a user account',
     description:
-      'Updates account status or replaces its roles and records the administration reason in the same transaction. An identical Idempotency-Key retry returns the original response without reapplying changes. Distinct actions remain last-write-wins; this endpoint does not yet require an expected version.',
+      'Updates account status or replaces roles using the required expected_version from an administration read. Stale actions return 409 without mutation or success audit. Successful actions advance version once, including no-op edits. An identical Idempotency-Key retry returns the original response without reapplying changes.',
   })
-  @ApiOkResponse({ type: UserDto })
+  @ApiOkResponse({ type: UserAdministrationDto })
+  @ApiConflictResponse({
+    description:
+      'Stale expected_version, changed keyed payload, or overlapping keyed request.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description: 'A valid expected_version and reason_code are required.',
+  })
   @Permissions(
     PERMISSION_MATRIX[PermissionDomain.USER_ADMINISTRATION].UPDATE_USERS,
   )
@@ -92,7 +99,7 @@ export class UserAdministrationController {
   public async updateUserById(
     @Param('id', NanoIdParamPipe) id: string,
     @Body() dto: UpdateUserAdministrationDto,
-  ): Promise<UserDto> {
+  ): Promise<UserAdministrationDto> {
     return this.svc.updateUser(id, dto);
   }
 
@@ -101,11 +108,11 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'Get user by ID',
     description:
-      'Returns a single user account record for administration, including identity, profile, roles, and permission data.',
+      'Returns a user administration record with identity, profile, roles, permission data and version. Send version as expected_version for updates or deletion.',
   })
   @ApiOkResponse({
     description: 'User record returned successfully.',
-    type: UserDto,
+    type: UserAdministrationDto,
   })
   @ApiNotFoundResponse({
     description: 'No user was found for the provided ID.',
@@ -116,7 +123,7 @@ export class UserAdministrationController {
   @EntityIdParam
   public async getUserById(
     @Param('id', NanoIdParamPipe) id: string,
-  ): Promise<UserDto> {
+  ): Promise<UserAdministrationDto> {
     return this.svc.findUser(id);
   }
 
@@ -147,7 +154,14 @@ export class UserAdministrationController {
   @ApiOperation({
     summary: 'Delete user',
     description:
-      'Permanently deletes a user account by ID through user administration. This operation performs account cleanup before deletion, including removal of account-owned profile resources such as avatar and address data where applicable.',
+      'Permanently deletes a user account using expected_version from an administration read and a controlled reason. Stale actions return 409 before cleanup or deletion. Cleanup and the success audit share the transaction; identical keyed retries replay the original bodyless 204 after deletion.',
+  })
+  @ApiConflictResponse({
+    description:
+      'Stale expected_version, changed keyed payload, or overlapping keyed request.',
+  })
+  @ApiUnprocessableEntityResponse({
+    description: 'A valid expected_version and reason_code are required.',
   })
   @EntityIdParam
   @ApiNoContentResponse({
@@ -162,7 +176,7 @@ export class UserAdministrationController {
   )
   public async removeUserById(
     @Param('id', NanoIdParamPipe) id: string,
-    @Body() dto: AdministrationActionDto,
+    @Body() dto: UserAdministrationActionDto,
   ): Promise<void> {
     return this.svc.removeUser(id, dto);
   }

@@ -1,7 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { posix, parse } from 'path';
-
 import { Base } from '@/common/models/base.model';
 import { removeTemporaryUpload } from '@/common/helpers/upload-cleanup.helper';
 import {
@@ -9,13 +7,16 @@ import {
   type ValidatedImage,
 } from '../policies/image-upload.policy';
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
-import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
+import {
+  TransactionLifecycle,
+  runInTransaction,
+} from '@/common/helpers/transaction.helper';
 import { InvalidOperationError } from '@/common/errors/operation.error';
-import { logger } from '@/config/logger.config';
 
 import { ImageEntity } from '../entities/image.entity';
 import { ImageRepository } from '../repositories/image.repository';
-import { StorageService } from '@/modules/system/storage/types/storage.types';
+import { StorageCleanupService } from '@/modules/system/storage-cleanup/services/storage-cleanup.service';
+import { StorageUploadService } from '@/modules/system/storage/services/storage-upload.service';
 import type { DeepPartial, EntityManager } from 'typeorm';
 
 export type CreateImageInput = {
@@ -33,18 +34,12 @@ export type UpdateImageInput = {
   folder: string;
 };
 
-type StoredFileResult = {
-  storage_key: string;
-  filename: string;
-};
-
-const storageDeleteAttempts = 3;
-
 @Injectable()
 export class ImageService {
   public constructor(
     private readonly imgRepo: ImageRepository,
-    private readonly storageSvc: StorageService,
+    private readonly uploads: StorageUploadService,
+    private readonly cleanup: StorageCleanupService,
   ) {}
 
   public async findById(
@@ -64,34 +59,33 @@ export class ImageService {
     manager: EntityManager = this.imgRepo.manager,
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
+    if (!lifecycle)
+      return runInTransaction(manager, (manager, lifecycle) =>
+        this.create(input, manager, lifecycle),
+      );
     const metadata = await this.prepareImage(input.file, manager, lifecycle);
-    const storedFile = await this.storeFile(input.file, input.folder, metadata);
-    const cancelRollback = lifecycle?.afterRollback(() =>
-      this.removeStoredFile(storedFile.storage_key),
-    );
+    const storedFile = await this.uploads.upload({
+      originalName: input.file.originalname,
+      folder: input.folder,
+      ...metadata,
+    });
+    lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
+    await this.uploads.attach(manager, storedFile.storage_key);
+    const payload: Base<ImageEntity> = {
+      storage_key: storedFile.storage_key,
+      filename: storedFile.filename,
+      size_bytes: metadata.buffer.length,
+      width: metadata.width,
+      height: metadata.height,
+      mime_type: metadata.mimeType,
+      alt_text: input.alt_text ?? null,
+      decorative: input.decorative ?? false,
+    };
 
-    try {
-      const payload: Base<ImageEntity> = {
-        storage_key: storedFile.storage_key,
-        filename: storedFile.filename,
-        size_bytes: metadata.buffer.length,
-        width: metadata.width,
-        height: metadata.height,
-        mime_type: metadata.mimeType,
-        alt_text: input.alt_text ?? null,
-        decorative: input.decorative ?? false,
-      };
+    const image = manager.create(ImageEntity, payload);
+    const created = await manager.save(ImageEntity, image);
 
-      const image = manager.create(ImageEntity, payload);
-      const created = await manager.save(ImageEntity, image);
-
-      return await manager.findOneByOrFail(ImageEntity, { id: created.id });
-    } catch (error) {
-      await this.compensateUpload(storedFile.storage_key, error);
-      cancelRollback?.();
-
-      throw error;
-    }
+    return await manager.findOneByOrFail(ImageEntity, { id: created.id });
   }
 
   public async update(
@@ -99,46 +93,50 @@ export class ImageService {
     manager: EntityManager = this.imgRepo.manager,
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
+    if (!lifecycle)
+      return runInTransaction(manager, (manager, lifecycle) =>
+        this.updateImage(input, manager, lifecycle),
+      );
+    return this.updateImage(input, manager, lifecycle);
+  }
+
+  private async updateImage(
+    input: UpdateImageInput,
+    manager: EntityManager,
+    lifecycle: TransactionLifecycle,
+  ): Promise<ImageEntity> {
     const previousStorageKey = input.image.storage_key;
     const metadata = await this.prepareImage(input.file, manager, lifecycle);
-    const storedFile = await this.storeFile(input.file, input.folder, metadata);
-    const cancelRollback = lifecycle?.afterRollback(() =>
-      this.removeStoredFile(storedFile.storage_key),
+    const storedFile = await this.uploads.upload({
+      originalName: input.file.originalname,
+      folder: input.folder,
+      ...metadata,
+    });
+    lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
+
+    await this.uploads.attach(manager, storedFile.storage_key);
+    const payload: Partial<Base<ImageEntity>> = {
+      storage_key: storedFile.storage_key,
+      filename: storedFile.filename,
+      size_bytes: metadata.buffer.length,
+      width: metadata.width,
+      height: metadata.height,
+      mime_type: metadata.mimeType,
+      alt_text: input.alt_text,
+      decorative: input.decorative,
+    };
+
+    const detachedImage = manager.create(
+      ImageEntity,
+      input.image as DeepPartial<ImageEntity>,
     );
-
-    let savedImage: ImageEntity;
-    try {
-      const payload: Partial<Base<ImageEntity>> = {
-        storage_key: storedFile.storage_key,
-        filename: storedFile.filename,
-        size_bytes: metadata.buffer.length,
-        width: metadata.width,
-        height: metadata.height,
-        mime_type: metadata.mimeType,
-        alt_text: input.alt_text,
-        decorative: input.decorative,
-      };
-
-      const detachedImage = manager.create(
-        ImageEntity,
-        input.image as DeepPartial<ImageEntity>,
-      );
-      const updatedImage = manager.merge(
-        ImageEntity,
-        detachedImage,
-        omitUndefinedDeep(payload),
-      );
-      savedImage = await manager.save(ImageEntity, updatedImage);
-    } catch (error) {
-      await this.compensateUpload(storedFile.storage_key, error);
-      cancelRollback?.();
-
-      throw error;
-    }
-
-    if (lifecycle)
-      lifecycle.afterCommit(() => this.removeStoredFile(previousStorageKey));
-    else await this.removeStoredFile(previousStorageKey);
+    const updatedImage = manager.merge(
+      ImageEntity,
+      detachedImage,
+      omitUndefinedDeep(payload),
+    );
+    const savedImage = await manager.save(ImageEntity, updatedImage);
+    await this.cleanup.schedule(manager, previousStorageKey, 'image_replaced');
 
     return savedImage;
   }
@@ -148,12 +146,13 @@ export class ImageService {
     manager: EntityManager = this.imgRepo.manager,
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
+    if (!lifecycle)
+      return runInTransaction(manager, (manager, lifecycle) =>
+        this.remove(image, manager, lifecycle),
+      );
     this.assertTransactionLifecycle(manager, lifecycle);
     await manager.delete(ImageEntity, { id: image.id });
-
-    if (lifecycle)
-      lifecycle.afterCommit(() => this.removeStoredFile(image.storage_key));
-    else await this.removeStoredFile(image.storage_key);
+    await this.cleanup.schedule(manager, image.storage_key, 'image_removed');
 
     return image;
   }
@@ -183,62 +182,5 @@ export class ImageService {
     }
     await removeTemporaryUpload(file);
     return image;
-  }
-
-  private async storeFile(
-    file: Express.Multer.File,
-    folder: string,
-    image: ValidatedImage,
-  ): Promise<StoredFileResult> {
-    const filename = `${parse(file.filename).name}${image.extension}`;
-    const storageKey = posix.join(folder, filename);
-    await this.storageSvc.putObject({
-      key: storageKey,
-      body: image.buffer,
-      contentType: image.mimeType,
-      metadata: {
-        filename,
-        originalName: file.originalname,
-      },
-    });
-
-    return {
-      storage_key: storageKey,
-      filename,
-    };
-  }
-
-  private async removeStoredFile(storageKey: string): Promise<void> {
-    let lastError: unknown;
-
-    for (let attempt = 1; attempt <= storageDeleteAttempts; attempt += 1) {
-      try {
-        await this.storageSvc.deleteObject({ key: storageKey });
-        return;
-      } catch (error) {
-        lastError = error;
-      }
-    }
-
-    logger.error(
-      { error: lastError, storageKey, attempts: storageDeleteAttempts },
-      `Storage cleanup failed after ${storageDeleteAttempts} attempts for ${storageKey}.`,
-    );
-    throw lastError;
-  }
-
-  private async compensateUpload(
-    storageKey: string,
-    originalError: unknown,
-  ): Promise<void> {
-    try {
-      await this.removeStoredFile(storageKey);
-    } catch (cleanupError) {
-      throw new AggregateError(
-        [originalError, cleanupError],
-        'Image persistence failed and the uploaded object could not be removed.',
-        { cause: originalError },
-      );
-    }
   }
 }

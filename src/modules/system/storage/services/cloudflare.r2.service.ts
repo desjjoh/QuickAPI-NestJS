@@ -37,6 +37,7 @@ export class CloudflareStorageService extends StorageService {
         ContentType: input.contentType,
         Metadata: input.metadata,
       }),
+      { abortSignal: input.signal },
     );
 
     return {
@@ -66,8 +67,14 @@ export class CloudflareStorageService extends StorageService {
       );
 
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (
+        (error as { $metadata?: { httpStatusCode?: number } }).$metadata
+          ?.httpStatusCode === 404
+      )
+        return false;
+      // An outage or denied access is not proof that an object is absent.
+      throw error;
     }
   }
 

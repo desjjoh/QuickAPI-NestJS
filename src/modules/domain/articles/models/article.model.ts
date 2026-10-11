@@ -2,12 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { BaseModel } from '@/common/models/base.model';
 import { PaginationMeta } from '@/common/models/pagination.model';
-import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { ImageDto } from '@/modules/domain/media/models/image.model';
 
 import { ArticleEntity } from '../entities/article.entity';
-import { ArticleStatusEntity } from '../entities/articleStatus.entity';
+import type {
+  ArticleAuthorRead,
+  ArticleImageRead,
+  ArticleListRead,
+} from './article-list.read-model';
 
 export class ArticleImageDto {
   @ApiProperty({
@@ -48,9 +50,9 @@ export class ArticleImageDto {
   })
   public readonly decorative: boolean;
 
-  public constructor(image: ImageEntity) {
+  public constructor(image: ArticleImageRead) {
     this.id = image.id;
-    this.url = new ImageDto(image).url;
+    this.url = ImageDto.buildPublicUrl(image.storage_key);
     this.width = image.width;
     this.height = image.height;
     this.altText = image.alt_text ?? null;
@@ -80,7 +82,7 @@ export class ArticleAuthorDto {
   })
   public readonly avatar: ArticleImageDto | null;
 
-  public constructor(user: UserEntity) {
+  public constructor(user: ArticleAuthorRead) {
     const preferred = user.profile.name.preferred?.trim();
 
     this.id = user.id;
@@ -108,7 +110,7 @@ export class ArticleStatusDto {
   })
   public readonly label: string;
 
-  public constructor(status: ArticleStatusEntity) {
+  public constructor(status: ArticleListRead['publication']['status']) {
     this.key = status.key;
     this.label = status.label;
   }
@@ -155,7 +157,7 @@ export class ArticleListItemDto extends BaseModel {
   })
   public readonly publishedAt: Date | null;
 
-  public constructor(article: ArticleEntity) {
+  public constructor(article: ArticleListRead) {
     super(article);
 
     this.title = article.content.title;

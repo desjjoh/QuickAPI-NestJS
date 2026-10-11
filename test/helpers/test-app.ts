@@ -11,6 +11,7 @@ import {
 } from './database/test-database';
 import { QueueEventsProvider } from '@/common/providers/queue.provider';
 import { EmailOutboxDispatcher } from '@/modules/system/email/services/email-outbox-dispatcher.service';
+import { StorageCleanupDispatcher } from '@/modules/system/storage-cleanup/services/storage-cleanup-dispatcher.service';
 
 export async function createTestApp(
   configure?: (builder: TestingModuleBuilder) => TestingModuleBuilder,
@@ -28,6 +29,7 @@ export async function createTestApp(
   builder = builder.overrideProvider(QueueEventsProvider).useValue({});
   // Outbox delivery is exercised explicitly in its disposable-database suite.
   builder = builder.overrideProvider(EmailOutboxDispatcher).useValue({});
+  builder = builder.overrideProvider(StorageCleanupDispatcher).useValue({});
 
   if (configure) builder = configure(builder);
   const moduleRef = await builder.compile();

@@ -3,10 +3,21 @@ import { getOptionsToken } from '@nestjs/throttler';
 import { mkdir, rm, readdir } from 'node:fs/promises';
 import request from 'supertest';
 import { jest } from '@jest/globals';
-import type { Logger } from 'typeorm';
+import {
+  SelectQueryBuilder,
+  type Logger,
+  type FindOptionsWhere,
+} from 'typeorm';
 import { Order, PaginationOptions } from '@/common/models/pagination.model';
 import { ArticleRepository } from '@/modules/domain/articles/repositories/article.repository';
 import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
+import { ArticleService } from '@/modules/domain/articles/services/article.service';
+import type {
+  ArticleListPage,
+  ArticleListRead,
+} from '@/modules/domain/articles/models/article-list.read-model';
+import { ArticleListItemDto } from '@/modules/domain/articles/models/article.model';
+import { ArticleManagementListItemDto } from '@/modules/domain/articles/models/article-management.model';
 
 import { env } from '@/config/environment.config';
 import { ArticleAuditEvents } from '@/config/audit-events.config';
@@ -14,7 +25,9 @@ import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
+import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
+import { drainStorageCleanup } from '../../helpers/storage-cleanup';
 import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
 import { EmailService } from '@/modules/system/email/services/email.service';
@@ -191,6 +204,28 @@ describe('article API lifecycle', () => {
       },
     ];
     try {
+      suite.dataSource.logger = capture;
+      await articles.findAndCount({
+        where: { publication: { status: { key: 'published' } } },
+        order: { publication: { publishedAt: 'ASC' }, id: 'ASC' },
+        take: 25,
+      });
+      suite.dataSource.logger = originalLogger;
+      const baselineSql = statements.find((statement) =>
+        statement.sql.startsWith('SELECT DISTINCT'),
+      );
+      expect(baselineSql).toBeDefined();
+      const baselinePlan = JSON.parse(
+        (
+          await suite.dataSource.query(
+            `EXPLAIN FORMAT=JSON ${baselineSql!.sql}`,
+            baselineSql!.parameters,
+          )
+        )[0].EXPLAIN,
+      ) as unknown;
+      const baselineTables = planNodes(baselinePlan).filter(
+        (node) => typeof node.table_name === 'string',
+      ).length;
       for (const order of [Order.ASC, Order.DESC]) {
         for (const scenario of cases) {
           statements.length = 0;
@@ -200,22 +235,47 @@ describe('article API lifecycle', () => {
           );
           suite.dataSource.logger = originalLogger;
           expect(rows).toHaveLength(25);
-          // Use the ORM's actual DISTINCT/eager-join pagination query, not an idealized SELECT.
-          const sql = statements.find(
-            (statement) =>
-              statement.sql.startsWith('SELECT DISTINCT') &&
-              statement.sql.includes('FROM `articles`'),
+          // The actual count, ID page, and display queries must remain bounded.
+          expect(statements).toHaveLength(3);
+          const [countSql, sql, displaySql] = statements;
+          expect(countSql.sql).toMatch(/COUNT\(/);
+          expect(sql.sql).toMatch(/LIMIT 25/);
+          expect(sql.sql).not.toMatch(
+            /DISTINCT|user_profiles|user_roles|permissions|images/,
           );
-          expect(sql).toBeDefined();
+          expect(countSql.sql).not.toMatch(
+            /user_profiles|user_roles|permissions|images/,
+          );
+          expect(displaySql.sql).not.toMatch(
+            /user_roles|permissions|publisher|password|email|`body`/,
+          );
+          expect(displaySql.sql).toMatch(/ IN \(/);
           const explain = await suite.dataSource.query(
-            `EXPLAIN FORMAT=JSON ${sql!.sql}`,
-            sql!.parameters,
+            `EXPLAIN FORMAT=JSON ${sql.sql}`,
+            sql.parameters,
           );
           const plan = JSON.parse(explain[0].EXPLAIN) as unknown;
           const nodes = planNodes(plan);
-          const access = nodes.filter(
-            (node) => node.table_name === 'ArticleEntity',
-          );
+          const access = nodes.filter((node) => node.table_name === 'article');
+          expect(
+            nodes.filter((node) => typeof node.table_name === 'string').length,
+          ).toBeLessThanOrEqual(2);
+          expect(
+            nodes.filter((node) => typeof node.table_name === 'string').length,
+          ).toBeLessThan(baselineTables);
+          const displayPlan = JSON.parse(
+            (
+              await suite.dataSource.query(
+                `EXPLAIN FORMAT=JSON ${displaySql.sql}`,
+                displaySql.parameters,
+              )
+            )[0].EXPLAIN,
+          ) as unknown;
+          expect(
+            planNodes(displayPlan).some(
+              (node) => node.table_name === 'article' && node.key === 'PRIMARY',
+            ),
+          ).toBe(true);
           if (scenario.index) {
             // Statistics can make MySQL choose another index with the same filter prefix.
             // Check eligibility and indexed filtering, not a particular optimizer decision.
@@ -334,13 +394,13 @@ describe('article API lifecycle', () => {
       summary = 'Neutral summary',
       body = 'Neutral body',
       status = 'published',
-      authorId = author.id,
+      authorId: string | null = author.id,
     ) => {
       const article = await articles.save(
         articles.create({
           content: { title, summary, body },
           media: { hero: { id: hero.id } },
-          attribution: { author: { id: authorId } },
+          attribution: { author: authorId ? { id: authorId } : null },
           publication: {
             status: {
               id: statuses.find((candidate) => candidate.key === status)!.id,
@@ -357,6 +417,17 @@ describe('article API lifecycle', () => {
     const accented = await add('Café handbook');
     const phrase = await add('Alpha beta guide');
     await add('Body-only fixture', 'Neutral summary', 'bodyexclusive');
+    await add(
+      'Unassigned byline',
+      'Neutral summary',
+      'Neutral body',
+      'published',
+      null,
+    );
+    // One byline has an avatar; the other does not. Both must match the old DTO.
+    await suite.dataSource
+      .getRepository(UserProfileEntity)
+      .update(author.profile.id, { media: { avatar: { id: hero.id } } });
     const scopeIds: Record<string, string[]> = {};
     for (const owner of [author, other]) {
       for (const status of ['published', 'submitted', 'archived']) {
@@ -438,12 +509,114 @@ describe('article API lifecycle', () => {
       [publicResults, expectedPublic],
       [creatorResults, scopeIds[`${author.id}:submitted`]],
       [administrationResults, scopeIds[`${author.id}:submitted`]],
-    ] as Array<[[ArticleEntity[], number], string[]]>) {
+    ] as Array<[ArticleListPage, string[]]>) {
       expect(result[0].map((article) => article.id).sort()).toEqual(
         [...ids].sort(),
       );
       expect(result[1]).toBe(ids.length);
     }
+
+    const scenarios: Array<{
+      public: boolean;
+      scope: FindOptionsWhere<ArticleEntity>;
+      run: (page: PaginationOptions) => Promise<ArticleListPage>;
+    }> = [
+      {
+        public: true,
+        scope: { publication: { status: { key: 'published' } } },
+        run: (page) =>
+          repository.paginatePublished(suite.dataSource.manager, page),
+      },
+      {
+        public: false,
+        scope: { attribution: { author: { id: author.id } } },
+        run: (page) =>
+          repository.paginateByAuthor(
+            suite.dataSource.manager,
+            author.id,
+            page,
+          ),
+      },
+      {
+        public: false,
+        scope: {
+          publication: { status: { key: 'submitted' } },
+          attribution: { author: { id: author.id } },
+        },
+        run: (page) =>
+          repository.paginateForAdministration(suite.dataSource.manager, page, {
+            statusKey: 'submitted',
+            authorId: author.id,
+          }),
+      },
+    ];
+    // Compare the unchanged API projection to the former eager pagination path.
+    for (const scenario of scenarios) {
+      for (const order of [Order.ASC, Order.DESC]) {
+        for (const pageNumber of [1, 2, 50]) {
+          const page = Object.assign(new PaginationOptions(), {
+            order,
+            take: 2,
+            page: pageNumber,
+          });
+          const [expected, total] = await articles.findAndCount({
+            where: scenario.scope,
+            take: page.take,
+            skip: page.skip,
+            order: scenario.public
+              ? { publication: { publishedAt: order }, id: order }
+              : { createdAt: order, id: order },
+          });
+          const [actual, count] = await scenario.run(page);
+          const project = (row: ArticleListRead) =>
+            scenario.public
+              ? new ArticleListItemDto(row)
+              : new ArticleManagementListItemDto(row);
+          expect(actual.map(project)).toEqual(expected.map(project));
+          expect(count).toBe(total);
+          for (const row of actual) {
+            expect(row.content).not.toHaveProperty('body');
+            expect(row.publication).not.toHaveProperty('publisher');
+            if (row.attribution.author) {
+              expect(row.attribution.author).not.toHaveProperty('identity');
+              expect(row.attribution.author).not.toHaveProperty('roles');
+            }
+          }
+        }
+      }
+    }
+
+    // Change status on another connection after COUNT has established the snapshot.
+    const originalCount = SelectQueryBuilder.prototype.getCount;
+    const countSpy = jest
+      .spyOn(SelectQueryBuilder.prototype, 'getCount')
+      .mockImplementationOnce(async function () {
+        const count = await originalCount.call(this);
+        await articles.update(literal, {
+          content: { title: 'Changed title' },
+          publication: {
+            status: {
+              id: statuses.find((status) => status.key === 'archived')!.id,
+            },
+          },
+        });
+        return count;
+      });
+    try {
+      const [snapshot, count] = await app
+        .get(ArticleService)
+        .paginatePublished(new PaginationOptions(), { search: '%' });
+      expect(count).toBe(1);
+      expect(snapshot.map((row) => row.id)).toEqual([literal]);
+      expect(snapshot[0].content.title).toContain('100%');
+    } finally {
+      countSpy.mockRestore();
+    }
+    expect(
+      await app
+        .get(ArticleService)
+        .paginatePublished(new PaginationOptions(), { search: '%' }),
+    ).toEqual([[], 0]);
   }, 30_000);
 
   async function assignRole(user: UserEntity, key: ROLE_KEYS): Promise<void> {
@@ -929,6 +1102,7 @@ describe('article API lifecycle', () => {
         contentType: 'image/png',
       })
       .expect(200);
+    await drainStorageCleanup(app);
     const replacementStorageKey = [...storage.objects.keys()][0];
     expect(replaced.body.hero).toMatchObject({
       id: firstHeroId,
@@ -1156,6 +1330,8 @@ describe('article API lifecycle', () => {
       insertion.mockRestore();
     }
 
+    expect(storage.objects.size).toBe(1);
+    await drainStorageCleanup(app);
     expect(storage.objects.size).toBe(0);
     expect(await suite.dataSource.getRepository(ArticleEntity).count()).toBe(0);
     expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(0);
@@ -1196,6 +1372,8 @@ describe('article API lifecycle', () => {
       .findOneByOrFail({ id: articleId });
     expect(stored.media.hero.storage_key).toBe(oldStorageKey);
     expect(stored.version).toBe(created.body.version);
+    expect(storage.objects.size).toBe(2);
+    await drainStorageCleanup(app);
     expect([...storage.objects.keys()]).toEqual([oldStorageKey]);
     expect(
       await suite.dataSource.getRepository(AuditEventEntity).existsBy({

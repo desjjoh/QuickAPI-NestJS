@@ -23,9 +23,11 @@ import {
   ApiUnprocessableEntityResponse,
   ApiTags,
   ApiConflictResponse,
+  ApiServiceUnavailableResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
+import { STORAGE_UPLOAD_RETRY_DESCRIPTION } from '@/modules/system/storage/types/storage-upload.contract';
 
 import { imageUploadPolicy } from '@/config/image-upload.config';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -122,6 +124,9 @@ export class CreatorArticleController {
       'Article content and a PNG, JPEG, or GIF hero no larger than 5 MB, 8192 pixels per side, or 40 million pixels across all frames.',
   })
   @ApiCreatedResponse({ type: ArticleManagementDto })
+  @ApiServiceUnavailableResponse({
+    description: STORAGE_UPLOAD_RETRY_DESCRIPTION,
+  })
   @ApiUnprocessableEntityResponse({
     description:
       'Article content or hero accessibility metadata failed validation.',
@@ -180,6 +185,9 @@ export class CreatorArticleController {
 
   @Put(':id/hero')
   @Idempotent('articles.hero.replace')
+  @ApiServiceUnavailableResponse({
+    description: STORAGE_UPLOAD_RETRY_DESCRIPTION,
+  })
   @UseGuards(CsrfGuard)
   @Throttle({ default: throttlePolicies.fileUpload })
   @Permissions(

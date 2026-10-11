@@ -1,5 +1,12 @@
-import { applicationManager } from '@/common/helpers/transaction.helper';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  applicationManager,
+  runInTransaction,
+} from '@/common/helpers/transaction.helper';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 
 import { AccountStatusKey } from '@/config/statuses.config';
@@ -12,8 +19,10 @@ import { UserRepository } from '../repositories/user.repository';
 import { IdentityReferenceService } from './identity-reference.service';
 import { RefreshService } from './refresh.service';
 import { UserService } from './user.service';
+import { assertUserAdministrationVersion } from '../policies/user-administration-version.policy';
 
 export type UpdateUserAdministrationInput = {
+  expected_version: number;
   status_id?: string;
   role_ids?: string[];
 };
@@ -68,34 +77,50 @@ export class UserAdministrationService {
     input: UpdateUserAdministrationInput,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
-    const status = input.status_id
-      ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
-      : null;
+    return runInTransaction(manager, async (manager) => {
+      assertUserAdministrationVersion(user, input.expected_version);
+      const status = input.status_id
+        ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
+        : null;
 
-    if (input.status_id && !status)
-      throw new BadRequestException('Account status not found.');
+      if (input.status_id && !status)
+        throw new BadRequestException('Account status not found.');
 
-    const roles = input.role_ids
-      ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })
-      : null;
+      const roles = input.role_ids
+        ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })
+        : null;
 
-    if (roles && roles.length !== new Set(input.role_ids).size)
-      throw new BadRequestException('One or more roles were not found.');
+      if (roles && roles.length !== new Set(input.role_ids).size)
+        throw new BadRequestException('One or more roles were not found.');
 
-    if (status)
-      await manager
-        .createQueryBuilder()
-        .relation(UserEntity, 'status')
-        .of(user.id)
-        .set(status.id);
+      const revision = await manager.increment(
+        UserEntity,
+        {
+          id: user.id,
+          administration_version: input.expected_version,
+        },
+        'administration_version',
+        1,
+      );
+      if (revision.affected !== 1)
+        throw new ConflictException(
+          'User administration state has changed. Reload the user before retrying.',
+        );
+      if (status)
+        await manager
+          .createQueryBuilder()
+          .relation(UserEntity, 'status')
+          .of(user.id)
+          .set(status.id);
 
-    if (roles)
-      await manager
-        .createQueryBuilder()
-        .relation(UserEntity, 'roles')
-        .of(user.id)
-        .addAndRemove(roles, user.roles ?? []);
+      if (roles)
+        await manager
+          .createQueryBuilder()
+          .relation(UserEntity, 'roles')
+          .of(user.id)
+          .addAndRemove(roles, user.roles ?? []);
 
-    return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+      return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+    });
   }
 }

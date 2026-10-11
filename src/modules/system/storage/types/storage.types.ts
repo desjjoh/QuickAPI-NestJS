@@ -3,6 +3,7 @@ export interface PutStorageObjectInput {
   body: Buffer | Uint8Array | string;
   contentType: string;
   metadata?: Record<string, string>;
+  signal?: AbortSignal;
 }
 
 export interface DeleteStorageObjectInput {

@@ -65,6 +65,9 @@ class Identity {
 
 @Entity('users')
 export class UserEntity extends BaseEntity {
+  @Column({ type: 'int', unsigned: true, default: 1 })
+  public readonly administration_version!: number;
+
   @Column(() => Identity, { prefix: false })
   public readonly identity!: Identity;
 

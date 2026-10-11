@@ -17,17 +17,16 @@ import {
 } from '@/common/models/pagination.model';
 
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
-import {
-  UserDto,
-  UserPaginationOptions,
-} from '@/modules/domain/identity/models/user.model';
+import { UserPaginationOptions } from '@/modules/domain/identity/models/user.model';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserAdministrationService } from '@/modules/domain/identity/services/user-administration.service';
 import { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
 
 import { UpdateUserAdministrationDto } from '../models/update-user.model';
-import { AdministrationActionDto } from '../models/administration-action.model';
+import { UserAdministrationActionDto } from '../models/user-action.model';
+import { UserAdministrationDto } from '@/modules/domain/identity/models/user-administration.model';
+import { assertUserAdministrationVersion } from '@/modules/domain/identity/policies/user-administration-version.policy';
 
 @Injectable()
 export class UserAdminService {
@@ -41,25 +40,26 @@ export class UserAdminService {
 
   public async paginateUsers(
     pageOptions: UserPaginationOptions,
-  ): Promise<PaginationDto<UserDto>> {
+  ): Promise<PaginationDto<UserAdministrationDto>> {
     const [response, itemCount] = await this.userSvc.paginate(pageOptions);
 
     return new PaginationDto(
-      response.map((e: UserEntity) => new UserDto(e)),
+      response.map((e: UserEntity) => new UserAdministrationDto(e)),
       new PaginationMeta({ pageOptions, itemCount }),
     );
   }
 
-  public async findUser(id: string): Promise<UserDto> {
-    return new UserDto(await this.userSvc.findByIdOrFail(id));
+  public async findUser(id: string): Promise<UserAdministrationDto> {
+    return new UserAdministrationDto(await this.userSvc.findByIdOrFail(id));
   }
 
   public async removeUser(
     id: string,
-    dto: AdministrationActionDto,
+    dto: UserAdministrationActionDto,
   ): Promise<void> {
     await this.userSvc.transaction(async (manager, lifecycle) => {
       const before = await this.lockUser(manager, id);
+      assertUserAdministrationVersion(before, dto.expected_version);
       const beforeSnapshot = this.auditSnapshot(before);
       await this.lifecycle.deleteUser(before, manager, lifecycle);
       await this.audit.record(
@@ -78,9 +78,10 @@ export class UserAdminService {
   public async updateUser(
     id: string,
     dto: UpdateUserAdministrationDto,
-  ): Promise<UserDto> {
+  ): Promise<UserAdministrationDto> {
     const user = await this.userSvc.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
+      assertUserAdministrationVersion(before, dto.expected_version);
       const beforeSnapshot = this.auditSnapshot(before);
       const after = await this.userAdministration.updateAdministration(
         before,
@@ -99,7 +100,7 @@ export class UserAdminService {
       );
       return after;
     });
-    return new UserDto(user);
+    return new UserAdministrationDto(user);
   }
 
   /** The pessimistic read makes the captured before value part of the mutation transaction. */
@@ -143,6 +144,7 @@ export class UserAdminService {
   private auditSnapshot(user: UserEntity) {
     return {
       id: user.id,
+      version: user.administration_version,
       status: { id: user.status.id },
       roles: user.roles?.map(({ id }) => id) ?? [],
     };

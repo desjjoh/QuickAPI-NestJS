@@ -36,6 +36,7 @@ export const userFixture = (
 ): UserEntity =>
   ({
     id: 'user-1',
+    administration_version: 1,
     createdAt: timestamp,
     updatedAt: timestamp,
     identity: { email: 'person@example.test', password: 'hash' },

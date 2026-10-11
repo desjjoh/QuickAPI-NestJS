@@ -1,16 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
 import { ImageEntity } from './entities/image.entity';
-
 import { ImageService } from './services/image.service';
 import { ImageRepository } from './repositories/image.repository';
-import { TemporaryUploadCleanupService } from './services/temporary-upload-cleanup.service';
 import { StorageModule } from '@/modules/system/storage/storage.module';
+import { StorageCleanupModule } from '@/modules/system/storage-cleanup/storage-cleanup.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ImageEntity]), StorageModule],
-  providers: [ImageService, ImageRepository, TemporaryUploadCleanupService],
+  imports: [
+    TypeOrmModule.forFeature([ImageEntity]),
+    StorageModule,
+    StorageCleanupModule.register(ImageRepository),
+  ],
+  providers: [ImageService, ImageRepository],
   exports: [ImageService],
 })
 export class MediaModule {}

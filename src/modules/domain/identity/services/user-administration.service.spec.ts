@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
@@ -11,6 +11,7 @@ import { UserAdministrationService } from './user-administration.service';
 describe('UserAdministrationService', () => {
   const user = {
     id: 'user-1',
+    administration_version: 1,
     roles: [{ id: 'old-role', key: 'old' }],
   };
   const relation = {
@@ -24,6 +25,8 @@ describe('UserAdministrationService', () => {
     findBy: jest.fn(),
     findOneOrFail: jest.fn(),
     createQueryBuilder: jest.fn(),
+    transaction: jest.fn(),
+    increment: jest.fn(),
   };
   const repository = { manager };
   const users = { updateUser: jest.fn() };
@@ -35,7 +38,9 @@ describe('UserAdministrationService', () => {
   let service: UserAdministrationService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
+    manager.transaction.mockImplementation(async (work) => work(manager));
+    manager.increment.mockResolvedValue({ affected: 1 });
     users.updateUser.mockResolvedValue({ ...user, status: { id: 'active' } });
     references.getAccountStatus.mockResolvedValue({ id: 'active' });
     references.getRole.mockResolvedValue({
@@ -117,7 +122,10 @@ describe('UserAdministrationService', () => {
     manager.findOneBy.mockResolvedValue(null);
 
     await expect(
-      service.updateAdministration(user as never, { status_id: 'missing' }),
+      service.updateAdministration(user as never, {
+        expected_version: 1,
+        status_id: 'missing',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(manager.findOneBy).toHaveBeenCalledWith(AccountStatusEntity, {
       id: 'missing',
@@ -130,6 +138,7 @@ describe('UserAdministrationService', () => {
 
     await expect(
       service.updateAdministration(user as never, {
+        expected_version: 1,
         role_ids: ['role-1', 'missing'],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -141,7 +150,11 @@ describe('UserAdministrationService', () => {
     await expect(
       service.updateAdministration(
         user as never,
-        { status_id: 'active', role_ids: ['new-role', 'new-role'] },
+        {
+          expected_version: 1,
+          status_id: 'active',
+          role_ids: ['new-role', 'new-role'],
+        },
         manager as never,
       ),
     ).resolves.toBe(user);
@@ -157,5 +170,35 @@ describe('UserAdministrationService', () => {
     expect(manager.findOneOrFail).toHaveBeenCalledWith(UserEntity, {
       where: { id: 'user-1' },
     });
+    expect(manager.increment).toHaveBeenCalledWith(
+      UserEntity,
+      { id: 'user-1', administration_version: 1 },
+      'administration_version',
+      1,
+    );
+  });
+
+  it('rejects a revision changed since the caller read before replacing relations', async () => {
+    manager.findBy.mockResolvedValueOnce([]);
+    manager.increment.mockResolvedValueOnce({ affected: 0 });
+    await expect(
+      service.updateAdministration(user as never, {
+        expected_version: 1,
+        role_ids: [],
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(manager.increment).toHaveBeenCalledWith(
+      UserEntity,
+      { id: 'user-1', administration_version: 1 },
+      'administration_version',
+      1,
+    );
+    expect(query.relation).not.toHaveBeenCalled();
+  });
+
+  it('advances the revision for an accepted no-op administration action', async () => {
+    await service.updateAdministration(user as never, { expected_version: 1 });
+    expect(manager.increment).toHaveBeenCalledTimes(1);
+    expect(query.relation).not.toHaveBeenCalled();
   });
 });

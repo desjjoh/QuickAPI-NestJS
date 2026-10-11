@@ -22,13 +22,15 @@ export class IdempotencyRepository {
     return this.manager.connection.createQueryRunner();
   }
 
+  /** Call only while holding the connection-scoped advisory lock for this scope. */
   public findByScope(
     manager: EntityManager,
     scopeHash: string,
   ): Promise<IdempotencyEntity | null> {
+    // FOR UPDATE on an absent key takes a gap lock under REPEATABLE READ;
+    // unrelated new scopes can then deadlock when inserting their claims.
     return manager.getRepository(IdempotencyEntity).findOne({
       where: { scope_hash: scopeHash },
-      lock: { mode: 'pessimistic_write' },
     });
   }
 }

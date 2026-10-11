@@ -14,10 +14,12 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOkResponse,
+  ApiServiceUnavailableResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
+import { STORAGE_UPLOAD_RETRY_DESCRIPTION } from '@/modules/system/storage/types/storage-upload.contract';
 
 import {
   PERMISSION_MATRIX,
@@ -147,6 +149,9 @@ export class ProfileApiController {
   // POST /avatar
   @Post('avatar')
   @Idempotent('identity.profile.avatar.replace')
+  @ApiServiceUnavailableResponse({
+    description: STORAGE_UPLOAD_RETRY_DESCRIPTION,
+  })
   @Throttle({ default: throttlePolicies.fileUpload })
   @ApiOperation({
     summary: 'Set profile avatar',
@@ -190,7 +195,7 @@ export class ProfileApiController {
   @ApiOperation({
     summary: 'Remove profile avatar',
     description:
-      'Removes the authenticated user’s current profile avatar. The avatar relation is cleared, the associated image record is removed, and the stored image file is deleted. If no avatar exists, the request fails.',
+      'Removes the authenticated user’s current profile avatar. The avatar relation and image record are removed transactionally; stored bytes are deleted asynchronously through durable cleanup. If no avatar exists, the request fails.',
   })
   @ApiOkResponse({
     description:
