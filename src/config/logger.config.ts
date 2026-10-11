@@ -6,6 +6,7 @@ import os from 'node:os';
 import { env } from '@/config/environment.config';
 import { log_level } from '@/config/environment.schema';
 import { requestContextRef } from '@/common/store/request-context.store';
+import { errorDiagnostics } from '@/common/helpers/error-diagnostics.helper';
 
 const isDev: boolean = env.NODE_ENV !== 'production';
 const defaultLevel: log_level = env.LOG_LEVEL;
@@ -87,13 +88,10 @@ export const logger: Logger = pino(
         sessionId: ctx.sessionId,
         source: ctx.source,
         method: ctx.method,
-        normalizedRoute: ctx.normalizedRoute,
-        ipAddress: ctx.ipAddress,
-        userAgent: ctx.userAgent,
       };
     },
     serializers: {
-      error: pino.stdSerializers.err,
+      error: errorDiagnostics,
     },
   },
   isDev ? devStream : undefined,

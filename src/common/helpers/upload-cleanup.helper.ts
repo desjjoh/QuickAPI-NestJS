@@ -14,10 +14,7 @@ export async function removeTemporaryUpload(
   try {
     await rm(file.path, { force: true });
   } catch (error) {
-    logger.error(
-      { error, path: file.path },
-      'Temporary upload cleanup failed.',
-    );
+    logger.error({ error }, 'Temporary upload cleanup failed.');
     throw error;
   } finally {
     activeUploadPaths.delete(file.path);

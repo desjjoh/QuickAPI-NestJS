@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { jest } from '@jest/globals';
 import type { DataSource } from 'typeorm';
 import { runInTransaction } from '@/common/helpers/transaction.helper';
+import { RequestDeadline } from '@/common/helpers/request-deadline.helper';
 import { idempotencyPolicy } from '@/config/idempotency.config';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
@@ -48,6 +49,44 @@ describe('request idempotency (disposable MySQL)', () => {
       );
       return { status: 201, body: { id: image.id } };
     });
+
+  it('drains timed-out work before rollback and releases its claim for a safe retry', async () => {
+    const deadline = new RequestDeadline(Date.now() + 10_000);
+    let entered!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const first = deadline.run(() =>
+      service.execute(scope, 'timeout', 'fp', async () => {
+        const result = await createImage();
+        entered();
+        await pending;
+        return result;
+      }),
+    );
+    const rejected = expect(first).rejects.toThrow('deadline');
+    await started;
+    deadline.expire();
+    try {
+      expect(await source.getRepository(ImageEntity).count()).toBe(0);
+      const other = new IdempotencyService(new IdempotencyRepository(source));
+      await expect(
+        other.execute(scope, 'timeout', 'fp', createImage),
+      ).rejects.toBeInstanceOf(ConflictException);
+    } finally {
+      release();
+    }
+    await rejected;
+    expect(await source.getRepository(ImageEntity).count()).toBe(0);
+    expect(await source.getRepository(IdempotencyEntity).count()).toBe(0);
+    await service.execute(scope, 'timeout', 'fp', createImage);
+    expect(await source.getRepository(ImageEntity).count()).toBe(1);
+    expect(await source.getRepository(IdempotencyEntity).count()).toBe(1);
+  });
 
   it('coordinates separate connections and replays one durable mutation', async () => {
     let entered!: () => void;

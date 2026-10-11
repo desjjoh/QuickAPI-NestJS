@@ -21,10 +21,11 @@ describe(requestContextMiddleware.name, () => {
       body: { password: 'secret' },
       query: { token: 'secret' },
     } as unknown as Request;
+    const setHeader = jest.fn();
 
     requestContextMiddleware()(
       request,
-      {} as Response,
+      { setHeader } as unknown as Response,
       (() => {
         expect(context.getStore()).toEqual(
           expect.objectContaining({
@@ -42,5 +43,6 @@ describe(requestContextMiddleware.name, () => {
         );
       }) as NextFunction,
     );
+    expect(setHeader).toHaveBeenCalledWith('X-Request-ID', expect.any(String));
   });
 });

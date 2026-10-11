@@ -28,7 +28,7 @@ export async function sweepTemporaryUploads(
         await rm(path, { force: true });
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
-        logger.error({ error, path }, 'Stale temporary upload cleanup failed.');
+        logger.error({ error }, 'Stale temporary upload cleanup failed.');
     }
   }
 }

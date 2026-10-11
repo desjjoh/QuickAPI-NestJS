@@ -1,93 +1,109 @@
-# Testing and coverage policy
+# Testing and coverage
 
-## Coverage scope and gates
+[Documentation index](../README.md#documentation)
 
-`npm run test:cov` instruments application services, queue processors, guards,
-and repositories, including files that a test never imports. DTO-only
-declarations, migrations, bootstrap code, test files, and generated artifacts
-are intentionally excluded because their executable behavior is either absent
-or validated at a different boundary.
+## Fast checks
 
-The global threshold is an achievable baseline, not a security sign-off. Jest
-also enforces higher branch thresholds on identity tokens and refresh, MFA and
-password reset, email verification and registration, permission guards, and the
-authentication/account orchestration layers. Raise the relevant threshold in
-the same change that adds branch coverage; do not pre-raise it in a way that
-leaves the default branch failing.
+```bash
+npm test
+npm run test:cov
+npm run check
+```
 
-**Release rule:** every security-sensitive allow, deny, expiry, replay,
-revocation, lockout, and error-mapping branch must have a test. A known missing
-security branch is a release blocker even when Jest's aggregate and scoped
-thresholds pass. Review the detailed HTML report in `coverage/lcov-report` and
-record any intentional exception in the release review; reducing or bypassing
-a threshold is not an acceptable exception.
+`npm test` includes unit and in-process `integration.spec.ts` suites. CI runs these in separate jobs. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
 
-## Test matrix
+## Disposable E2E infrastructure
 
-Legend: **Unit** is an isolated `*.spec.ts`; **Integration** exercises multiple
-Nest providers or an infrastructure adapter; **E2E** exercises the HTTP API and
-disposable MySQL/Redis stack. “Required” identifies the intended layer even if
-the corresponding scenario still needs to be added; such gaps in a
-security-sensitive branch block release.
+E2E global setup **drops, migrates, and seeds the selected schema**. Never point these tests at development, staging, or production data. Safety requires explicit `TEST_DB_ENABLED=true`, `NODE_ENV=test`, `DB_SYNC=false`, and an active database exactly matching `TEST_DB_DATABASE`; a name containing “test” is not sufficient protection.
 
-| Major service or flow                                     | Unit coverage                                              | Integration coverage                               | E2E coverage                                                               |
-| --------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------- |
-| Domain token issuance, validation, expiry, and revocation | `token.service.spec.ts`                                    | Required with token storage/crypto adapters        | Login, refresh, and logout token lifecycle required                        |
-| Refresh-token rotation and replay rejection               | `refresh.service.spec.ts`                                  | Required with persisted session/token state        | Refresh success, expired/revoked token, and replay rejection required      |
-| Registration-token issue and consumption                  | `registration-token.service.spec.ts`                       | Required with token and user providers             | Registration completion and reused/expired token rejection required        |
-| MFA enrollment, challenge, recovery, and removal          | `mfa.service.spec.ts`                                      | Required with user/token persistence               | Enrollment and valid/invalid/replayed challenge required                   |
-| Password reset request and completion                     | `password-reset.service.spec.ts`                           | Required with email, token, and user providers     | Request, expiry, one-time use, and session invalidation required           |
-| Email verification issue and completion                   | `email-verification.service.spec.ts`                       | Required with email, token, and user providers     | Verification, expiry, and replay rejection required                        |
-| Registration orchestration                                | `registration.service.spec.ts`                             | Required across user, token, and email providers   | New account, duplicate identity, validation failure, and rollback required |
-| Authentication orchestration                              | `authentication.service.spec.ts`                           | Required across credentials, sessions, and tokens  | Login success/failure, lockout, refresh, and logout required               |
-| Account profile and current-user orchestration            | `me.service.spec.ts`, `profile.service.spec.ts`            | Required with user repository                      | Authenticated read/update plus unauthorized and invalid update required    |
-| Account session orchestration                             | `sessions.service.spec.ts`                                 | Required with session/token state                  | Session listing and self/other-session revocation required                 |
-| Security/account recovery orchestration                   | `security.service.spec.ts`                                 | Required across MFA/password/email providers       | Password, MFA, and recovery flows required                                 |
-| Permission and authentication guards                      | `permission.guard.spec.ts` plus guard unit specs           | `guards.integration.spec.ts`                       | Missing, malformed, insufficient, and sufficient authorization required    |
-| CSRF and operations-route guards                          | `csrf.guard.spec.ts`, `operations.guard.spec.ts`           | `guards.integration.spec.ts`                       | Trusted/untrusted origin and operations-key paths required                 |
-| User repository and identity persistence                  | Required                                                   | Repository tests against disposable MySQL required | Exercised by registration/account/auth flows                               |
-| Library and media repositories                            | `library.repositories.spec.ts`, `image.repository.spec.ts` | Disposable-MySQL adapter scenarios required        | Exercised by library/media API flows                                       |
-| Email queue processors and dead-letter handling           | `email.processor.spec.ts`, `dlq.processor.spec.ts`         | BullMQ/Redis delivery, retry, and DLQ required     | User flows verify enqueueing; worker delivery smoke test required          |
-| Email service and transport                               | Required                                                   | Provider sandbox/fake transport required           | Registration/reset/verification delivery contract required                 |
-| Storage, geolocation, database, and application services  | Existing service unit specs                                | Adapter startup/failure scenarios required         | Health/readiness and affected API flows required                           |
+`test/load-test-env.ts` sets the test runtime and copies explicit test connection values before configuration loads. The checked-in [test Compose topology](../docker-compose.test.yml) uses MySQL port 3308 and authenticated Redis port 6380, separate from development services.
 
-## Commands
+### POSIX shells
 
-- `npm test` runs the unit and in-process integration suites.
-- `npm run test:cov` applies all global and scoped coverage gates.
-- `npm run test:infra:up && npm run test:db:prepare && npm run test:e2e:local`
-  runs E2E tests against disposable MySQL and Redis dependencies.
-- `npm run test:infra:down` removes the disposable dependencies and volumes.
+```bash
+npm run test:infra:up
+npm run test:e2e:local
+```
 
-## Production topology smoke test
+Global setup applies all migrations, so a separate `test:db:prepare` is not required. That command is available for manual inspection of a disposable database.
 
-Run the same production-image test used by the staging gate with one command:
+### PowerShell
+
+The convenience `test:e2e:local` and `test:db:prepare` scripts use POSIX environment assignment. In a dedicated PowerShell session instead run:
+
+```powershell
+npm run test:infra:up
+$env:TEST_DB_ENABLED = 'true'
+$env:TEST_DB_HOST = '127.0.0.1'
+$env:TEST_DB_PORT = '3308'
+$env:TEST_DB_USER = 'quickapi_test_app'
+$env:TEST_DB_PASSWORD = 'quickapi_test_password'
+$env:TEST_DB_DATABASE = 'quickapi_test'
+$env:REDIS_HOST = '127.0.0.1'
+$env:REDIS_PORT = '6380'
+$env:REDIS_PASSWORD = 'quickapi_test_redis_password'
+npm run test:e2e
+```
+
+These credentials are for the disposable checked-in topology only. Close the dedicated shell afterwards to avoid carrying test overrides into development.
+
+Run one E2E invocation at a time per database/Redis topology; another invocation's global setup can destroy the first one's fixtures. CI shards use separate infrastructure.
+
+For a focused run after setting the same environment:
+
+```bash
+npm run test:e2e -- --runInBand --runTestsByPath test/e2e/articles/articles.e2e-spec.ts
+```
+
+For teardown diagnostics, append `--detectOpenHandles`. Do not use `--forceExit` to hide leaked connections/workers.
+
+`npm run test:infra:down` **deletes disposable containers and volumes**. It is not a shutdown command for a database you want to preserve.
+
+## Regression map
+
+These are existing suites, not placeholders or a claim that every possible failure has been tested.
+
+| Boundary                                                                                  | Suites                                                                                                                                                                                                                    |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database-backed claims, rollback, 204 replay, expiry/concurrency                          | [idempotency](e2e/idempotency/idempotency.e2e-spec.ts)                                                                                                                                                                    |
+| Admin authorization, revisions, deletion, replay, audit                                   | [users](e2e/administration/users.e2e-spec.ts)                                                                                                                                                                             |
+| Profile/contact/avatar replay, recreated contacts, upload validation                      | [profile](e2e/account/profile.e2e-spec.ts)                                                                                                                                                                                |
+| Article permissions, versions, lifecycle, heroes, pagination/search/EXPLAIN               | [articles](e2e/articles/articles.e2e-spec.ts)                                                                                                                                                                             |
+| Registration and verification                                                             | [registration](e2e/authentication/registration.e2e-spec.ts), [verification](e2e/authentication/email-verification.e2e-spec.ts)                                                                                            |
+| MFA, reset, credentials, sessions                                                         | [MFA](e2e/authentication/mfa.e2e-spec.ts), [reset](e2e/authentication/password-reset.e2e-spec.ts), [credentials](e2e/authentication/account-credentials.e2e-spec.ts), [sessions](e2e/authentication/sessions.e2e-spec.ts) |
+| Encrypted email intents, cancellation/expiry/retry, real Redis worker with fake transport | [security delivery](e2e/authentication/security-delivery.e2e-spec.ts)                                                                                                                                                     |
+| Storage intents, upload reconciliation, reference fencing, retries/DLQ                    | [storage cleanup](e2e/storage/storage-cleanup.e2e-spec.ts)                                                                                                                                                                |
+| User repository against MySQL                                                             | [user repository](e2e/repositries/user.repository.e2e-spec.ts)                                                                                                                                                            |
+| Account activity visibility                                                               | [activity](e2e/account/activity.e2e-spec.ts)                                                                                                                                                                              |
+| Dependency readiness                                                                      | [readiness](e2e/ready.e2e-spec.ts)                                                                                                                                                                                        |
+
+HTTP test apps replace background dispatchers and pause their own workers to isolate request assertions. Dedicated delivery/cleanup tests create uniquely named queues/workers and exercise real Redis with fake external providers. Passing HTTP tests alone does not prove automatic production worker delivery or real-provider availability.
+
+Use event/subject-filtered audit assertions or a captured baseline; authentication fixture setup can legitimately add events. Do not log EXPLAIN plans, raw email payloads, tokens, or other sensitive data in passing tests.
+
+## Coverage gates
+
+Jest instruments services, processors, guards, and repositories, including unimported files. DTOs, migrations, bootstrap, tests, and generated artifacts are excluded from that instrumentation; schema behavior is checked through migration/topology tests instead.
+
+Current thresholds are defined in [package.json](../package.json):
+
+- Global: branches 40%, functions 45%, lines/statements 65%.
+- Identity services: branch coverage 75%.
+- Permission guard: branch coverage 90%.
+- Authentication and account API services: branch coverage 75%.
+
+Thresholds are a baseline, not security sign-off. Require tests for security-sensitive allow/deny, expiry, replay, revocation, lockout, rollback, and error mapping. Review the HTML report in `coverage/lcov-report`; do not lower gates to hide a known missing security branch.
+
+## CI and production-image checks
+
+[CI](../.github/workflows/ci.yml) runs for pushes and pull requests to `main`, `staging`, and `dev`, plus manual dispatch. It separates formatting, lint, type checking/build, unit coverage, integration, two E2E shards, production-image migration/readiness, and production topology smoke checks; aggregate gates depend on those results.
 
 ```bash
 npm run test:smoke
 ```
 
-The command requires Docker Engine, Docker Compose v2, and outbound HTTPS access
-to GitHub's raw-content host for MaxMind's public test databases. It builds the
-production Dockerfile once, addresses that build by immutable image ID, and then
-runs the following disposable topology in order:
+This command requires Docker/Compose and Bash, plus outbound HTTPS for public MaxMind test databases. It builds the production image and runs an immutable-image disposable topology with authenticated MySQL/Redis, staging preflight, fresh GeoLite initialization, compiled migrations, the non-root API, HTTP policy/readiness probes, compiled migration revert/forward, and graceful shutdown.
 
-1. healthy MySQL 8.4 and password-authenticated Redis 7;
-2. staging configuration preflight;
-3. initialization of a newly-created GeoLite volume with valid public test data;
-4. production TypeORM migrations;
-5. the API under the image's configured non-root user;
-6. HTTP policy probes and graceful SIGTERM shutdown.
+It removes its disposable containers/network/volumes on completion or failure and writes failure diagnostics to `smoke-logs/`. Run `test:smoke:config` in a POSIX shell to check Compose rendering only. Neither command is a real-provider test or a production deployment.
 
-The command removes all smoke containers, its private network, and its volumes
-on success or failure. If it fails, it first writes component logs to
-`smoke-logs/`. To validate only the rendered Compose model without building or
-starting containers, run:
-
-```bash
-npm run test:smoke:config
-```
-
-In GitHub Actions the `Production topology smoke test` job runs the full command
-for every staging push and staging pull request. Its log artifact is uploaded on
-failure, and the staging deployment gate cannot pass unless the smoke job does.
+Release review should use evidence from the exact release commit, including failures that prevent suites from reaching their tests. Do not embed transient suite counts or “tests not run here” notes in product documentation. See [deployment](../docs/deployment.md) and [remaining gaps](../docs/backlog.md).

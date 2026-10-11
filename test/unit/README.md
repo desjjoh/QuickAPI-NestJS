@@ -1,5 +1,7 @@
 # Unit service tests
 
+[Testing guide](../TESTING.md) · [Architecture](../../docs/architecture.md)
+
 Import shared builders and typed mocks from `test/unit`. Builders return a small,
 valid baseline entity and accept `Partial<Entity>` overrides, so a test only names
 the state relevant to its behavior.
@@ -11,7 +13,7 @@ Keep every service test focused on one public behavior:
    with a builder such as `buildActiveUser({ roles: [role] })`.
 2. **Act once** by invoking one public service method.
 3. **Assert returned state** rather than internal implementation details.
-4. **Assert persistence** (`save`, `update`, transaction calls) and external side
+4. **Assert service-owned persistence** (manager `save`/`update`, transaction calls) and external side
    effects (email, queue, Redis, cookies, or storage).
 5. **Assert expected exceptions** with `await expect(...).rejects`; also verify that
    persistence and side effects did not run on rejected paths.
@@ -23,7 +25,7 @@ import {
   buildActiveUser,
   deterministicGenerators,
   mockEmailService,
-  mockRepository,
+  mockEntityManager,
   resetUnitTestState,
   useDeterministicClock,
 } from './index';
@@ -34,22 +36,30 @@ describe('ExampleService', () => {
   it('performs one behavior', async () => {
     // Arrange dependencies and state.
     useDeterministicClock();
-    const users = mockRepository<UserEntity>();
+    const manager = mockEntityManager();
     const email = mockEmailService();
     const generated = deterministicGenerators();
     const user = buildActiveUser();
-    users.save.mockResolvedValue(user);
+    manager.save.mockResolvedValue(user);
 
     // Act once through the public API.
     const result = await service.perform(user, generated.token());
 
     // Assert state, persistence, and side effects.
     expect(result).toBe(user);
-    expect(users.save).toHaveBeenCalledWith(user);
+    expect(manager.save).toHaveBeenCalledWith(user);
     expect(email.sendEmail).toHaveBeenCalledTimes(1);
   });
 });
 ```
 
-Every suite must call `afterEach(resetUnitTestState)`. This restores spies, clears
-mock call state, and returns Jest to real timers, preventing order-dependent tests.
+The example illustrates assertion shape; construct the actual service with its
+dependencies before invoking it. Domain repositories remain read-only: use
+repository mocks for reads and the transaction manager for service-owned writes.
+Adapter-level TypeORM repository mocks do not authorize mutation methods on a
+domain repository.
+
+Use `afterEach(resetUnitTestState)` or equivalent teardown. This restores spies,
+clears mock call state, and returns Jest to real timers, preventing order-dependent
+tests. When behavior depends on affected rows, relations, or lock results, configure
+those mock results explicitly rather than treating an undefined result as success.

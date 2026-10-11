@@ -27,6 +27,7 @@ import {
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
+import { RequestTimeout } from '@/common/decorators/request-timeout.decorator';
 import { STORAGE_UPLOAD_RETRY_DESCRIPTION } from '@/modules/system/storage/types/storage-upload.contract';
 
 import { imageUploadPolicy } from '@/config/image-upload.config';
@@ -106,6 +107,7 @@ export class CreatorArticleController {
   }
 
   @Post('')
+  @RequestTimeout(imageUploadPolicy.requestTimeoutMs)
   @Idempotent('articles.create')
   @UseGuards(CsrfGuard)
   @Throttle({ default: throttlePolicies.fileUpload })
@@ -214,6 +216,7 @@ export class CreatorArticleController {
     description:
       'No article owned by the authenticated creator was found for the provided ID.',
   })
+  @RequestTimeout(imageUploadPolicy.requestTimeoutMs)
   @UseInterceptors(ImageFileInterceptor('hero', imageUploadPolicy.heroMaxBytes))
   public updateHero(
     @CurrentUser() user: UserEntity,

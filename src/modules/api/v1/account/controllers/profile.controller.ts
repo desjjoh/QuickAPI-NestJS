@@ -19,6 +19,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
+import { RequestTimeout } from '@/common/decorators/request-timeout.decorator';
 import { STORAGE_UPLOAD_RETRY_DESCRIPTION } from '@/modules/system/storage/types/storage-upload.contract';
 
 import {
@@ -148,6 +149,7 @@ export class ProfileApiController {
 
   // POST /avatar
   @Post('avatar')
+  @RequestTimeout(imageUploadPolicy.requestTimeoutMs)
   @Idempotent('identity.profile.avatar.replace')
   @ApiServiceUnavailableResponse({
     description: STORAGE_UPLOAD_RETRY_DESCRIPTION,
