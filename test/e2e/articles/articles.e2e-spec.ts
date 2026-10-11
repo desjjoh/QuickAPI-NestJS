@@ -600,7 +600,9 @@ describe('article API lifecycle', () => {
     const originalCount = SelectQueryBuilder.prototype.getCount;
     const countSpy = jest
       .spyOn(SelectQueryBuilder.prototype, 'getCount')
-      .mockImplementationOnce(async function () {
+      .mockImplementationOnce(async function (
+        this: SelectQueryBuilder<ArticleEntity>,
+      ) {
         const count = await originalCount.call(this);
         await articles.update(literal, {
           content: { title: 'Changed title' },

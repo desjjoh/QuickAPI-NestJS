@@ -103,7 +103,8 @@ jobs:
       - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm run typecheck
+      - name: Strict typecheck application and E2E configurations
+        run: npm run typecheck
       - run: npm run build
 
   unit-tests:

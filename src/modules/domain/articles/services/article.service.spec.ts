@@ -177,7 +177,7 @@ describe('ArticleService', () => {
       'paginatePublished',
       'paginateByAuthor',
       'paginateForAdministration',
-    ])
+    ] as const)
       articleRepo[method].mockResolvedValue([[], 0]);
     await service.paginatePublished({} as never);
     await service.paginateByAuthor('author-1', {} as never);
