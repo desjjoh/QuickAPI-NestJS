@@ -105,6 +105,8 @@ jobs:
       - run: npm ci
       - name: Strict typecheck application and E2E configurations
         run: npm run typecheck
+      - name: Verify release gate without building or publishing images
+        run: npm run test:release
       - run: npm run build
 
   unit-tests:

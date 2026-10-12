@@ -140,3 +140,5 @@ dist
 
 # Application-managed MaxMind databases
 data/geoip/
+# Local release candidates and vulnerability evidence (never production data).
+.release-check/
