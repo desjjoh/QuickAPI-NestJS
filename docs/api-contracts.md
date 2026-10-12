@@ -34,13 +34,13 @@ Security routes use the shared request transaction and root-user lock. Authentic
 
 ## Article API audiences
 
-Article API controllers and services are grouped under `src/modules/api/v1/public`, `creator/articles`, and `administration`. Public and creator audience modules are routed independently; administration owns its article controller. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
+Public and authoring article controllers/services live in one feature-based `src/modules/api/v1/articles` API module, mounted at `v1/articles` with `public` and `me` controller prefixes. Creator permissions and ownership restrictions remain unchanged. Administration keeps its article controller in the administration module. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
 
-- Public reads: `/api/v1/public/articles` and `/api/v1/public/articles/:id`.
-- Creator reads and creation: `/api/v1/creator/articles`; detail and updates: `/api/v1/creator/articles/:id`; hero replacement, submission, and withdrawal: `/:id/hero`, `/:id/submit`, and `/:id/withdraw` beneath that creator collection.
+- Public reads: `/api/v1/articles/public` and `/api/v1/articles/public/:id`.
+- My article reads and creation: `/api/v1/articles/me`; detail and updates: `/api/v1/articles/me/:id`; hero replacement, submission, and withdrawal: `/:id/hero`, `/:id/submit`, and `/:id/withdraw` beneath that collection. Authentication alone does not grant access: these actions require the corresponding creator permissions and enforce ownership.
 - Administration: `/api/v1/administration/articles`, including `/:id/publish` and the other review/lifecycle actions.
 
-This is a breaking route change: the former `/api/v1/articles` public routes and `/api/v1/articles/creator` creator routes are no longer mounted. Clients must update their URLs when adopting this release; no temporary aliases are provided. Swagger groups article operations as Public Articles, Creator Articles, and Article Administration.
+This is a breaking route change: the former `/api/v1/public/articles`, `/api/v1/account/articles`, `/api/v1/creator/articles`, and older `/api/v1/articles` and `/api/v1/articles/creator` routes are no longer mounted. Clients must update their URLs when adopting this release; no temporary aliases are provided. Swagger groups article operations as Public Articles, My Articles, and Article Administration.
 
 Creator and administration article list/detail and mutation responses include a numeric `version`. Send that value as `expected_version` for content updates, hero replacements (a multipart field), submission/withdrawal, and administration lifecycle actions. A successful mutation increments the article version, including hero-only and unchanged-content edits. Missing or invalid versions fail request validation; stale versions return `409 Conflict` without mutation or an audit event. On conflict, reload and reconcile the article before retrying rather than blindly retrying the stale edit. Public article responses do not expose the version. Apply all pending migrations before deploying this contract; existing articles start at version 1.
 

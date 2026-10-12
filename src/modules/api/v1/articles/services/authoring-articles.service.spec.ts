@@ -1,8 +1,8 @@
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import { ConflictException } from '@nestjs/common';
 
-import { CreatorArticleQueryDto } from '../models/article-query.model';
-import { CreatorArticleApiService } from './articles.service';
+import { AuthoringArticleQueryDto } from '../models/article-query.model';
+import { AuthoringArticleApiService } from './authoring-articles.service';
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 function article(): ArticleEntity {
@@ -33,7 +33,7 @@ function article(): ArticleEntity {
   } as ArticleEntity;
 }
 
-describe('CreatorArticleApiService', () => {
+describe('AuthoringArticleApiService', () => {
   const manager = {};
   const lifecycle = new TransactionLifecycle();
   const articles = {
@@ -49,7 +49,7 @@ describe('CreatorArticleApiService', () => {
     withdraw: jest.fn(),
   };
   const audit = { record: jest.fn().mockResolvedValue({}) };
-  const service = new CreatorArticleApiService(
+  const service = new AuthoringArticleApiService(
     articles as never,
     audit as never,
   );
@@ -65,7 +65,7 @@ describe('CreatorArticleApiService', () => {
   });
 
   it('maps an author-scoped collection and pagination metadata', async () => {
-    const query = Object.assign(new CreatorArticleQueryDto(), {
+    const query = Object.assign(new AuthoringArticleQueryDto(), {
       search: 'Title',
       statusKey: 'draft',
       page: 2,

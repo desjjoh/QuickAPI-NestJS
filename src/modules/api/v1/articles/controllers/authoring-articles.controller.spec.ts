@@ -3,10 +3,10 @@ import { PATH_METADATA } from '@nestjs/common/constants';
 import { PERMISSIONS_KEY } from '@/common/decorators/permissions.decorator';
 import { ArticleCreatorPermissions } from '@/config/permissions.config';
 
-import { CreatorArticleQueryDto } from '../models/article-query.model';
-import { CreatorArticleController } from './articles.controller';
+import { AuthoringArticleQueryDto } from '../models/article-query.model';
+import { AuthoringArticleController } from './authoring-articles.controller';
 
-describe(CreatorArticleController.name, () => {
+describe(AuthoringArticleController.name, () => {
   const articles = {
     list: jest.fn(),
     find: jest.fn(),
@@ -16,7 +16,7 @@ describe(CreatorArticleController.name, () => {
     submit: jest.fn(),
     withdraw: jest.fn(),
   };
-  const controller = new CreatorArticleController(articles as never);
+  const controller = new AuthoringArticleController(articles as never);
   const user = { id: 'creator-1' };
   const file = { originalname: 'hero.png' } as Express.Multer.File;
 
@@ -26,14 +26,14 @@ describe(CreatorArticleController.name, () => {
       operation.mockResolvedValue({ id: 'article-1' });
   });
 
-  it('owns articles within the creator API area', () => {
-    expect(Reflect.getMetadata(PATH_METADATA, CreatorArticleController)).toBe(
-      'articles',
+  it('owns the authenticated me controller prefix', () => {
+    expect(Reflect.getMetadata(PATH_METADATA, AuthoringArticleController)).toBe(
+      'me',
     );
   });
 
   it('delegates creator reads with the authenticated user scope', async () => {
-    const query = new CreatorArticleQueryDto();
+    const query = new AuthoringArticleQueryDto();
 
     await controller.list(user as never, query);
     await controller.find(user as never, 'article-1');
@@ -99,7 +99,7 @@ describe(CreatorArticleController.name, () => {
     expect(
       Reflect.getMetadata(
         PERMISSIONS_KEY,
-        CreatorArticleController.prototype[method],
+        AuthoringArticleController.prototype[method],
       ),
     ).toEqual([permission]);
   });

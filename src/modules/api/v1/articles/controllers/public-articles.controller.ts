@@ -15,11 +15,11 @@ import {
   ArticlePageDto,
 } from '@/modules/domain/articles/models/article.model';
 
-import { PublicArticleQueryDto } from '../models/article-query.model';
-import { PublicArticleApiService } from '../services/articles.service';
+import { PublicArticleQueryDto } from '../models/public-article-query.model';
+import { PublicArticleApiService } from '../services/public-articles.service';
 
 @ApiTags('Public Articles')
-@Controller('articles')
+@Controller('public')
 @Throttle({ default: throttlePolicies.publicRead })
 export class PublicArticleController {
   public constructor(private readonly articles: PublicArticleApiService) {}

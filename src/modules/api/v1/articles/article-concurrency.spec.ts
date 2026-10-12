@@ -17,14 +17,24 @@ import { ArticleService } from '@/modules/domain/articles/services/article.servi
 import { ArticleStatusTransitionPolicy } from '@/modules/domain/articles/policies/article-status-transition.policy';
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 import { AuditModule } from '@/modules/domain/audit/audit.module';
-import { CreatorApiModule } from '../creator.module';
-import { CreatorArticleApiService } from './services/articles.service';
-import { apiV1Routes } from '../../v1.module';
+import { ArticlesApiModule } from './articles.module';
+import { AuthoringArticleController } from './controllers/authoring-articles.controller';
+import { TokenModule } from '@/modules/system/tokens/token.module';
+import { AuthoringArticleApiService } from './services/authoring-articles.service';
+import { apiV1Routes } from '../v1.module';
 import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.module';
 import { IdempotencyInterceptor } from '@/common/interceptors/idempotency.interceptor';
 
 @Module({})
 class EmptyDomainModule {}
+
+// Exercise authoring HTTP behavior using the production article route registration.
+@Module({
+  imports: [ArticlesModule, AuditModule, TokenModule, IdempotencyModule],
+  controllers: [AuthoringArticleController],
+  providers: [AuthoringArticleApiService],
+})
+class AccountArticlesTestModule {}
 
 describe('creator article HTTP concurrency', () => {
   let app: INestApplication;
@@ -61,11 +71,29 @@ describe('creator article HTTP concurrency', () => {
       {} as never,
       new ArticleStatusTransitionPolicy(),
     );
-    const service = new CreatorArticleApiService(domain, audit as never);
+    const service = new AuthoringArticleApiService(domain, audit as never);
     const module = await Test.createTestingModule({
       imports: [
-        CreatorApiModule,
-        RouterModule.register([{ path: 'api', children: apiV1Routes }]),
+        AccountArticlesTestModule,
+        RouterModule.register([
+          {
+            path: 'api',
+            children: apiV1Routes.map((route) => ({
+              ...route,
+              children: route.children?.map((child) =>
+                typeof child === 'function'
+                  ? child
+                  : {
+                      ...child,
+                      module:
+                        child.module === ArticlesApiModule
+                          ? AccountArticlesTestModule
+                          : child.module,
+                    },
+              ),
+            })),
+          },
+        ]),
       ],
     })
       .overrideModule(ArticlesModule)
@@ -79,7 +107,7 @@ describe('creator article HTTP concurrency', () => {
         intercept: (_context: unknown, next: { handle: () => unknown }) =>
           next.handle(),
       })
-      .overrideProvider(CreatorArticleApiService)
+      .overrideProvider(AuthoringArticleApiService)
       .useValue(service)
       .overrideGuard(PermissionsGuard)
       .useValue({ canActivate: () => true })
@@ -128,7 +156,7 @@ describe('creator article HTTP concurrency', () => {
     const responses = await Promise.all(
       ['First', 'Second'].map((title) =>
         request(app.getHttpServer())
-          .patch(`/api/v1/creator/articles/${id}`)
+          .patch(`/api/v1/articles/me/${id}`)
           .send({ title, expected_version: 1 }),
       ),
     );
@@ -148,10 +176,10 @@ describe('creator article HTTP concurrency', () => {
       const pending =
         action === 'patch'
           ? request(app.getHttpServer())
-              .patch(`/api/v1/creator/articles/${id}`)
+              .patch(`/api/v1/articles/me/${id}`)
               .send({ title: 'Edit' })
           : request(app.getHttpServer())
-              .post(`/api/v1/creator/articles/${id}/${action}`)
+              .post(`/api/v1/articles/me/${id}/${action}`)
               .send({});
       await pending.expect(400);
       expect(stored.version).toBe(1);
@@ -175,7 +203,7 @@ describe('creator article HTTP concurrency', () => {
       }),
     );
     expect(
-      doc.paths['/api/v1/creator/articles/{id}/submit'].post?.responses['409'],
+      doc.paths['/api/v1/articles/me/{id}/submit'].post?.responses['409'],
     ).toBeDefined();
     expect(doc.components?.schemas?.ArticleManagementDto).toEqual(
       expect.objectContaining({

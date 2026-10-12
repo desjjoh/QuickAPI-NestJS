@@ -12,8 +12,7 @@ src/
   modules/
     api/            HTTP controllers and audience-specific orchestration
       v1/
-        public/     Public article reads
-        creator/    Creator article operations
+        articles/   Public and authenticated authoring controllers/services
         administration/
         authentication/
         account/

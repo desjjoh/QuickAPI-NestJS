@@ -1,7 +1,7 @@
 import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
 
-import { PublicArticleQueryDto } from '../models/article-query.model';
-import { PublicArticleApiService } from './articles.service';
+import { PublicArticleQueryDto } from '../models/public-article-query.model';
+import { PublicArticleApiService } from './public-articles.service';
 
 function article(): ArticleEntity {
   return {

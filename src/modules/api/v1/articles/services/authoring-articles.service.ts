@@ -25,12 +25,12 @@ import { ArticleVersionDto } from '@/modules/domain/articles/models/article-vers
 import { assertArticleVersion } from '@/modules/domain/articles/policies/article-version.policy';
 
 import { CreateArticleDto } from '../models/create-article.model';
-import { CreatorArticleQueryDto } from '../models/article-query.model';
+import { AuthoringArticleQueryDto } from '../models/article-query.model';
 import { UpdateArticleDto } from '../models/update-article.model';
 import { UpdateArticleHeroDto } from '../models/update-article-hero.model';
 
 @Injectable()
-export class CreatorArticleApiService {
+export class AuthoringArticleApiService {
   public constructor(
     private readonly articles: ArticleService,
     private readonly audit: AuditService,
@@ -38,7 +38,7 @@ export class CreatorArticleApiService {
 
   public async list(
     user: UserEntity,
-    query: CreatorArticleQueryDto,
+    query: AuthoringArticleQueryDto,
   ): Promise<ArticleManagementPageDto> {
     const [articles, itemCount] = await this.articles.paginateByAuthor(
       user.id,
