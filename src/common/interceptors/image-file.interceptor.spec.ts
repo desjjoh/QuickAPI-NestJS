@@ -15,7 +15,7 @@ import sharp from 'sharp';
 import { uploadTempRoot } from '@/config/storage.config';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
 import { ImageFileInterceptor } from './image-file.interceptor';
-import { UpdateArticleHeroDto } from '@/modules/api/v1/creator/articles/models/update-article-hero.model';
+import { UpdateArticleHeroDto } from '@/modules/api/v1/articles/models/update-article-hero.model';
 
 class UploadBody {
   @IsString()

@@ -59,8 +59,8 @@ import {
   TestSuite,
 } from '../../helpers/test-app';
 
-const PUBLIC_ROOT = '/api/v1/public/articles';
-const CREATOR_ROOT = '/api/v1/creator/articles';
+const PUBLIC_ROOT = '/api/v1/articles/public';
+const CREATOR_ROOT = '/api/v1/articles/me';
 const ADMINISTRATION_ROOT = '/api/v1/administration/articles';
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -702,12 +702,18 @@ describe('article API lifecycle', () => {
 
     await request(app.getHttpServer()).get(PUBLIC_ROOT).expect(200);
     await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
+    for (const retired of [
+      '/api/v1/public/articles',
+      '/api/v1/account/articles',
+    ])
+      await auth.agent.get(retired).set(auth.headers).expect(404);
+    await request(app.getHttpServer()).get(`${PUBLIC_ROOT}/me`).expect(422);
     await auth.agent.get(CREATOR_ROOT).set(auth.headers).expect(403);
     await request(app.getHttpServer()).get(ADMINISTRATION_ROOT).expect(401);
     await auth.agent.get(ADMINISTRATION_ROOT).set(auth.headers).expect(403);
   });
 
-  it('isolates creator routing from public article ID matching and retires the old paths', async () => {
+  it('isolates account article routing from public article ID matching and retires the old paths', async () => {
     const author = await creator();
     const response = await author.agent
       .get(CREATOR_ROOT)
@@ -715,6 +721,10 @@ describe('article API lifecycle', () => {
       .expect(200);
     expect(response.body.data).toEqual([]);
     await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
+    await author.agent
+      .get('/api/v1/creator/articles')
+      .set(author.headers)
+      .expect(404);
     await request(app.getHttpServer())
       .get('/api/v1/articles/creator')
       .expect(404);

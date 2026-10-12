@@ -46,17 +46,17 @@ Configuration keys live in [.env.example](.env.example) and [.env.staging.exampl
 
 ## API overview
 
-| Audience                         | Route                    |
-| -------------------------------- | ------------------------ |
-| Public                           | `/api/v1/public`         |
-| Creator                          | `/api/v1/creator`        |
-| Administration                   | `/api/v1/administration` |
-| Authentication and registration  | `/api/v1/authentication` |
-| Current account/profile/sessions | `/api/v1/account`        |
-| Account security                 | `/api/v1/security`       |
-| Reference data                   | `/api/v1/library`        |
+| Audience                          | Route                     |
+| --------------------------------- | ------------------------- |
+| Public articles                   | `/api/v1/articles/public` |
+| My articles (creator permissions) | `/api/v1/articles/me`     |
+| Administration                    | `/api/v1/administration`  |
+| Authentication and registration   | `/api/v1/authentication`  |
+| Current account/profile/sessions  | `/api/v1/account`         |
+| Account security                  | `/api/v1/security`        |
+| Reference data                    | `/api/v1/library`         |
 
-There are no aliases for the old `/api/v1/articles` routes. See [API contracts](docs/api-contracts.md) before integrating retries, lifecycle actions, or versioned updates. Enabled Swagger provides the detailed endpoint schemas.
+There are no aliases for retired article routes. See [API contracts](docs/api-contracts.md) before integrating retries, lifecycle actions, or versioned updates. Enabled Swagger provides the detailed endpoint schemas.
 
 ## Quality checks
 

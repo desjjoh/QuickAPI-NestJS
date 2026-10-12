@@ -52,20 +52,20 @@ import {
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ArticleVersionDto } from '@/modules/domain/articles/models/article-version.model';
 
-import { CreatorArticleQueryDto } from '../models/article-query.model';
+import { AuthoringArticleQueryDto } from '../models/article-query.model';
 import { CreateArticleDto } from '../models/create-article.model';
 import { UpdateArticleDto } from '../models/update-article.model';
 import { UpdateArticleHeroDto } from '../models/update-article-hero.model';
-import { CreatorArticleApiService } from '../services/articles.service';
+import { AuthoringArticleApiService } from '../services/authoring-articles.service';
 import { Idempotent } from '@/common/decorators/idempotent.decorator';
 
-@ApiTags('Creator Articles')
+@ApiTags('My Articles')
 @ApiBearerAuth('access-token')
-@Controller('articles')
+@Controller('me')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Throttle({ default: throttlePolicies.publicRead })
-export class CreatorArticleController {
-  public constructor(private readonly articles: CreatorArticleApiService) {}
+export class AuthoringArticleController {
+  public constructor(private readonly articles: AuthoringArticleApiService) {}
 
   @Get('')
   @Permissions(
@@ -79,7 +79,7 @@ export class CreatorArticleController {
   @ApiOkResponse({ type: ArticleManagementPageDto })
   public list(
     @CurrentUser() user: UserEntity,
-    @Query() query: CreatorArticleQueryDto,
+    @Query() query: AuthoringArticleQueryDto,
   ): Promise<ArticleManagementPageDto> {
     return this.articles.list(user, query);
   }

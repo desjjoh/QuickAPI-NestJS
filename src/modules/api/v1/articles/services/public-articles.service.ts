@@ -8,7 +8,7 @@ import {
 } from '@/modules/domain/articles/models/article.model';
 import { ArticleService } from '@/modules/domain/articles/services/article.service';
 
-import { PublicArticleQueryDto } from '../models/article-query.model';
+import { PublicArticleQueryDto } from '../models/public-article-query.model';
 
 @Injectable()
 export class PublicArticleApiService {

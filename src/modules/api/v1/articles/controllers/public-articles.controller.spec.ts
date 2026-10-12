@@ -1,7 +1,7 @@
 import { PATH_METADATA } from '@nestjs/common/constants';
 
-import { PublicArticleQueryDto } from '../models/article-query.model';
-import { PublicArticleController } from './articles.controller';
+import { PublicArticleQueryDto } from '../models/public-article-query.model';
+import { PublicArticleController } from './public-articles.controller';
 
 describe(PublicArticleController.name, () => {
   const articles = {
@@ -26,7 +26,7 @@ describe(PublicArticleController.name, () => {
     await expect(controller.find(detail.id)).resolves.toBe(detail);
 
     expect(Reflect.getMetadata(PATH_METADATA, PublicArticleController)).toBe(
-      'articles',
+      'public',
     );
     expect(articles.list).toHaveBeenCalledWith(query);
     expect(articles.find).toHaveBeenCalledWith(detail.id);
