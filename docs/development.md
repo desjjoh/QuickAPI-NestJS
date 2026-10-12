@@ -20,7 +20,7 @@ The example is a configuration reference, not a ready-to-deploy file. For local 
 - Development Redis uses host port 6379 without authentication. Leave `REDIS_PASSWORD` empty for that topology only; deployed Redis must use its configured credentials.
 - Swagger is opt-in but is not operations-key protected; restrict it at ingress outside development. Metrics and diagnostics use an operations credential outside development; development guards bypass the flag/key checks. Do not reuse an end-user token for operations access.
 - Email is disabled by default. Enable Postmark only with a valid token and sender; use fake providers in tests.
-- **Uploads currently bind Cloudflare R2 regardless of `STORAGE_DRIVER`.** To use uploads, configure `STORAGE_DRIVER=r2` and valid R2 credentials/URLs. The `local` configuration value is not a filesystem-storage implementation.
+- **Cloudflare R2 is the only supported storage provider.** `STORAGE_DRIVER` accepts only `r2` and defaults to it when omitted. All six R2 settings are required at startup in every environment. Replace reference placeholders with valid credentials/URLs before using uploads; unsupported drivers and missing/blank settings are rejected. Permanent uploads live in R2, while `UPLOAD_TMP_DIR` is scratch space and `public/` serves static assets.
 - Set a MaxMind license key and initialize both GeoLite2 databases before starting the app.
 
 For app-owned local TLS, create certificates and configure `HTTPS_KEY_PATH`/`HTTPS_CERT_PATH`, HTTPS URLs, and cookie settings consistently. Reverse-proxy TLS termination instead uses HTTP inside the trusted network; see [deployment](deployment.md).

@@ -17,7 +17,7 @@ This repository is more than a CRUD starter: it includes transaction-aware audit
 Use Node.js 22, npm, Docker Engine, and Docker Compose v2.
 
 1. Run `npm ci`, then copy [.env.example](.env.example) to a gitignored `.env`.
-2. Follow [local configuration](docs/development.md#local-configuration): replace secrets, set development logging, and configure GeoLite data. Uploads currently require R2; `STORAGE_DRIVER=local` does not provide a local backend.
+2. Follow [local configuration](docs/development.md#local-configuration): replace secrets, set development logging, and configure GeoLite data. R2 is the only supported storage provider; all R2 settings are required at startup.
 3. Start dependencies and apply migrations:
 
    ```bash
