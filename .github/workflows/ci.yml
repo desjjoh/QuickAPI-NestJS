@@ -57,7 +57,7 @@ env:
   POSTMARK_ENABLED: 'false'
   POSTMARK_SERVER_TOKEN: POSTMARK_TEST_TOKEN
   POSTMARK_FROM_EMAIL: noreply@test.example.com
-  STORAGE_DRIVER: local
+  STORAGE_DRIVER: r2
   R2_ACCOUNT_ID: cloudflare-test-account
   R2_ENDPOINT: https://cloudflare-test-account.r2.cloudflarestorage.com
   R2_ACCESS_KEY_ID: R2_TEST_ACCESS_KEY_ID

@@ -10,6 +10,7 @@ Recommended deployment contract:
 - Inject secrets and environment variables through the hosting platform.
 - Run all pending database migrations before starting or replacing API instances.
 - Keep `DB_SYNC=false` in production.
+- Use `STORAGE_DRIVER=r2` (the only supported provider, also the default) with all R2 credentials, bucket, endpoint, and public URL configured. Previous `local` settings must be updated; production rejects the shipped credential placeholders. Configuration validation does not verify provider connectivity or permissions—verify those against the actual R2 bucket before rollout.
 - Use HTTPS publicly.
 - Set `COOKIE_SECURE=true` for HTTPS environments.
 - Use `/ready` for readiness checks.

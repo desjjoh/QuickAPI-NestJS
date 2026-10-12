@@ -275,14 +275,15 @@ export const EnvSchema = z
     // # Storage / Cloudflare R2
     // # ============================================================
 
-    STORAGE_DRIVER: z.enum(['local', 'r2']).default('local'),
+    // R2 is the only implemented provider; never advertise a fallback driver.
+    STORAGE_DRIVER: z.literal('r2').default('r2'),
 
-    R2_ACCOUNT_ID: z.string().min(1).optional(),
-    R2_ENDPOINT: z.url().optional(),
-    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
-    R2_BUCKET_NAME: z.string().min(1).optional(),
-    R2_PUBLIC_BASE_URL: z.url().optional(),
+    R2_ACCOUNT_ID: z.string().trim().min(1),
+    R2_ENDPOINT: z.string().trim().pipe(z.url()),
+    R2_ACCESS_KEY_ID: z.string().trim().min(1),
+    R2_SECRET_ACCESS_KEY: z.string().trim().min(1),
+    R2_BUCKET_NAME: z.string().trim().min(1),
+    R2_PUBLIC_BASE_URL: z.string().trim().pipe(z.url()),
 
     // # ============================================================
     // # Redis
@@ -355,36 +356,18 @@ export const EnvSchema = z
       }
     }
 
-    if (env.STORAGE_DRIVER === 'r2') {
+    if (env.NODE_ENV === 'production') {
       for (const name of [
         'R2_ACCOUNT_ID',
-        'R2_ENDPOINT',
         'R2_ACCESS_KEY_ID',
         'R2_SECRET_ACCESS_KEY',
-        'R2_BUCKET_NAME',
-        'R2_PUBLIC_BASE_URL',
       ] as const) {
-        if (!env[name])
+        if (env[name] === exampleSentinels[name])
           ctx.addIssue({
             code: 'custom',
             path: [name],
-            message: `${name} is required when STORAGE_DRIVER is r2.`,
+            message: `${name} must not use the .env.example sentinel in production.`,
           });
-      }
-
-      if (env.NODE_ENV === 'production') {
-        for (const name of [
-          'R2_ACCOUNT_ID',
-          'R2_ACCESS_KEY_ID',
-          'R2_SECRET_ACCESS_KEY',
-        ] as const) {
-          if (env[name] === exampleSentinels[name])
-            ctx.addIssue({
-              code: 'custom',
-              path: [name],
-              message: `${name} must not use the .env.example sentinel in production.`,
-            });
-        }
       }
     }
 

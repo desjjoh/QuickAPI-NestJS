@@ -31,6 +31,7 @@ process.env.COOKIE_DOMAIN = '';
 process.env.POSTMARK_ENABLED = 'false';
 process.env.POSTMARK_SERVER_TOKEN = 'POSTMARK_TEST_TOKEN';
 process.env.POSTMARK_FROM_EMAIL = 'noreply@test.example.com';
+process.env.STORAGE_DRIVER = 'r2';
 process.env.R2_ACCOUNT_ID = 'cloudflare-test-account';
 process.env.R2_ENDPOINT =
   'https://cloudflare-test-account.r2.cloudflarestorage.com';

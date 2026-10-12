@@ -12,6 +12,8 @@ npm run check
 
 `npm test` includes unit and in-process `integration.spec.ts` suites. CI runs these in separate jobs. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
 
+Test setup explicitly selects the supported R2 driver and supplies inert R2 credentials/URLs before configuration loads, independent of a developer's `.env`. Storage tests mock the SDK or replace `StorageService` with an in-memory provider; they do not enable a nonexistent local driver or use live bucket credentials.
+
 ## Disposable E2E infrastructure
 
 E2E global setup **drops, migrates, and seeds the selected schema**. Never point these tests at development, staging, or production data. Safety requires explicit `TEST_DB_ENABLED=true`, `NODE_ENV=test`, `DB_SYNC=false`, and an active database exactly matching `TEST_DB_DATABASE`; a name containing “test” is not sufficient protection.

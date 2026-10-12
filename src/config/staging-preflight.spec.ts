@@ -111,6 +111,10 @@ describe('staging preflight', () => {
       /immutable sha256 digest/,
     ],
     [{ DB_SYNC: 'true' }, /DB_SYNC/],
+    [{ STORAGE_DRIVER: 'local' }, /STORAGE_DRIVER/],
+    [{ R2_BUCKET_NAME: '' }, /R2_BUCKET_NAME/],
+    [{ R2_ENDPOINT: '' }, /R2_ENDPOINT/],
+    [{ R2_PUBLIC_BASE_URL: '' }, /R2_PUBLIC_BASE_URL/],
   ])('rejects unsafe staging input %#', (change, message) =>
     rejects(change, message),
   );

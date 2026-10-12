@@ -13,6 +13,13 @@ function createValidEnv(
 
   return {
     ...envExample,
+    // Isolate each validation test from shipped reference placeholders.
+    R2_ACCOUNT_ID: 'test-account',
+    R2_ENDPOINT: 'https://test-account.r2.cloudflarestorage.com',
+    R2_ACCESS_KEY_ID: 'R2_TEST_ACCESS_KEY_ID',
+    R2_SECRET_ACCESS_KEY: 'R2_TEST_SECRET_ACCESS_KEY',
+    R2_BUCKET_NAME: 'test-bucket',
+    R2_PUBLIC_BASE_URL: 'https://assets.test.example.com',
     ...overrides,
   };
 }
@@ -25,7 +32,9 @@ describe('environment config', () => {
   };
 
   it('parses .env.example as a valid environment', () => {
-    const env = parseEnv(createValidEnv());
+    const env = parseEnv(
+      parse(readFileSync(resolve(process.cwd(), '.env.example'))),
+    );
 
     expect(env.NODE_ENV).toBeDefined();
     expect(env.PORT).toEqual(expect.any(Number));
@@ -36,6 +45,7 @@ describe('environment config', () => {
     expect(env.DOCUMENTATION_ENABLED).toBe(false);
     expect(env.METRICS_ENABLED).toBe(false);
     expect(env.DETAILED_DIAGNOSTICS_ENABLED).toBe(false);
+    expect(env.STORAGE_DRIVER).toBe('r2');
   });
 
   it('requires an operations credential for each protected surface', () => {
@@ -169,7 +179,7 @@ describe('environment config', () => {
     ).toThrow();
   });
 
-  it('does not require credentials for disabled integrations in production', () => {
+  it('does not require credentials for disabled Postmark while R2 remains required', () => {
     const env = parseEnv(
       createValidEnv({
         NODE_ENV: 'production',
@@ -178,18 +188,12 @@ describe('environment config', () => {
         POSTMARK_ENABLED: 'false',
         POSTMARK_SERVER_TOKEN: undefined,
         POSTMARK_FROM_EMAIL: undefined,
-        STORAGE_DRIVER: 'local',
-        R2_ACCOUNT_ID: undefined,
-        R2_ENDPOINT: undefined,
-        R2_ACCESS_KEY_ID: undefined,
-        R2_SECRET_ACCESS_KEY: undefined,
-        R2_BUCKET_NAME: undefined,
-        R2_PUBLIC_BASE_URL: undefined,
       }),
     );
 
     expect(env.POSTMARK_SERVER_TOKEN).toBeUndefined();
-    expect(env.R2_ACCESS_KEY_ID).toBeUndefined();
+    expect(env.STORAGE_DRIVER).toBe('r2');
+    expect(env.R2_ACCESS_KEY_ID).toBe('R2_TEST_ACCESS_KEY_ID');
   });
 
   it.each([
@@ -220,7 +224,7 @@ describe('environment config', () => {
   });
 
   it('rejects enabled Postmark and R2 example credentials in production', () => {
-    const example = createValidEnv();
+    const example = parse(readFileSync(resolve(process.cwd(), '.env.example')));
     expect(() =>
       parseEnv({
         ...example,
@@ -231,6 +235,85 @@ describe('environment config', () => {
       }),
     ).toThrow(/sentinel/);
   });
+
+  it('defaults to the actual R2 provider when STORAGE_DRIVER is omitted', () => {
+    expect(
+      parseEnv(createValidEnv({ STORAGE_DRIVER: undefined })).STORAGE_DRIVER,
+    ).toBe('r2');
+  });
+
+  it.each(['local', 's3', '', 'r2 '])(
+    'rejects unsupported STORAGE_DRIVER=%j',
+    (driver) => {
+      expect(() =>
+        parseEnv(createValidEnv({ STORAGE_DRIVER: driver })),
+      ).toThrow(/STORAGE_DRIVER/);
+    },
+  );
+
+  const storageFields = [
+    'R2_ACCOUNT_ID',
+    'R2_ENDPOINT',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+    'R2_BUCKET_NAME',
+    'R2_PUBLIC_BASE_URL',
+  ] as const;
+  const missingStorageCases = (
+    ['development', 'test', 'production'] as const
+  ).flatMap((mode) =>
+    storageFields.flatMap((field) =>
+      [undefined, '', '   '].map((value) => ({ mode, field, value })),
+    ),
+  );
+  it.each(missingStorageCases)(
+    'rejects $field=$value in $mode without a driver validation bypass',
+    ({ mode, field, value }) => {
+      expect(() =>
+        parseEnv(
+          createValidEnv({
+            NODE_ENV: mode,
+            ...productionSecrets,
+            BULL_BOARD_ENABLED: 'false',
+            STORAGE_DRIVER: undefined,
+            [field]: value,
+          }),
+        ),
+      ).toThrow(new RegExp(field));
+    },
+  );
+
+  it.each(['R2_ENDPOINT', 'R2_PUBLIC_BASE_URL'] as const)(
+    'rejects malformed %s URLs',
+    (field) => {
+      expect(() => parseEnv(createValidEnv({ [field]: 'not-a-url' }))).toThrow(
+        new RegExp(field),
+      );
+    },
+  );
+
+  it.each([
+    'R2_ACCOUNT_ID',
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY',
+  ] as const)(
+    'rejects the %s reference sentinel in production independently',
+    (field) => {
+      const example = parse(
+        readFileSync(resolve(process.cwd(), '.env.example')),
+      );
+      expect(() =>
+        parseEnv(
+          createValidEnv({
+            NODE_ENV: 'production',
+            ...productionSecrets,
+            BULL_BOARD_ENABLED: 'false',
+            [field]: example[field],
+          }),
+        ),
+      ).toThrow(new RegExp(`${field} must not use`));
+    },
+  );
 
   it('rejects invalid Postmark sender email', () => {
     expect(() =>
