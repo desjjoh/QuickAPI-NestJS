@@ -7,7 +7,6 @@ This repository is more than a CRUD starter: it includes transaction-aware audit
 ## What's included
 
 - Identity: registration, sign-in, refresh/session management, MFA, password reset, email verification, profiles, and user administration.
-- Articles: public reading, creator editing and submission, administrator review/publishing, hero images, and explicit transition rules.
 - Shared reference data, permissions, and lean repositories with service-owned mutations.
 - MySQL/TypeORM migrations, Redis/BullMQ workers, email outbox, and durable storage deletion/upload tracking.
 - OpenAPI documentation, structured logging, health/readiness endpoints, opt-in metrics, and production-image CI checks.
@@ -47,15 +46,15 @@ Configuration keys live in [.env.example](.env.example) and [.env.staging.exampl
 
 ## API overview
 
-| Audience                         | Route                      |
-| -------------------------------- | -------------------------- |
-| Public articles                  | `/api/v1/public/articles`  |
-| Creator articles                 | `/api/v1/creator/articles` |
-| Article and user administration  | `/api/v1/administration`   |
-| Authentication and registration  | `/api/v1/authentication`   |
-| Current account/profile/sessions | `/api/v1/account`          |
-| Account security                 | `/api/v1/security`         |
-| Reference data                   | `/api/v1/library`          |
+| Audience                         | Route                    |
+| -------------------------------- | ------------------------ |
+| Public                           | `/api/v1/public`         |
+| Creator                          | `/api/v1/creator`        |
+| Administration                   | `/api/v1/administration` |
+| Authentication and registration  | `/api/v1/authentication` |
+| Current account/profile/sessions | `/api/v1/account`        |
+| Account security                 | `/api/v1/security`       |
+| Reference data                   | `/api/v1/library`        |
 
 There are no aliases for the old `/api/v1/articles` routes. See [API contracts](docs/api-contracts.md) before integrating retries, lifecycle actions, or versioned updates. Enabled Swagger provides the detailed endpoint schemas.
 

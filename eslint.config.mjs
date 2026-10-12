@@ -29,4 +29,10 @@ export default tseslint.config(
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
+  {
+    // Direct Node build tooling is CommonJS, outside the TypeScript program.
+    files: ['.github/scripts/*.cjs'],
+    languageOptions: { parserOptions: { project: null } },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
 );

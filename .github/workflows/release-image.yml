@@ -32,6 +32,7 @@ env:
   # Track Trivy's current scanner so newly released distro versions (such as
   # Alpine 3.24) are interpreted by scanner logic that understands them.
   TRIVY_SCANNER_IMAGE: aquasec/trivy:latest
+  REGCTL_IMAGE: ghcr.io/regclient/regctl:latest
 
 jobs:
   release:
@@ -99,23 +100,25 @@ jobs:
             echo EOF
           } >> "$GITHUB_OUTPUT"
 
-      - uses: docker/setup-buildx-action@v4
-      - name: Log in to selected registry
-        uses: docker/login-action@v4
+      - uses: actions/setup-node@v5
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.REGISTRY_USERNAME || github.actor }}
-          password: ${{ secrets.REGISTRY_PASSWORD || github.token }}
+          node-version: 22
+      - name: Prepare local candidate directory
+        run: mkdir -p "$RUNNER_TEMP/release-candidate"
+      - uses: docker/setup-buildx-action@v4
 
-      # This is the only image build in the release workflow. All tags point to
-      # the manifest digest emitted by this step.
-      - name: Build and push release image once
+      # One unpublished build. OCI preserves runtime, provenance, and SBOM
+      # manifests; release tags are created only after the shared gate passes.
+      - name: Build unpublished release candidate
         id: build
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
+          pull: true
+          push: false
+          platforms: linux/amd64
+          tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.sha }}
+          outputs: type=oci,dest=${{ runner.temp }}/release-candidate/image.tar
           provenance: mode=max
           sbom: true
           labels: |
@@ -124,110 +127,41 @@ jobs:
             org.opencontainers.image.version=${{ steps.metadata.outputs.version }}
             org.opencontainers.image.created=${{ steps.metadata.outputs.built }}
 
-      - name: Capture immutable deployment reference
-        run: |
-          reference="${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}"
-          echo "QUICKAPI_IMAGE=$reference" | tee release-image.env
-          echo "quickapi-image=$reference" >> "$GITHUB_OUTPUT"
-          echo "### Release image" >> "$GITHUB_STEP_SUMMARY"
-          echo "\`QUICKAPI_IMAGE=$reference\`" >> "$GITHUB_STEP_SUMMARY"
-        id: immutable
+      - name: Scan candidate and enforce critical vulnerability gate
+        id: scan
+        env:
+          RELEASE_SCAN_CACHE: ${{ runner.temp }}/trivy-cache
+        run: node .github/scripts/release-check.cjs scan "$RUNNER_TEMP/release-candidate/image.tar" "$RUNNER_TEMP/release-evidence"
 
-      - name: Generate SPDX SBOM from immutable image
-        uses: anchore/sbom-action@v0
+      - name: Log in to selected registry after scan approval
+        uses: docker/login-action@v4
         with:
-          image: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
-          format: spdx-json
-          output-file: quickapi.spdx.json
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME || github.actor }}
+          password: ${{ secrets.REGISTRY_PASSWORD || github.token }}
 
-      - name: Report high-severity vulnerabilities
+      - name: Publish the exact approved archive and release tags
+        id: immutable
         env:
-          IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/trivy-cache"
-          docker run --rm \
-            --volume "$HOME/.docker:/root/.docker:ro" \
-            --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            "$TRIVY_SCANNER_IMAGE" image \
-            --scanners vuln \
-            --format table \
-            --output /workspace/high-vulnerabilities.txt \
-            --severity HIGH \
-            --ignore-unfixed \
-            --exit-code 0 \
-            "$IMAGE_REF"
-
-      - name: Report critical vulnerabilities
-        env:
-          IMAGE_REF: ${{ steps.release.outputs.image }}@${{ steps.build.outputs.digest }}
-        run: |
-          docker run --rm \
-            --volume "$HOME/.docker:/root/.docker:ro" \
-            --volume "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            "$TRIVY_SCANNER_IMAGE" image \
-            --scanners vuln \
-            --format json \
-            --output /workspace/critical-vulnerabilities.json \
-            --severity CRITICAL \
-            --ignore-unfixed \
-            --exit-code 0 \
-            "$IMAGE_REF"
-          # Keep SARIF for code scanning, and retain JSON so the package and
-          # minimum fixed version are visible in the job log and artifacts.
-          docker run --rm \
-            --volume "$PWD:/workspace" \
-            --workdir /workspace \
-            "$TRIVY_SCANNER_IMAGE" convert \
-            --format sarif \
-            --output /workspace/critical-vulnerabilities.sarif \
-            /workspace/critical-vulnerabilities.json
-          count="$(jq '[.Results[]?.Vulnerabilities[]?] | length' critical-vulnerabilities.json)"
-          if [[ "$count" -gt 0 ]]; then
-            summary="$RUNNER_TEMP/critical-vulnerabilities.md"
-            {
-              echo '### Fixable critical vulnerabilities'
-              echo
-              echo '| Vulnerability | Package | Installed | Fixed version | Image target |'
-              echo '| --- | --- | --- | --- | --- |'
-            } > "$summary"
-            jq -r '.Results[] as $result | $result.Vulnerabilities[]? | [
-                .VulnerabilityID,
-                .PkgName,
-                .InstalledVersion,
-                .FixedVersion,
-                $result.Target
-              ] | @tsv' critical-vulnerabilities.json |
-              while IFS=$'\t' read -r vulnerability package installed fixed target; do
-                echo "| \`$vulnerability\` | \`$package\` | \`$installed\` | \`$fixed\` | \`$target\` |" >> "$summary"
-                echo "::warning title=$vulnerability in $package::Installed $installed; upgrade to $fixed (target: $target)."
-              done
-            {
-              echo
-              echo 'Download `critical-vulnerabilities.json` from the release evidence artifact for the complete Trivy findings.'
-            } >> "$summary"
-            tee -a "$GITHUB_STEP_SUMMARY" < "$summary"
-          fi
+          RELEASE_IMAGE: ${{ steps.release.outputs.image }}
+          RELEASE_TAGS: ${{ steps.metadata.outputs.tags }}
+          RELEASE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: node .github/scripts/release-publish.cjs "$RUNNER_TEMP/release-candidate/image.tar" "$RUNNER_TEMP/release-evidence"
 
       - name: Upload vulnerability report to code scanning
-        if: always() && hashFiles('critical-vulnerabilities.sarif') != ''
+        if: always() && steps.scan.outputs.sarif == 'true'
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: critical-vulnerabilities.sarif
+          sarif_file: ${{ runner.temp }}/release-evidence/vulnerabilities.sarif
+        continue-on-error: true
 
-      - name: Publish release evidence
+      - name: Retain release and failure evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: release-evidence-${{ steps.release.outputs.sha }}
           path: |
-            release-image.env
-            quickapi.spdx.json
-            high-vulnerabilities.txt
-            critical-vulnerabilities.json
-            critical-vulnerabilities.sarif
+            ${{ runner.temp }}/release-evidence/
+            security/container-vulnerability-exceptions.json
             security/container-vulnerability-exceptions.md
           if-no-files-found: warn

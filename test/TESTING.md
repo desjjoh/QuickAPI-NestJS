@@ -10,6 +10,10 @@ npm run test:cov
 npm run check
 ```
 
+`npm run test:release` runs dependency-free Node tests of release gating, exception scopes/expiry, scanner failures, evidence tampering, and publication ordering. It does not build, scan, authenticate to a registry, or publish. CI runs these tests before release eligibility. `npm run release:check` separately builds and scans a real local production candidate, retaining OCI provenance/SBOM and complete findings under ignored `.release-check/`; it never pushes an image. Critical findings require remediation or explicit reviewed exceptions, even without a fix. HIGH/lower findings remain visible.
+
+The optional `RELEASE_REGISTRY_TEST=true` transport regression requires `RELEASE_TEST_ARCHIVE` and `RELEASE_TEST_EVIDENCE` pointing to an approved local candidate. It copies that candidate only into a newly created private Docker registry/network with no host ports, verifies digest/attestation preservation, then removes those test containers/network. It never uses production credentials or contacts GitHub. Registry permission behavior still needs environment-specific verification.
+
 `npm test` includes unit and in-process `integration.spec.ts` suites. CI runs these in separate jobs. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
 
 Test setup explicitly selects the supported R2 driver and supplies inert R2 credentials/URLs before configuration loads, independent of a developer's `.env`. Storage tests mock the SDK or replace `StorageService` with an in-memory provider; they do not enable a nonexistent local driver or use live bucket credentials.
