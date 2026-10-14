@@ -1,10 +1,16 @@
-# Unit service tests
+# Unit tests
 
 [Testing guide](../TESTING.md) · [Architecture](../../docs/architecture.md)
 
 Import shared builders and typed mocks from `test/unit`. Builders return a small,
 valid baseline entity and accept `Partial<Entity>` overrides, so a test only names
 the state relevant to its behavior.
+
+Unit specs mirror production paths beneath `src`: a service in
+`src/modules/domain/identity/services` has its isolated tests in
+`test/unit/modules/domain/identity/services`. Import production code through `@/`.
+Tests exercising real HTTP pipelines, SQL/metadata compilation, or filesystem
+integration belong in the matching path under `test/integration` instead.
 
 Keep every service test focused on one public behavior:
 

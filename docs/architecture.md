@@ -21,7 +21,11 @@ src/
     domain/         Articles, identity, media, audit, and library
     system/         Storage, cleanup, email, queues, idempotency, context,
                     geolocation, database, and other infrastructure concerns
-test/               Shared test helpers, integration tests, and HTTP E2E suites
+test/
+  unit/             Isolated specs mirroring src, plus shared typed test builders
+  integration/      Component/HTTP/filesystem specs mirroring src
+  e2e/              Database-backed HTTP E2E suites
+  helpers/          Shared test infrastructure and fixtures
 ```
 
 - **Repositories** are the domain's datasource boundary. Keep queries focused and read-only; do not add application mutations or orchestration here.

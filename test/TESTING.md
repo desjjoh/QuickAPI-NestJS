@@ -6,6 +6,8 @@
 
 ```bash
 npm test
+npm run test:unit
+npm run test:integration
 npm run test:cov
 npm run check
 ```
@@ -14,7 +16,9 @@ npm run check
 
 The optional `RELEASE_REGISTRY_TEST=true` transport regression requires `RELEASE_TEST_ARCHIVE` and `RELEASE_TEST_EVIDENCE` pointing to an approved local candidate. It copies that candidate only into a newly created private Docker registry/network with no host ports, verifies digest/attestation preservation, then removes those test containers/network. It never uses production credentials or contacts GitHub. Registry permission behavior still needs environment-specific verification.
 
-`npm test` includes unit and in-process `integration.spec.ts` suites. CI runs these in separate jobs. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
+`npm test` includes all suites beneath `test/unit` and `test/integration`. Both directories mirror the paths beneath `src` (for example, `src/modules/domain/articles/services/article.service.ts` is tested by `test/unit/modules/domain/articles/services/article.service.spec.ts`). Unit tests isolate behavior with mocked dependencies. Integration tests exercise real component boundaries such as the Nest HTTP pipeline, TypeORM SQL/metadata, and filesystem/image processing; they do not require live providers or the E2E database. Classify by behavior, not by filename. E2E suites remain in `test/e2e`, and shared support stays in `test/helpers` and `test/unit`.
+
+CI selects the two categories by directory, not an `integration.spec.ts` suffix. Coverage targets production files beneath `src`, not test files. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
 
 Test setup explicitly selects the supported R2 driver and supplies inert R2 credentials/URLs before configuration loads, independent of a developer's `.env`. Storage tests mock the SDK or replace `StorageService` with an in-memory provider; they do not enable a nonexistent local driver or use live bucket credentials.
 
