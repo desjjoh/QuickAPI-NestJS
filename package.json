@@ -18,6 +18,8 @@
     "typecheck:main": "tsc --noEmit",
     "typecheck:e2e": "tsc --project test/tsconfig.e2e.json --noEmit",
     "test": "jest",
+    "test:unit": "jest --testPathPatterns=test/unit/",
+    "test:integration": "jest --testPathPatterns=test/integration/",
     "test:verbose": "npm run test -- --verbose",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -153,9 +155,13 @@
     "rootDir": ".",
     "roots": [
       "<rootDir>/src",
-      "<rootDir>/test"
+      "<rootDir>/test/unit",
+      "<rootDir>/test/integration"
     ],
-    "testRegex": ".*\\.spec\\.ts$",
+    "testMatch": [
+      "<rootDir>/test/unit/**/*.spec.ts",
+      "<rootDir>/test/integration/**/*.spec.ts"
+    ],
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },

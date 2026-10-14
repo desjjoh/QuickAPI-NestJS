@@ -127,7 +127,7 @@ jobs:
       - name: Run isolated unit tests with coverage
         run: |
           mkdir -p junit
-          npm run test:cov -- --testPathIgnorePatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/unit-jest.json
+          npm run test:cov -- --testPathPatterns=test/unit/ --detectOpenHandles --json --outputFile=junit/unit-jest.json
       - name: Upload unit Jest results and coverage
         if: always()
         uses: actions/upload-artifact@v6
@@ -203,7 +203,7 @@ jobs:
       - name: Run integration tests
         run: |
           mkdir -p junit
-          npm test -- --testPathPatterns=integration.spec.ts --detectOpenHandles --json --outputFile=junit/integration-jest.json
+          npm run test:integration -- --detectOpenHandles --json --outputFile=junit/integration-jest.json
       - name: Capture service logs on failure
         if: failure()
         run: |
