@@ -3,6 +3,7 @@ import { IdempotencyService } from '@/modules/system/idempotency/services/idempo
 import { idempotencyTestStore } from '../../../../../helpers/idempotency-test-store';
 import { runInTransaction } from '@/common/helpers/transaction.helper';
 import { logger } from '@/config/logger.config';
+import { activeIdempotencyKey } from '@/common/store/idempotency-context.store';
 
 describe('durable request idempotency', () => {
   const scope = {
@@ -28,6 +29,23 @@ describe('durable request idempotency', () => {
       'erased after account deletion',
     );
     expect(work).toHaveBeenCalledTimes(1);
+  });
+  it('exposes the original key only during execution, not on replay or after failure', async () => {
+    const work = jest.fn(async () => {
+      expect(activeIdempotencyKey()).toBe('audited-key');
+      return { status: 204, body: null };
+    });
+    await service.execute(scope, 'audited-key', 'fp', work);
+    await service.execute(scope, 'audited-key', 'fp', work);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(activeIdempotencyKey()).toBeNull();
+    await expect(
+      service.execute(scope, 'failed-key', 'fp', async () => {
+        expect(activeIdempotencyKey()).toBe('failed-key');
+        throw new Error('rollback');
+      }),
+    ).rejects.toThrow('rollback');
+    expect(activeIdempotencyKey()).toBeNull();
   });
   afterEach(() => {
     service.onModuleDestroy();

@@ -24,6 +24,7 @@ function entity(id = 'audit-1'): AuditEventEntity {
     resource_id: 'resource-1',
     operation_id: 'operation-1',
     request_id: 'request-1',
+    idempotency_key: 'original-key',
     session_id: 'session-1',
     ip_address: null,
     user_agent: null,
@@ -68,6 +69,7 @@ describe('AuditQueryService', () => {
       Order.DESC,
     );
     expect(result.data.map(({ id }) => id)).toEqual([row.id]);
+    expect(result.data[0].idempotencyKey).toBe('original-key');
     expect(result.meta).toEqual({
       page: 2,
       take: 2,

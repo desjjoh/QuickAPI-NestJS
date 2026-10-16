@@ -305,6 +305,8 @@ describe('authenticated account profile lifecycle', () => {
     expect(put).toHaveBeenCalledTimes(3);
     expect(remove).toHaveBeenCalledTimes(2);
     expect(await audits.count()).toBe(baseline + 4);
+    for (const key of ['assign', 'replace', 'remove', 'new-avatar'])
+      expect(await audits.countBy({ idempotency_key: key })).toBe(1);
     expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
 
     const snapshots = await suite.dataSource

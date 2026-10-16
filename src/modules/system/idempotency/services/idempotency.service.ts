@@ -14,6 +14,7 @@ import {
 import { InvalidOperationError } from '@/common/errors/operation.error';
 import { idempotencyPolicy } from '@/config/idempotency.config';
 import { logger } from '@/config/logger.config';
+import { withIdempotencyKey } from '@/common/store/idempotency-context.store';
 import { IdempotencyEntity } from '../entities/idempotency.entity';
 import { IdempotencyRepository } from '../repositories/idempotency.repository';
 
@@ -142,7 +143,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
           const response = await withApplicationTransaction(
             manager,
             lifecycle,
-            work,
+            () => withIdempotencyKey(key, work),
           );
           // Store the original JSON response, not a later projection of a mutable resource.
           const body = JSON.parse(

@@ -99,6 +99,9 @@ export class AuditEventEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 64, nullable: true })
   public readonly request_id!: string | null;
 
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public readonly idempotency_key!: string | null;
+
   @Index('IDX_activity_audits_session_id')
   @Column({ type: 'varchar', length: 16, nullable: true })
   public readonly session_id!: string | null;

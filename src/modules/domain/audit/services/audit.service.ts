@@ -1,5 +1,6 @@
 import { applicationManager } from '@/common/helpers/transaction.helper';
 import { RequestContext } from '@/common/store/request-context.store';
+import { activeIdempotencyKey } from '@/common/store/idempotency-context.store';
 import {
   BadRequestException,
   Injectable,
@@ -36,6 +37,7 @@ export interface RecordAuditInput {
   readonly source: AuditSource;
   readonly metadata: Record<string, unknown>;
   readonly requestId?: string | null;
+  readonly idempotencyKey?: string | null;
   readonly sessionId?: string | null;
   readonly ipAddress?: string | null;
   readonly userAgent?: string | null;
@@ -174,6 +176,11 @@ export class AuditService {
       resource_id: input.resourceId ?? null,
       domain: input.domain,
       operation_id: input.operationId ?? generateOperationId(),
+      idempotency_key: this.explicitOrContext(
+        input,
+        'idempotencyKey',
+        activeIdempotencyKey() ?? undefined,
+      ),
       request_id: this.explicitOrContext(
         input,
         'requestId',
@@ -270,6 +277,13 @@ export class AuditService {
 
     this.optionalString('resourceId', input.resourceId, 255);
     this.optionalString('requestId', input.requestId, 64);
+    this.optionalString('idempotencyKey', input.idempotencyKey, 128);
+    if (
+      input.idempotencyKey != null &&
+      (!/^[\x21-\x7e]+$/.test(input.idempotencyKey) ||
+        input.idempotencyKey.includes(','))
+    )
+      throw new BadRequestException('idempotencyKey is invalid');
     this.optionalString('sessionId', input.sessionId, 16);
     this.optionalString('ipAddress', input.ipAddress, 45);
     this.optionalString('userAgent', input.userAgent, 512);
