@@ -40,6 +40,7 @@ export class AuditEvent extends BaseModel {
   public readonly resourceId: string | null;
   public readonly operationId: string | null;
   public readonly requestId: string | null;
+  public readonly idempotencyKey: string | null;
   public readonly sessionId: string | null;
   public readonly ipAddress: string | null;
   public readonly userAgent: string | null;
@@ -69,6 +70,7 @@ export class AuditEvent extends BaseModel {
     this.resourceId = entity.resource_id;
     this.operationId = entity.operation_id;
     this.requestId = entity.request_id;
+    this.idempotencyKey = entity.idempotency_key ?? null;
     this.sessionId = entity.session_id;
     this.ipAddress = entity.ip_address;
     this.userAgent = entity.user_agent;

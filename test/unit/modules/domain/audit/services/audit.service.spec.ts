@@ -7,6 +7,8 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import type { EntityManager } from 'typeorm';
 
 import { RequestContext } from '@/common/store/request-context.store';
+import { withIdempotencyKey } from '@/common/store/idempotency-context.store';
+import { AuditEvent } from '@/modules/domain/audit/models/audit-query-result.model';
 import * as nanoidHelper from '@/common/helpers/nanoid.helper';
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
@@ -49,6 +51,40 @@ describe(AuditService.name, () => {
       context,
     );
   });
+
+  it('records nullable keys, explicit overrides and isolated active operation keys', async () => {
+    expect((await service.record(activity))?.idempotency_key).toBeNull();
+    const keyed = await withIdempotencyKey('original-key', () =>
+      service.record(activity),
+    );
+    expect(keyed?.idempotency_key).toBe('original-key');
+    expect(
+      new AuditEvent({ ...keyed, occurred_at: new Date() } as AuditEventEntity)
+        .idempotencyKey,
+    ).toBe('original-key');
+    expect(
+      (
+        await withIdempotencyKey('context-key', () =>
+          service.record({ ...activity, idempotencyKey: null }),
+        )
+      )?.idempotency_key,
+    ).toBeNull();
+    expect(
+      (await service.record({ ...activity, idempotencyKey: 'explicit-key' }))
+        ?.idempotency_key,
+    ).toBe('explicit-key');
+    expect((await service.record(activity))?.idempotency_key).toBeNull();
+  });
+
+  it.each(['', 'two keys', 'a,b', 'x'.repeat(129), 'é'])(
+    'rejects invalid explicit idempotency keys: %s',
+    (idempotencyKey) => {
+      expect(() => service.record({ ...activity, idempotencyKey })).toThrow(
+        BadRequestException,
+      );
+      expect(repository.insert).not.toHaveBeenCalled();
+    },
+  );
 
   it('records an explicitly supplied activity after redacting metadata', async () => {
     const result = await service.record(activity);

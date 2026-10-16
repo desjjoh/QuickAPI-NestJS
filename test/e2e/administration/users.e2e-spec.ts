@@ -549,6 +549,7 @@ describe('user administration authorization and lifecycle', () => {
         where: {
           event: IdentityAuditEvents.ADMIN_USER_UPDATED,
           resource_id: target.id,
+          idempotency_key: 'concurrent',
         },
       }),
     ).toBe(1);

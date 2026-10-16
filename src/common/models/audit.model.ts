@@ -183,6 +183,14 @@ export class AuditEventDto {
     nullable: true,
   })
   public readonly requestId: string | null;
+
+  @ApiProperty({
+    description: 'Client idempotency key for the original operation, or null.',
+    type: String,
+    nullable: true,
+    maxLength: 128,
+  })
+  public readonly idempotencyKey: string | null;
   @ApiPropertyOptional({
     example: 'S3s4s5i6o7n8I9d0',
     description:
@@ -323,6 +331,7 @@ export class AuditEventDto {
     this.occurredAt = new Date(event.occurredAt);
     this.operationId = event.operationId;
     this.requestId = event.requestId;
+    this.idempotencyKey = event.idempotencyKey;
     this.sessionId = event.sessionId;
     this.ipAddress = event.ipAddress;
     this.ipLocation = new AuditIpLocationDto(location);

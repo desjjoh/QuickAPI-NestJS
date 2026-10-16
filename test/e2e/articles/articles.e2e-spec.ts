@@ -915,6 +915,7 @@ describe('article API lifecycle', () => {
         where: {
           event: ArticleAuditEvents.CREATED,
           resource_id: original.body.id as string,
+          idempotency_key: 'concurrent-create',
         },
       }),
     ).toBe(1);
