@@ -6,7 +6,7 @@ import { ArticlesModule } from '@/modules/domain/articles/articles.module';
 import { AdministrationApiModule } from '@/modules/api/v1/administration/administration.module';
 import { ArticlesApiModule } from '@/modules/api/v1/articles/articles.module';
 import { PublicApiModule } from '@/modules/api/v1/public/public.module';
-import { PublicArticleController } from '@/modules/api/v1/public/articles/controllers/public-articles.controller';
+import { PublicArticleController } from '@/modules/api/v1/public/controllers/public-articles.controller';
 
 describe('article API module dependencies', () => {
   it('registers public reads only in the public API module', () => {

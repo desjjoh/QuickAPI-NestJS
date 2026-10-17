@@ -1,7 +1,7 @@
 import { PATH_METADATA } from '@nestjs/common/constants';
 
-import { PublicArticleQueryDto } from '@/modules/api/v1/public/articles/models/public-article-query.model';
-import { PublicArticleController } from '@/modules/api/v1/public/articles/controllers/public-articles.controller';
+import { PublicArticleQueryDto } from '@/modules/api/v1/public/models/public-article-query.model';
+import { PublicArticleController } from '@/modules/api/v1/public/controllers/public-articles.controller';
 
 describe(PublicArticleController.name, () => {
   const articles = {

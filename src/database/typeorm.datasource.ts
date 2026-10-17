@@ -8,10 +8,10 @@ import { env } from '@/config/environment.config';
 // PUBLIC LIBRARY
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
-import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 
 // USER IDENTITY
+import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
 import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
@@ -62,15 +62,15 @@ const dataSourceOptions: DataSourceOptions = {
     CountryEntity,
     RegionEntity,
     TimezoneEntity,
-    GenderEntity,
-    PermissionEntity,
-    RoleEntity,
-    AccountStatusEntity,
     // MEDIA MODULE
     ImageEntity,
     StorageDeletionIntentEntity,
     StorageObjectEntity,
     // IDENTITY MODULE
+    GenderEntity,
+    PermissionEntity,
+    RoleEntity,
+    AccountStatusEntity,
     UserAddressEntity,
     UserPhoneEntity,
     UserMfaSettingsEntity,

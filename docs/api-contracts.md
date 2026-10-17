@@ -34,7 +34,7 @@ Security routes use the shared request transaction and root-user lock. Authentic
 
 ## Article API audiences
 
-Public article controllers/services and request models live under `src/modules/api/v1/public/articles` in the public API module. Authoring remains in the articles API module mounted at `v1/articles` without an additional controller prefix. Creator permissions and ownership restrictions remain unchanged. Administration keeps its article controller in the administration module. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
+Public article controllers, services, and request models live in the corresponding `controllers`, `services`, and `models` folders under `src/modules/api/v1/public`. Authoring remains in the articles API module mounted at `v1/articles` without an additional controller prefix. Creator permissions and ownership restrictions remain unchanged. Administration keeps its article controller in the administration module. Shared article query and outbound models, application rules, and persistence remain in the articles domain module.
 
 - Public reads: `/api/v1/public/articles` and `/api/v1/public/articles/:id`.
 - My article reads and creation: `/api/v1/articles`; detail and updates: `/api/v1/articles/:id`; hero replacement, submission, and withdrawal: `/:id/hero`, `/:id/submit`, and `/:id/withdraw` beneath that collection. Authentication alone does not grant access: these actions require the corresponding creator permissions and enforce ownership.
