@@ -6,7 +6,7 @@ import { MAX_VERIFICATION_CODE_ATTEMPTS } from '@/config/token.config';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 import {
   acquireCsrf,
   CapturingEmailService,

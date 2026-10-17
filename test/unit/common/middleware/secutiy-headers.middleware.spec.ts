@@ -40,7 +40,9 @@ function createNext(): jest.MockedFunction<NextFunction> {
 describe('securityHeadersMiddleware', () => {
   it('sets same-origin CORP for API routes', () => {
     const mw = securityHeadersMiddleware();
-    const req = createRequest({ originalUrl: '/api/v1/library/countries' });
+    const req = createRequest({
+      originalUrl: '/api/v1/public/library/countries',
+    });
     const res = createResponse();
     const next = createNext();
 

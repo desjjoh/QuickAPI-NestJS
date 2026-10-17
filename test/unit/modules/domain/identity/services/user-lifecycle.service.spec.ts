@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';

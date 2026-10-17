@@ -26,9 +26,9 @@ describe(AuthoringArticleController.name, () => {
       operation.mockResolvedValue({ id: 'article-1' });
   });
 
-  it('owns the authenticated me controller prefix', () => {
+  it('mounts directly at the authenticated articles module root', () => {
     expect(Reflect.getMetadata(PATH_METADATA, AuthoringArticleController)).toBe(
-      'me',
+      '',
     );
   });
 

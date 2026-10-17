@@ -1,12 +1,12 @@
 import { DataSource, QueryRunner } from 'typeorm';
 
 import applicationDataSource from '@/database/typeorm.datasource';
-import { AccountStatusSeeder } from '@/modules/domain/library/seeders/accountstatus.seeder';
+import { AccountStatusSeeder } from '@/modules/domain/identity/seeders/accountstatus.seeder';
 import { CountrySeeder } from '@/modules/domain/library/seeders/country.seeder';
-import { GenderSeeder } from '@/modules/domain/library/seeders/gender.seeder';
-import { PermissionSeeder } from '@/modules/domain/library/seeders/permission.seeder';
+import { GenderSeeder } from '@/modules/domain/identity/seeders/gender.seeder';
+import { PermissionSeeder } from '@/modules/domain/identity/seeders/permission.seeder';
 import { RegionSeeder } from '@/modules/domain/library/seeders/region.seeder';
-import { RoleSeeder } from '@/modules/domain/library/seeders/role.seeder';
+import { RoleSeeder } from '@/modules/domain/identity/seeders/role.seeder';
 import { TimezoneSeeder } from '@/modules/domain/library/seeders/time-zone.seeder';
 import type { Seeder } from '@/modules/system/seeder/types/seeder.types';
 

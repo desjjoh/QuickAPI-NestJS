@@ -9,7 +9,7 @@ import {
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 import {
   runInTransaction,
   TransactionLifecycle,

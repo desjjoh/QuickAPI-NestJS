@@ -1,7 +1,7 @@
 import { InternalServerErrorException } from '@nestjs/common';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 
 import { IdentityReferenceService } from '@/modules/domain/identity/services/identity-reference.service';
 

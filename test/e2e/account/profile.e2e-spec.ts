@@ -6,7 +6,7 @@ import request from 'supertest';
 
 import { env } from '@/config/environment.config';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
-import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
+import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
 import { StorageService } from '@/modules/system/storage/types/storage.types';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
