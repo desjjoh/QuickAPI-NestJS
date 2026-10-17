@@ -142,3 +142,5 @@ dist
 data/geoip/
 # Local release candidates and vulnerability evidence (never production data).
 .release-check/
+# Generated smoke evidence can contain a rendered local deployment configuration.
+migration-artifacts/

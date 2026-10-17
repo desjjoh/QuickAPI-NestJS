@@ -7,6 +7,17 @@ import { apiV1Routes } from '@/modules/api/v1/v1.module';
 const smoke = readFileSync('.github/scripts/ci-smoke.sh', 'utf8');
 
 describe('deployment smoke contracts', () => {
+  it('keeps the smoke environment version and browser retry header current', () => {
+    const fixture = readFileSync('.github/ci-smoke.env', 'utf8');
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+      version: string;
+    };
+    expect(fixture).toContain(`APP_VERSION=${pkg.version}`);
+    expect(
+      fixture.match(/^CORS_ALLOWED_HEADERS=(.*)$/m)?.[1].split(','),
+    ).toContain('Idempotency-Key');
+  });
+
   it('probes the registered startup country endpoint', () => {
     const version = apiV1Routes.find((route) => route.path === 'v1')!;
     const audience = version.children?.find(
