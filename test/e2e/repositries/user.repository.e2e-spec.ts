@@ -20,12 +20,12 @@ import { UserAdministrationService } from '@/modules/domain/identity/services/us
 import { UserLifecycleService } from '@/modules/domain/identity/services/user-lifecycle.service';
 import { UserProfileService } from '@/modules/domain/identity/services/user-profile.service';
 import { SessionRepository } from '@/modules/domain/identity/repositories/session.repository';
-import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
-import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
+import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
+import { AccountStatusRepository } from '@/modules/domain/identity/repositories/accountstatus.repository';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
-import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
-import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
+import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
+import { RoleRepository } from '@/modules/domain/identity/repositories/role.repository';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import {
   closeTestDataSource,

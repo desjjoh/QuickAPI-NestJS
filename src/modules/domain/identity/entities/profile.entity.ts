@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 
 import { BaseEntity } from '@/common/entities/base.entity';
-import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
+import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 
 import { UserEntity } from './user.entity';
 import { UserAddressEntity } from './address.entity';

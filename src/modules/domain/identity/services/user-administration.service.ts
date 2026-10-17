@@ -15,9 +15,9 @@ import {
   ACCOUNT_STATUS_KEYS,
   AccountStatusKey,
 } from '@/config/statuses.config';
-import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';

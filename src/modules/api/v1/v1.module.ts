@@ -3,7 +3,7 @@ import { Routes } from '@nestjs/core';
 import { AuthenticationApiModule } from './authentication/authentication.module';
 import { AdministrationApiModule } from './administration/administration.module';
 import { SecurityApiModule } from './security/security.module';
-import { LibraryApiModule } from './library/library.module';
+import { PublicApiModule } from './public/public.module';
 import { AccountApiModule } from './account/account.module';
 import { ArticlesApiModule } from './articles/articles.module';
 
@@ -13,7 +13,7 @@ import { ArticlesApiModule } from './articles/articles.module';
     AuthenticationApiModule,
     AccountApiModule,
     AdministrationApiModule,
-    LibraryApiModule,
+    PublicApiModule,
     ArticlesApiModule,
   ],
 })
@@ -40,8 +40,8 @@ export const apiV1Routes: Routes = [
         module: AdministrationApiModule,
       },
       {
-        path: 'library',
-        module: LibraryApiModule,
+        path: 'public',
+        module: PublicApiModule,
       },
       {
         path: 'articles',

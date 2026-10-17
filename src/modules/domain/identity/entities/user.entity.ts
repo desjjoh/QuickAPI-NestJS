@@ -12,11 +12,11 @@ import {
 import { Exclude } from 'class-transformer';
 
 import { BaseEntity } from '@/common/entities/base.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 
 import { UserProfileEntity } from './profile.entity';
 import { UserSessionEntity } from './session.entity';
-import { AccountStatusEntity } from '../../library/entities/accountstatus.entity';
+import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
 import { AccountTokenEntity } from './account-token.entity';
 import { UserMfaSettingsEntity } from './mfa.entity';
 

@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 import { AccountTokenType } from '@/config/token.config';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 import { EmailVerificationService } from '@/modules/domain/identity/services/email-verification.service';
 
 describe('EmailVerificationService', () => {

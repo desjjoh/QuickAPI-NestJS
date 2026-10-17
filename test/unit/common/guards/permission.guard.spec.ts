@@ -11,8 +11,8 @@ import {
   PermissionsKey,
 } from '@/config/permissions.config';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 
 import { PERMISSIONS_KEY } from '@/common/decorators/permissions.decorator';
 import { PermissionsGuard } from '@/common/guards/permission.guard';

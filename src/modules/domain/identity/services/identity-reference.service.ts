@@ -3,11 +3,11 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import { AccountStatusKey } from '@/config/statuses.config';
-import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
-import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
-import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
+import { AccountStatusRepository } from '@/modules/domain/identity/repositories/accountstatus.repository';
+import { RoleRepository } from '@/modules/domain/identity/repositories/role.repository';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 
 @Injectable()
 export class IdentityReferenceService {

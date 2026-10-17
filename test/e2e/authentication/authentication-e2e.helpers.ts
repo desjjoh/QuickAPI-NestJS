@@ -6,7 +6,7 @@ import type { DataSource } from 'typeorm';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import type { SendEmailOptions } from '@/modules/system/email/types/options.types';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
-import { GenderEntity } from '@/modules/domain/library/entities/gender.entity';
+import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
 import { setupTestSuite, type TestSuite } from '../../helpers/test-app';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';

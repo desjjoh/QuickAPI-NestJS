@@ -21,7 +21,7 @@ import { RefreshService } from '@/modules/domain/identity/services/refresh.servi
 import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import { EmailVerificationTemplate } from '@/modules/system/email/templates/email-verification.template';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 import { RegistrationTokenMetadata } from '@/modules/domain/identity/entities/registration-token.entity';
 import { RegistrationTokenService } from '@/modules/domain/identity/services/registration-token.service';
 import { EntityManager } from 'typeorm';

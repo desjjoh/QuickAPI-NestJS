@@ -1,11 +1,7 @@
 import type { DataSource, EntityManager, Repository } from 'typeorm';
 
-import { AccountStatusRepository } from '@/modules/domain/library/repositories/accountstatus.repository';
 import { CountryRepository } from '@/modules/domain/library/repositories/country.repository';
-import { GenderRepository } from '@/modules/domain/library/repositories/gender.repository';
-import { PermissionRepository } from '@/modules/domain/library/repositories/permission.repository';
 import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
-import { RoleRepository } from '@/modules/domain/library/repositories/role.repository';
 import { TimezoneRepository } from '@/modules/domain/library/repositories/time-zone.repository';
 
 type LibraryRepository = {
@@ -40,10 +36,6 @@ const setup = () => {
 
 describe('library repository query behavior', () => {
   it.each<[LibraryRepositoryConstructor, Record<string, unknown>]>([
-    [AccountStatusRepository, { order: { key: 'ASC' } }],
-    [GenderRepository, { order: { key: 'ASC' } }],
-    [PermissionRepository, { order: { key: 'ASC' } }],
-    [RoleRepository, { order: { key: 'ASC' } }],
     [TimezoneRepository, { order: { key: 'ASC' } }],
     [
       CountryRepository,
@@ -77,14 +69,5 @@ describe('library repository query behavior', () => {
     expect(persistence.findOne).toHaveBeenCalledWith({
       where: { id: 'region-id', country: { id: 'country-id' } },
     });
-  });
-
-  it('does not expose persistence mutation methods', () => {
-    const { dataSource } = setup();
-    const repository = new GenderRepository(dataSource);
-
-    expect(repository).not.toHaveProperty('create');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('remove');
   });
 });

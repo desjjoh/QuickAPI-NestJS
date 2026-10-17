@@ -61,7 +61,7 @@ import { Idempotent } from '@/common/decorators/idempotent.decorator';
 
 @ApiTags('My Articles')
 @ApiBearerAuth('access-token')
-@Controller('me')
+@Controller('')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Throttle({ default: throttlePolicies.publicRead })
 export class AuthoringArticleController {

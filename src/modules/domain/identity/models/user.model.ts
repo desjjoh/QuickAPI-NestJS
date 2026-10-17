@@ -8,14 +8,14 @@ import { AddressDto } from '@/common/models/address.model';
 
 import { UserSessionEntity } from '../entities/session.entity';
 import { UserEntity, createUserMetadata } from '../entities/user.entity';
-import { RoleDto } from '../../library/models/role.model';
-import { RoleEntity } from '../../library/entities/role.entity';
+import { RoleDto } from '@/modules/domain/identity/models/role.model';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 import { ImageDto } from '../../media/models/image.model';
 import { PhoneDto } from '@/common/models/phone.model';
 import { BaseCountryDto } from '../../library/models/country.model';
 import { BaseTimezoneDto } from '../../library/models/time-zone.model';
-import { AccountStatusDto } from '../../library/models/status.model';
-import { GenderDto } from '../../library/models/gender.model';
+import { AccountStatusDto } from '@/modules/domain/identity/models/status.model';
+import { GenderDto } from '@/modules/domain/identity/models/gender.model';
 
 enum SORT_OPTIONS {
   CREATED = 'user.createdAt',

@@ -12,12 +12,12 @@ src/
   modules/
     api/            HTTP controllers and audience-specific orchestration
       v1/
-        articles/   Public and authenticated authoring controllers/services
+        articles/   Authenticated article authoring controllers/services
         administration/
         authentication/
         account/
         security/
-        library/
+        public/     Library startup/reference controller and public articles
     domain/         Articles, identity, media, audit, and library
     system/         Storage, cleanup, email, queues, idempotency, context,
                     geolocation, database, and other infrastructure concerns
@@ -35,6 +35,13 @@ test/
 - **System services** own queue, storage, cleanup, delivery, and reusable request infrastructure. Media imports these capabilities; it does not implement provider or queue mechanics.
 
 Identity capabilities are split into lifecycle, credentials, and administration services, with a shared user service where appropriate. Prefer a coherent capability over another service that duplicates persistence logic.
+
+Identity owns account statuses, genders, roles, and permissions, including their
+entities, read repositories, response models, and seeders. The library domain owns
+shared country, region, and time-zone reference data and does not depend on
+identity. The public API module's library controller composes both domains at
+`/api/v1/public/library`; lookup response contracts remain independent of domain
+ownership.
 
 ## Transactions and external effects
 

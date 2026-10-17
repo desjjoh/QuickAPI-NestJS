@@ -156,7 +156,7 @@ describe('creator article HTTP concurrency', () => {
     const responses = await Promise.all(
       ['First', 'Second'].map((title) =>
         request(app.getHttpServer())
-          .patch(`/api/v1/articles/me/${id}`)
+          .patch(`/api/v1/articles/${id}`)
           .send({ title, expected_version: 1 }),
       ),
     );
@@ -176,10 +176,10 @@ describe('creator article HTTP concurrency', () => {
       const pending =
         action === 'patch'
           ? request(app.getHttpServer())
-              .patch(`/api/v1/articles/me/${id}`)
+              .patch(`/api/v1/articles/${id}`)
               .send({ title: 'Edit' })
           : request(app.getHttpServer())
-              .post(`/api/v1/articles/me/${id}/${action}`)
+              .post(`/api/v1/articles/${id}/${action}`)
               .send({});
       await pending.expect(400);
       expect(stored.version).toBe(1);
@@ -203,7 +203,7 @@ describe('creator article HTTP concurrency', () => {
       }),
     );
     expect(
-      doc.paths['/api/v1/articles/me/{id}/submit'].post?.responses['409'],
+      doc.paths['/api/v1/articles/{id}/submit'].post?.responses['409'],
     ).toBeDefined();
     expect(doc.components?.schemas?.ArticleManagementDto).toEqual(
       expect.objectContaining({

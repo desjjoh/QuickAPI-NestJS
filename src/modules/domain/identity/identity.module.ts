@@ -1,5 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { SeedingModule } from '@/modules/system/seeder/seeder.module';
+import { AccountStatusEntity } from './entities/accountstatus.entity';
+import { GenderEntity } from './entities/gender.entity';
+import { PermissionEntity } from './entities/permission.entity';
+import { RoleEntity } from './entities/role.entity';
+import { AccountStatusRepository } from './repositories/accountstatus.repository';
+import { GenderRepository } from './repositories/gender.repository';
+import { PermissionRepository } from './repositories/permission.repository';
+import { RoleRepository } from './repositories/role.repository';
+import { AccountStatusSeeder } from './seeders/accountstatus.seeder';
+import { GenderSeeder } from './seeders/gender.seeder';
+import { PermissionSeeder } from './seeders/permission.seeder';
+import { RoleSeeder } from './seeders/role.seeder';
 
 import { TokenModule } from '@/modules/system/tokens/token.module';
 
@@ -44,6 +57,16 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
       AccountTokenEntity,
       RegistrationTokenEntity,
       UserMfaSettingsEntity,
+      AccountStatusEntity,
+      GenderEntity,
+      PermissionEntity,
+      RoleEntity,
+    ]),
+    SeedingModule.forFeature([
+      new GenderSeeder(),
+      new PermissionSeeder(),
+      new RoleSeeder(),
+      new AccountStatusSeeder(),
     ]),
     TokenModule,
     LibraryModule,
@@ -52,6 +75,10 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
     IdempotencyModule,
   ],
   providers: [
+    AccountStatusRepository,
+    GenderRepository,
+    PermissionRepository,
+    RoleRepository,
     UserRepository,
     SessionRepository,
     AccountTokenRepository,
@@ -70,6 +97,10 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
     EmailVerificationService,
   ],
   exports: [
+    AccountStatusRepository,
+    GenderRepository,
+    PermissionRepository,
+    RoleRepository,
     UserService,
     UserCredentialsService,
     UserLifecycleService,

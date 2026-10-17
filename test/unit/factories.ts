@@ -8,9 +8,9 @@ import {
 import { UserProfileEntity } from '@/modules/domain/identity/entities/profile.entity';
 import { UserSessionEntity } from '@/modules/domain/identity/entities/session.entity';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
-import { AccountStatusEntity } from '@/modules/domain/library/entities/accountstatus.entity';
-import { PermissionEntity } from '@/modules/domain/library/entities/permission.entity';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
+import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
+import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 
 export const TEST_NOW = new Date('2025-01-02T03:04:05.000Z');
 

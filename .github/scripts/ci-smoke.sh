@@ -39,11 +39,11 @@ run_one_shot() {
 
 image_migration_names() {
   docker run --rm --entrypoint sh "$SMOKE_IMAGE" -c \
-    "find /app/dist/database/migrations -maxdepth 1 -type f -name '*-migration.js' -exec basename {} .js \; | sort"
+    "find /app/dist/database/migrations -maxdepth 1 -type f -name '*.js' -exec basename {} .js \; | sort"
 }
 
 source_migration_names() {
-  find src/database/migrations -maxdepth 1 -type f -name '*-migration.ts' \
+  find src/database/migrations -maxdepth 1 -type f -name '*.ts' ! -name '*.d.ts' \
     -printf '%f\n' | sed 's/\.ts$//' | sort
 }
 
@@ -110,7 +110,7 @@ expect_status() {
 
 poll_200 /health
 poll_200 /ready
-expect_status 200 /api/v1/library/countries
+expect_status 200 /api/v1/public/library/countries
 expect_status 404 /docs
 expect_status 404 /docs-json
 expect_status 401 /system

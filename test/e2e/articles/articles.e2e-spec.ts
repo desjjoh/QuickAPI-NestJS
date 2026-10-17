@@ -38,8 +38,8 @@ import { EmailIntentEntity } from '@/modules/system/email/entities/email-intent.
 import { sealEmail } from '@/modules/system/email/services/email-outbox.service';
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
 import { drainStorageCleanup } from '../../helpers/storage-cleanup';
-import { RoleEntity } from '@/modules/domain/library/entities/role.entity';
-import { ROLE_KEYS } from '@/modules/domain/library/seeders/role.seeder';
+import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
+import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 import { EmailService } from '@/modules/system/email/services/email.service';
 import {
   DeleteStorageObjectInput,
@@ -59,8 +59,8 @@ import {
   TestSuite,
 } from '../../helpers/test-app';
 
-const PUBLIC_ROOT = '/api/v1/articles/public';
-const CREATOR_ROOT = '/api/v1/articles/me';
+const PUBLIC_ROOT = '/api/v1/public/articles';
+const CREATOR_ROOT = '/api/v1/articles';
 const ADMINISTRATION_ROOT = '/api/v1/administration/articles';
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -702,18 +702,12 @@ describe('article API lifecycle', () => {
 
     await request(app.getHttpServer()).get(PUBLIC_ROOT).expect(200);
     await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
-    for (const retired of [
-      '/api/v1/public/articles',
-      '/api/v1/account/articles',
-    ])
-      await auth.agent.get(retired).set(auth.headers).expect(404);
-    await request(app.getHttpServer()).get(`${PUBLIC_ROOT}/me`).expect(422);
     await auth.agent.get(CREATOR_ROOT).set(auth.headers).expect(403);
     await request(app.getHttpServer()).get(ADMINISTRATION_ROOT).expect(401);
     await auth.agent.get(ADMINISTRATION_ROOT).set(auth.headers).expect(403);
   });
 
-  it('isolates account article routing from public article ID matching and retires the old paths', async () => {
+  it('lists the authenticated creator’s articles', async () => {
     const author = await creator();
     const response = await author.agent
       .get(CREATOR_ROOT)
@@ -721,14 +715,6 @@ describe('article API lifecycle', () => {
       .expect(200);
     expect(response.body.data).toEqual([]);
     await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
-    await author.agent
-      .get('/api/v1/creator/articles')
-      .set(author.headers)
-      .expect(404);
-    await request(app.getHttpServer())
-      .get('/api/v1/articles/creator')
-      .expect(404);
-    await request(app.getHttpServer()).get('/api/v1/articles').expect(404);
   });
 
   it('allows only one concurrent edit from the same version and rejects stale image and lifecycle requests', async () => {
