@@ -1,4 +1,6 @@
 import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
+import { avatarProcessingPolicy } from '@/modules/domain/media/policies/avatar-processing.policy';
+import { imageUploadPolicy } from '@/config/image-upload.config';
 import {
   BadRequestException,
   Injectable,
@@ -138,6 +140,8 @@ export class ProfileApiService {
           file,
           alt_text: `Profile avatar for user id#${user.id}`,
           folder: 'users/avatars',
+          processing: avatarProcessingPolicy,
+          maxBytes: imageUploadPolicy.avatarMaxBytes,
         };
         const image = existing
           ? await this.imgSvc.update(

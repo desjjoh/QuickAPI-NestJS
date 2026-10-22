@@ -1,22 +1,30 @@
 import { Injectable, ParseFilePipe, PipeTransform } from '@nestjs/common';
 
 import { imageUploadPolicy } from '@/config/image-upload.config';
-import { readValidatedImage } from '@/modules/domain/media/policies/image-upload.policy';
+import {
+  readImageUpload,
+  readValidatedImage,
+} from '@/modules/domain/media/policies/image-upload.policy';
 import { removeTemporaryUpload } from '@/common/helpers/upload-cleanup.helper';
 
 @Injectable()
 export class ImageUploadValidationPipe implements PipeTransform {
   private readonly pipe: ParseFilePipe;
   private readonly maxSize: number;
+  private readonly processing: boolean;
 
   constructor({
     maxSize = imageUploadPolicy.maxBytes,
     fileIsRequired = false,
+    processing = false,
   }: {
     maxSize?: number;
     fileIsRequired?: boolean;
+    /** Defer pixel validation to the mandatory downstream transformation. */
+    processing?: boolean;
   }) {
     this.maxSize = maxSize;
+    this.processing = processing;
     this.pipe = new ParseFilePipe({
       fileIsRequired,
     });
@@ -26,7 +34,10 @@ export class ImageUploadValidationPipe implements PipeTransform {
     const file = value as Express.Multer.File | undefined;
     try {
       await this.pipe.transform(value);
-      if (file) await readValidatedImage(file, this.maxSize);
+      if (file) {
+        const validate = this.processing ? readImageUpload : readValidatedImage;
+        await validate(file, this.maxSize);
+      }
       return file;
     } catch (error) {
       await removeTemporaryUpload(file).catch(() => undefined);

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { Request } from 'express';
-import { readValidatedImage } from '@/modules/domain/media/policies/image-upload.policy';
+import { readImageUpload } from '@/modules/domain/media/policies/image-upload.policy';
 
 export function canonicalJson(value: unknown): string {
   if (value === undefined) return 'null';
@@ -19,7 +19,7 @@ export function canonicalJson(value: unknown): string {
 /** Image bytes and client metadata matter; random server paths and filenames do not. */
 export async function requestFingerprint(request: Request): Promise<string> {
   const file = request.file;
-  const image = file ? await readValidatedImage(file) : undefined;
+  const image = file ? await readImageUpload(file) : undefined;
   return createHash('sha256')
     .update(
       canonicalJson({

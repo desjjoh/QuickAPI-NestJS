@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { readFile, stat } from 'node:fs/promises';
 import sharp from 'sharp';
 import { imageUploadPolicy } from '@/config/image-upload.config';
+import { detectRasterImageFormat } from '@/common/helpers/image-format.helper';
 
 export type ValidatedImage = {
   buffer: Buffer;
@@ -12,20 +13,22 @@ export type ValidatedImage = {
 };
 
 const validatedUploads = new WeakMap<Express.Multer.File, ValidatedImage>();
+type ImageUpload = Pick<ValidatedImage, 'buffer' | 'mimeType' | 'extension'>;
+const checkedUploads = new WeakMap<Express.Multer.File, ImageUpload>();
 const formats = {
   png: { mimeType: 'image/png', extension: '.png' },
   jpeg: { mimeType: 'image/jpeg', extension: '.jpg' },
   gif: { mimeType: 'image/gif', extension: '.gif' },
 } as const;
 
-/** Shared by API validation and domain mutations; decode each upload once. */
-export async function readValidatedImage(
+/** Read once and check the upload boundary without decoding pixels. */
+export async function readImageUpload(
   file: Express.Multer.File,
   maxBytes: number = imageUploadPolicy.maxBytes,
-): Promise<ValidatedImage> {
+): Promise<ImageUpload> {
   if (!file) throw new BadRequestException('Image file is required.');
 
-  const cached = validatedUploads.get(file);
+  const cached = checkedUploads.get(file);
 
   if (cached) {
     assertSize(cached.buffer.length, maxBytes);
@@ -39,20 +42,9 @@ export async function readValidatedImage(
   assertSize(buffer?.length ?? 0, maxBytes);
 
   // Reject non-raster formats before handing untrusted input to the decoder.
-  const signature = buffer.subarray(0, 8);
-  const format = signature.equals(
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-  )
-    ? 'png'
-    : signature.subarray(0, 3).equals(Buffer.from([255, 216, 255]))
-      ? 'jpeg'
-      : ['GIF87a', 'GIF89a'].includes(
-            signature.subarray(0, 6).toString('ascii'),
-          )
-        ? 'gif'
-        : undefined;
+  const format = detectRasterImageFormat(buffer);
 
-  if (!format)
+  if (!format || format === 'webp')
     throw new BadRequestException(
       'Only PNG, JPEG, and GIF images are supported.',
     );
@@ -67,6 +59,24 @@ export async function readValidatedImage(
     throw new BadRequestException(
       'The declared image MIME type does not match its contents.',
     );
+
+  const result = { buffer, ...detected };
+  checkedUploads.set(file, result);
+
+  return result;
+}
+
+/** Unprocessed images still require a full corruption-validation decode. */
+export async function readValidatedImage(
+  file: Express.Multer.File,
+  maxBytes: number = imageUploadPolicy.maxBytes,
+): Promise<ValidatedImage> {
+  const upload = await readImageUpload(file, maxBytes);
+  const cached = validatedUploads.get(file);
+
+  if (cached) return cached;
+
+  const { buffer } = upload;
 
   try {
     const decoder = sharp(buffer, {
@@ -93,7 +103,7 @@ export async function readValidatedImage(
     // metadata() alone does not decode pixels and cannot catch corrupt payloads.
     await decoder.stats();
 
-    const result = { buffer, width, height, ...detected };
+    const result = { ...upload, width, height };
     validatedUploads.set(file, result);
 
     return result;

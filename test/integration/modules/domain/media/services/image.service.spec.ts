@@ -9,6 +9,10 @@ import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 import { InvalidOperationError } from '@/common/errors/operation.error';
 import { StorageCleanupService } from '@/modules/system/storage-cleanup/services/storage-cleanup.service';
 import { StorageUploadService } from '@/modules/system/storage/services/storage-upload.service';
+import sharp from 'sharp';
+import { ImageProcessingService } from '@/modules/system/image-processing/services/image-processing.service';
+import { avatarProcessingPolicy } from '@/modules/domain/media/policies/avatar-processing.policy';
+import { ImageProcessingError } from '@/modules/system/image-processing/types/image-processing.types';
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -85,6 +89,7 @@ describe('ImageService', () => {
         objects as never,
       ),
       cleanup as unknown as StorageCleanupService,
+      new ImageProcessingService(),
     );
 
   it('throws for a missing reference record', async () => {
@@ -93,6 +98,77 @@ describe('ImageService', () => {
       'Image with ID "missing" was not found.',
     );
     expect(repo.findById).toHaveBeenCalledWith(manager, 'missing');
+  });
+
+  it('stores only processed WebP bytes and persists their actual metadata', async () => {
+    const file = await fixture();
+    const stats = jest.spyOn(sharp.prototype, 'stats');
+
+    try {
+      await service().create({
+        file,
+        folder: 'avatars',
+        processing: avatarProcessingPolicy,
+      });
+
+      const uploaded = storage.putObject.mock.calls[0][0];
+      const metadata = await sharp(uploaded.body).metadata();
+
+      expect(uploaded.key).toBe('avatars/generated.webp');
+      expect(uploaded.contentType).toBe('image/webp');
+      expect(uploaded.body).not.toEqual(png);
+      expect(metadata).toMatchObject({
+        format: 'webp',
+        width: 256,
+        height: 256,
+      });
+      expect(manager.create).toHaveBeenCalledWith(
+        ImageEntity,
+        expect.objectContaining({
+          filename: 'generated.webp',
+          width: 256,
+          height: 256,
+          size_bytes: uploaded.body.length,
+          mime_type: 'image/webp',
+        }),
+      );
+      expect(stats).not.toHaveBeenCalled();
+      await expect(access(file.path)).rejects.toBeDefined();
+    } finally {
+      stats.mockRestore();
+    }
+  });
+
+  it('keeps the previous image unchanged and cleans the temporary file on processing failure', async () => {
+    const file = await fixture();
+    const previous = {
+      id: 'old',
+      storage_key: 'avatars/old.png',
+    } as ImageEntity;
+    const process = jest
+      .spyOn(ImageProcessingService.prototype, 'process')
+      .mockRejectedValue(
+        new ImageProcessingError('processing_failed', 'Invalid image.'),
+      );
+
+    try {
+      await expect(
+        service().update({
+          file,
+          folder: 'avatars',
+          image: previous,
+          processing: avatarProcessingPolicy,
+        }),
+      ).rejects.toThrow('Invalid image.');
+
+      expect(previous.storage_key).toBe('avatars/old.png');
+      expect(storage.putObject).not.toHaveBeenCalled();
+      expect(manager.save).not.toHaveBeenCalled();
+      expect(cleanup.schedule).not.toHaveBeenCalled();
+      await expect(access(file.path)).rejects.toBeDefined();
+    } finally {
+      process.mockRestore();
+    }
   });
   it('persists extracted metadata after upload and removes the temporary file', async () => {
     const file = await fixture();
@@ -150,6 +226,54 @@ describe('ImageService', () => {
     );
     expect(objects.abandon).toHaveBeenCalledWith('images/generated.png');
     expect(storage.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it.each(['create', 'replace'] as const)(
+    'abandons a processed WebP when %s metadata cannot be saved',
+    async (action) => {
+      const file = await fixture();
+      const previous = {
+        id: 'old',
+        storage_key: 'avatars/old.png',
+      } as ImageEntity;
+      manager.save.mockRejectedValueOnce(new Error('database unavailable'));
+      const input = {
+        file,
+        folder: 'avatars',
+        processing: avatarProcessingPolicy,
+      };
+
+      await expect(
+        action === 'create'
+          ? service().create(input)
+          : service().update({ ...input, image: previous }),
+      ).rejects.toThrow('database unavailable');
+
+      expect(storage.putObject).toHaveBeenCalledTimes(1);
+      expect(storage.putObject.mock.calls[0][0].contentType).toBe('image/webp');
+      expect(objects.abandon).toHaveBeenCalledWith('avatars/generated.webp');
+      expect(previous.storage_key).toBe('avatars/old.png');
+      expect(cleanup.schedule).not.toHaveBeenCalled();
+      expect(storage.deleteObject).not.toHaveBeenCalled();
+      await expect(access(file.path)).rejects.toBeDefined();
+    },
+  );
+
+  it('abandons the processed object when attachment fails before image persistence', async () => {
+    const file = await fixture();
+    objects.attach.mockRejectedValueOnce(new Error('attachment failed'));
+
+    await expect(
+      service().create({
+        file,
+        folder: 'avatars',
+        processing: avatarProcessingPolicy,
+      }),
+    ).rejects.toThrow('attachment failed');
+
+    expect(objects.abandon).toHaveBeenCalledWith('avatars/generated.webp');
+    expect(manager.save).not.toHaveBeenCalled();
+    await expect(access(file.path)).rejects.toBeDefined();
   });
 
   it('removes malformed uploads even for direct domain calls', async () => {
