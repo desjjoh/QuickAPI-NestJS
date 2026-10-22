@@ -4,6 +4,18 @@
 
 Enabled Swagger is the endpoint/schema reference. This guide records cross-request guarantees clients must understand.
 
+## Avatar uploads
+
+`POST /api/v1/account/profile/avatar` still accepts PNG, JPEG, and GIF uploads
+within the existing byte and pixel limits. New uploads and replacements are
+auto-oriented, center-cropped without stretching, and resized to exactly 256×256
+(including enlargement). Only the resulting static WebP is stored, with
+transparency preserved and actual output metadata. Animated GIFs use their first
+frame; APNG is unsupported. Existing avatars are not rewritten, and article
+uploads remain unchanged. Request/response shapes and existing transactional
+avatar audits, idempotency, and cleanup contracts are unchanged; processing does
+not produce an additional audit event.
+
 ## Account deletion and historical identity
 
 Self-service and administrator deletion preserve the original user/profile IDs and set the account status to `deleted`. This status is the authoritative deletion state: neither display names nor `metadata.deleted_at` determine whether an account is deleted. The entity stores the nullable timestamp in metadata and exposes it in user responses as `metadata.deletedAt` (ISO 8601).

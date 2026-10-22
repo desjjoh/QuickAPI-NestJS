@@ -89,6 +89,7 @@ export class AuthoringArticleApiService {
           manager,
           lifecycle,
         );
+
         await this.record(
           ArticleAuditEvents.CREATED,
           user,
@@ -97,6 +98,7 @@ export class AuthoringArticleApiService {
           articleAuditSnapshot(created),
           manager,
         );
+
         return created;
       },
     );
@@ -135,6 +137,7 @@ export class AuthoringArticleApiService {
         },
         manager,
       );
+
       await this.record(
         ArticleAuditEvents.UPDATED,
         user,
@@ -143,6 +146,7 @@ export class AuthoringArticleApiService {
         articleAuditSnapshot(updated),
         manager,
       );
+
       return updated;
     });
 
@@ -162,6 +166,7 @@ export class AuthoringArticleApiService {
           user.id,
           manager,
         );
+
         assertArticleVersion(current, dto.expected_version);
         const before = this.imageSnapshot(current.media.hero);
         const updated = await this.articles.updateHero(
@@ -236,6 +241,7 @@ export class AuthoringArticleApiService {
       const updated = await (action === 'submit'
         ? this.articles.submit(current, manager)
         : this.articles.withdraw(current, manager));
+
       await this.record(
         action === 'submit'
           ? ArticleAuditEvents.SUBMITTED
@@ -246,6 +252,7 @@ export class AuthoringArticleApiService {
         articleAuditSnapshot(updated),
         manager,
       );
+
       return updated;
     });
 

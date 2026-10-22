@@ -21,9 +21,11 @@ export class AuditAdministrationService {
     const data = await Promise.all(
       result.data.map(async (event) => {
         const location = await this.ipLocations.resolveIp(event.ipAddress);
+
         return new AuditEventDto(event, location);
       }),
     );
+
     return new AuditEventPageDto(data, result.meta);
   }
 
@@ -31,8 +33,10 @@ export class AuditAdministrationService {
     const event = await this.queries.findById(id, undefined, {
       includeActorUsers: true,
     });
+
     if (!event) throw new NotFoundException('Audit event not found.');
     const location = await this.ipLocations.resolveIp(event.ipAddress);
+
     return new AuditEventDto(event, location);
   }
 }

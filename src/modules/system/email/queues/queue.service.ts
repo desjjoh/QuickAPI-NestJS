@@ -23,15 +23,20 @@ export class EmailQueueService {
       removeOnFail: false,
     });
   }
+
   public async enqueueDelivery(deliveryId: string): Promise<void> {
     const id = `email-${deliveryId}`;
     const existing = await this.emailQueue.getJob(id);
+
     if (existing) {
       const state = await existing.getState();
+
       if (state === 'failed' || state === 'completed')
         await existing.retry(state, { resetAttemptsMade: true });
+
       return;
     }
+
     await this.emailQueue.add(
       EMAIL_JOB_SEND,
       { deliveryId },

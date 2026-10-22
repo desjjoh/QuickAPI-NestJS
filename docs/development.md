@@ -16,6 +16,7 @@ The example is a configuration reference, not a ready-to-deploy file. For local 
   ```
 
 - With `HTTPS_ENABLED=false`, use matching HTTP public API/web URLs and CORS origins. Default local API port is 4000.
+- Keep `Idempotency-Key` in `CORS_ALLOWED_HEADERS` alongside `Content-Type`, `Authorization`, and `X-CSRF-Token`. Existing `.env` files are not updated when examples change. Restart the API after editing environment values; a browser preflight rejecting this header prevents the actual mutation from reaching the controller.
 - The development MySQL service uses host port 3307 and the disposable development credentials in the example. Keep `DB_SYNC=false`.
 - Development Redis uses host port 6379 without authentication. Leave `REDIS_PASSWORD` empty for that topology only; deployed Redis must use its configured credentials.
 - Swagger is opt-in but is not operations-key protected; restrict it at ingress outside development. Metrics and diagnostics use an operations credential outside development; development guards bypass the flag/key checks. Do not reuse an end-user token for operations access.
@@ -60,6 +61,24 @@ Production uses `migration:run:prod` against the compiled datasource. Apply all 
 `UPLOAD_TMP_DIR` is scratch space for multipart files, not permanent object storage. Uploaded media lives in R2. Static `public/` assets and GeoIP data are separate concerns; mounting `public/` does not implement local upload storage.
 
 ## Checks and command reference
+
+### Readability conventions
+
+Prettier owns indentation, wrapping, quotes, and trailing commas. Source-code
+lint rules additionally separate class methods and logical statement groups:
+leave a blank line after declarations before executable work, after block-like
+steps, and before returns/throws. Related declarations and class data fields may
+remain grouped. Historical database migrations are excluded from the additional
+spacing rules; do not churn historical SQL for formatting.
+
+Use `npm run lint:fix` and `npm run format` for TypeScript cleanup. Keep changes
+behavior-preserving: do not reorder side effects or rewrite conditions merely to
+improve spacing. Add comments for intent and invariants (transaction ownership,
+concurrency fences, retry safety, validation boundaries, and non-obvious limits),
+not a line-by-line narration. Update comments when their assumptions change.
+Keep the README short and link to focused guides for implementation contracts.
+
+### Verification
 
 Use `npm run check` for formatting, lint, type checking, unit/in-process integration tests, and build; use `test:cov` for coverage gates. See [Testing](../test/TESTING.md) before starting E2E or smoke tests.
 

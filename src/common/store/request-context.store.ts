@@ -55,6 +55,7 @@ export class RequestContext {
     value: RequestContextStore[K],
   ): void {
     const store = this.storage.getStore();
+
     if (store) store[key] = value;
   }
 

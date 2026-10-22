@@ -5,12 +5,15 @@ import { EmailIntentEntity } from '../entities/email-intent.entity';
 @Injectable()
 export class EmailIntentRepository {
   private readonly persistence: Repository<EmailIntentEntity>;
+
   public constructor(source: DataSource) {
     this.persistence = source.getRepository(EmailIntentEntity);
   }
+
   public get manager(): EntityManager {
     return this.persistence.manager;
   }
+
   public findDue(manager: EntityManager): Promise<EmailIntentEntity[]> {
     return manager
       .getRepository(EmailIntentEntity)
@@ -25,6 +28,7 @@ export class EmailIntentRepository {
       .setOnLocked('skip_locked')
       .getMany();
   }
+
   public findForDelivery(
     manager: EntityManager,
     id: string,

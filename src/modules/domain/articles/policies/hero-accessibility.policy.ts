@@ -13,6 +13,7 @@ export function resolveHeroAccessibility(
       throw new BadRequestException(
         'Decorative heroes must omit alternative text.',
       );
+
     return { altText: null, decorative: true };
   }
 

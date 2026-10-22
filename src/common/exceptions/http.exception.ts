@@ -56,6 +56,7 @@ export class UnsupportedMediaTypeError extends AppException {
 export class ValidationErrorException extends AppException {
   constructor(errors: ValidationError[]) {
     const message: string = formatClassValidatorIssues(errors);
+
     super(422, message);
   }
 }

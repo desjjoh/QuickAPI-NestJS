@@ -79,6 +79,7 @@ export const logger: Logger = pino(
     },
     mixin() {
       const ctx = requestContextRef?.getStore();
+
       if (!ctx) return {};
 
       return {

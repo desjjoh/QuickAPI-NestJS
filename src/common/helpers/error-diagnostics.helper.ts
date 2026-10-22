@@ -52,6 +52,7 @@ export function errorDiagnostics(
             .filter((line) => /^\s+at\s/.test(line))
             .join('\n')
         : '';
+
     return {
       errorType: name,
       ...(typeof code === 'string' && safeCodes.has(code)

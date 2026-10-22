@@ -12,6 +12,7 @@ import { Order, PaginationOptions } from '@/common/models/pagination.model';
 import { ArticleRepository } from '@/modules/domain/articles/repositories/article.repository';
 import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 import { ArticleService } from '@/modules/domain/articles/services/article.service';
+import { ImageProcessingService } from '@/modules/system/image-processing/services/image-processing.service';
 import type {
   ArticleListPage,
   ArticleListRead,
@@ -715,6 +716,28 @@ describe('article API lifecycle', () => {
       .expect(200);
     expect(response.body.data).toEqual([]);
     await request(app.getHttpServer()).get(CREATOR_ROOT).expect(401);
+  });
+
+  it('keeps article hero bytes and original metadata unchanged by avatar processing', async () => {
+    const author = await creator();
+    const processor = jest.spyOn(app.get(ImageProcessingService), 'process');
+    const created = await createDraft(author);
+    const stored = await suite.dataSource
+      .getRepository(ArticleEntity)
+      .findOneByOrFail({
+        id: created.body.id,
+      });
+    const hero = stored.media.hero;
+
+    expect(storage.objects.get(hero.storage_key)).toEqual(PNG);
+    expect(hero).toMatchObject({
+      mime_type: 'image/png',
+      width: 1,
+      height: 1,
+      size_bytes: PNG.length,
+    });
+    expect(hero.filename).toMatch(/\.png$/);
+    expect(processor).not.toHaveBeenCalled();
   });
 
   it('allows only one concurrent edit from the same version and rejects stale image and lifecycle requests', async () => {

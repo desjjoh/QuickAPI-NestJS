@@ -7,5 +7,6 @@ type CompileOptions<T> = {
 
 export function compile<T>({ template, data }: CompileOptions<T>): string {
   const delegate = Handlebars.compile(template);
+
   return delegate(data);
 }

@@ -27,11 +27,13 @@ const Match = <T>(
 class MatchConstraint implements ValidatorConstraintInterface {
   validate(value: unknown, args: ValidationArguments): boolean {
     const [fn] = args.constraints;
+
     return fn(args.object) === value;
   }
 
   defaultMessage(args: ValidationArguments): string {
     const [constraintProperty]: Array<() => unknown> = args.constraints;
+
     return `${(constraintProperty + '').split('.')[1]} and ${
       args.property
     } don't match`;

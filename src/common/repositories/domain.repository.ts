@@ -40,6 +40,7 @@ export abstract class MutableDomainRepository<
     payload: DeepPartial<Base<TEntity>>,
   ): Promise<TEntity> {
     const repository = this.getRepository(manager);
+
     return repository.save(
       repository.create(omitUndefinedDeep(payload) as DeepPartial<TEntity>),
     );
@@ -68,6 +69,7 @@ export abstract class MutableDomainRepository<
     await this.getRepository(manager).delete({
       id: entity.id,
     } as FindOptionsWhere<TEntity>);
+
     return entity;
   }
 }

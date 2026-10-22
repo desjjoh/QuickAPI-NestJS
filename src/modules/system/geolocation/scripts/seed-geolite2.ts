@@ -25,6 +25,7 @@ async function extractArchive(
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn('tar', ['-xzf', archive, '-C', directory]);
+
     child.on('error', () =>
       reject(
         new Error('Unable to run tar; install a tar-compatible extractor.'),
@@ -70,6 +71,7 @@ export async function updateGeoLiteDatabases(
       console.log(`Downloading ${edition}.mmdb...`);
       const archive = join(workspace, `${edition}.tar.gz`);
       const extracted = join(workspace, edition);
+
       await mkdir(extracted);
       const url = `https://download.maxmind.com/app/geoip_download?edition_id=${edition}&license_key=${encodeURIComponent(key)}&suffix=tar.gz`;
       const headers: Record<string, string> = account
@@ -90,6 +92,7 @@ export async function updateGeoLiteDatabases(
         entry.startsWith(edition),
       );
       const source = folder ? join(extracted, folder, `${edition}.mmdb`) : '';
+
       if (!source)
         throw new Error(
           `Invalid archive for ${edition}: expected .mmdb file was not found.`,
@@ -100,6 +103,7 @@ export async function updateGeoLiteDatabases(
       } catch {
         throw new Error(`Invalid MaxMind database for ${edition}.`);
       }
+
       prepared.set(edition, source);
     }
 
@@ -107,23 +111,27 @@ export async function updateGeoLiteDatabases(
       for (const edition of editions) {
         const destination = join(dataDir, `${edition}.mmdb`);
         const backup = join(workspace, `${edition}.previous.mmdb`);
+
         try {
           await rename(destination, backup);
           backups.set(edition, backup);
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
         }
+
         await rename(prepared.get(edition)!, destination);
         replaced.add(edition);
       }
     } catch (error) {
       for (const edition of editions) {
         const destination = join(dataDir, `${edition}.mmdb`);
+
         if (replaced.has(edition)) await rm(destination, { force: true });
         if (backups.has(edition)) {
           await rename(backups.get(edition)!, destination);
         }
       }
+
       throw error;
     }
 

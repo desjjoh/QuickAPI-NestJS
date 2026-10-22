@@ -128,13 +128,16 @@ export class AuthService {
     res: Response,
   ): Promise<void> {
     const current = await this.refreshSvc.sessionForAudit(user.id, session.id);
+
     if (!current)
       throw new UnauthorizedException(
         'Authenticated session no longer exists.',
       );
     const before = identitySessionSnapshot(current, user.id);
+
     await this.refreshSvc.revokeTokens(current, res);
     const updated = await this.refreshSvc.sessionForAudit(user.id, session.id);
+
     if (!updated) throw new Error('Revoked session audit reload failed.');
     const after = identitySessionSnapshot(updated, user.id);
 

@@ -34,6 +34,7 @@ export class MfaService {
     manager: EntityManager = applicationManager(this.settingsRepo.manager),
   ): Promise<CreatedAccountToken | null> {
     const settings = await this.settingsRepo.findByUser(manager, user.id, true);
+
     if (!settings) return null;
 
     return this.createChallenge(

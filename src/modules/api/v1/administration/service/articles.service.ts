@@ -123,8 +123,10 @@ export class ArticleAdministrationApiService {
   ): Promise<ArticleManagementDto> {
     const article = await this.articles.transaction(async (manager) => {
       const current = await this.articles.findByIdForUpdateOrFail(id, manager);
+
       assertArticleVersion(current, expectedVersion);
       const updated = await this.applyAction(action, current, user.id, manager);
+
       await this.audit.record(
         {
           domain: AuditEventDomain.ARTICLES,
@@ -142,6 +144,7 @@ export class ArticleAdministrationApiService {
         },
         manager,
       );
+
       return updated;
     });
 

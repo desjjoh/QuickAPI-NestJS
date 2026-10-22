@@ -21,6 +21,7 @@ class LocalStrategy extends PassportStrategy(Strategy) {
 
   async validate(email: string, password: string): Promise<ValidationPayload> {
     const user = await this.credentials.validateUser(email, password);
+
     this.credentials.assertCanAuthenticate(user);
 
     return { userEntity: user, email: user.identity.email, sub: user.id };

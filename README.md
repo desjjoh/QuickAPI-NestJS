@@ -36,6 +36,7 @@ The default local API is `http://localhost:4000`. Swagger at `/docs` is opt-in t
 | ----------------------------------------------- | ---------------------------------------------------------------------------------- |
 | [Development](docs/development.md)              | Setup, configuration, migrations, seeding, GeoIP, and local infrastructure         |
 | [Architecture](docs/architecture.md)            | Layer boundaries, modules, transactions, and extension rules                       |
+| [Image processing](docs/image-processing.md)    | WebP transforms, avatar policy, validation, limits, and rollout                    |
 | [API contracts](docs/api-contracts.md)          | Audience routes, article pagination/search, concurrency, idempotency, and security |
 | [Reliability and recovery](docs/reliability.md) | Durable email/storage, retries, DLQ boundaries, privacy, and recovery procedures   |
 | [Testing](test/TESTING.md)                      | Test coverage, disposable databases, PowerShell commands, and CI                   |

@@ -21,6 +21,7 @@ export function requestContextMiddleware(): RequestHandler {
       actorType: AuditActorType.ANONYMOUS,
       source: AuditSource.HTTP,
     };
+
     res.setHeader('X-Request-ID', ctx.requestId);
 
     if (!requestContextRef) return next();

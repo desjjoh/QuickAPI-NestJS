@@ -135,6 +135,7 @@ export class RegistrationTokenService {
       !compareIdentityTokenHashes(entity.mfa_code_hash, codeHash)
     ) {
       await this.recordFailedAttempt(entity.id);
+
       throw new UnauthorizedException('Invalid or expired challenge.');
     }
 

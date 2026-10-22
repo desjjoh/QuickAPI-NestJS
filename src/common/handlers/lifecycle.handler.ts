@@ -38,6 +38,7 @@ class LifecycleHandler {
 
   public static register = (services: LifecycleService[]): void => {
     const start: number = performance.now();
+
     logger.debug(`Registering lifecycle services (${services.length} total)`);
 
     for (const service of services) {
@@ -64,12 +65,14 @@ class LifecycleHandler {
     this.registerInternalHandlers();
 
     const duration: string = (performance.now() - start).toFixed(2);
+
     logger.debug(`Lifecycle registration completed in ${duration}ms`);
   };
 
   private static registerInternalHandlers(): void {
     process.on('uncaughtException', (err: unknown) => {
       const error: Error = err instanceof Error ? err : new Error(String(err));
+
       logger.error({ stack: error.stack }, error.message);
 
       logger.fatal('Fatal error caused by uncaught exception — forcing exit');
@@ -93,6 +96,7 @@ class LifecycleHandler {
     this.startupStarted = true;
 
     const start: number = performance.now();
+
     logger.debug(`Starting services…`);
 
     for (const service of this.startupServices) {
@@ -105,6 +109,7 @@ class LifecycleHandler {
     this.startupCompleted = true;
 
     const duration: string = (performance.now() - start).toFixed(2);
+
     logger.debug(`All services started in ${duration}ms`);
   };
 
@@ -112,6 +117,7 @@ class LifecycleHandler {
     if (this.shutdownStarted) return;
 
     const start: number = performance.now();
+
     logger.debug('Stopping services…');
 
     this.shutdownStarted = true;
@@ -132,6 +138,7 @@ class LifecycleHandler {
     }
 
     const duration: string = (performance.now() - start).toFixed(2);
+
     logger.debug(`Shutdown completed in ${duration}ms`);
 
     process.exit(0);

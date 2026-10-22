@@ -20,10 +20,12 @@ export class StorageUploadService {
     private readonly storage: StorageService,
     private readonly objects: StorageObjectService,
   ) {}
+
   public async upload(
     input: UploadInput,
   ): Promise<{ storage_key: string; filename: string }> {
     const reserved = await this.objects.reserve(input.folder, input.extension);
+
     try {
       await this.objects.upload(reserved.storage_key, () =>
         this.storage
@@ -44,16 +46,20 @@ export class StorageUploadService {
       );
     } catch (error) {
       await this.abandon(reserved.storage_key);
+
       throw error;
     }
+
     return reserved;
   }
+
   public async attach(
     manager: EntityManager,
     storageKey: string,
   ): Promise<void> {
     await this.objects.attach(manager, storageKey);
   }
+
   /** Run after rollback has released ownership locks, never inside the failing transaction. */
   public async abandon(storageKey: string): Promise<void> {
     try {

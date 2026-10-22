@@ -52,6 +52,7 @@ export class PasswordResetApiController {
     @Body() dto: RequestPasswordResetDto,
   ): Promise<RequestPasswordResetResponseDto> {
     await this.prSvc.requestPasswordReset(dto.email);
+
     return new RequestPasswordResetResponseDto({
       message:
         'If an account exists for this email, a password reset email will be sent.',

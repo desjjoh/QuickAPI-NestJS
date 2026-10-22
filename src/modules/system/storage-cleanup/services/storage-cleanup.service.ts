@@ -25,8 +25,10 @@ import {
 } from '../queues/storage-cleanup.queue';
 
 const failureReason = STORAGE_CLEANUP_FAILURE;
+
 async function bounded<T>(work: Promise<T>): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
+
   try {
     return await Promise.race([
       work,
@@ -66,6 +68,7 @@ export class StorageCleanupService {
         'Storage deletion intents require the originating mutation transaction.',
       );
     const id = randomUUID();
+
     await this.objects.ensureTracked(manager, storageKey);
     await manager.insert(StorageDeletionIntentEntity, {
       id,
@@ -80,22 +83,26 @@ export class StorageCleanupService {
       completed_at: null,
       dlq_forwarded: false,
     });
+
     return id;
   }
 
   public async dispatch(): Promise<void> {
     this.assertWorkerBoundary();
+
     try {
       await this.reconcile();
     } catch {
       // A failed existence probe must not starve existing intents or DLQ handoffs.
       logger.error('Storage reconciliation failed; tracking records retained.');
     }
+
     // Claim briefly in SQL; never hold DB locks while waiting for Redis.
     const intents = await runInTransaction(
       this.repository.manager,
       async (manager) => {
         const due = await this.repository.findDue(manager);
+
         for (const intent of due)
           await manager.update(
             StorageDeletionIntentEntity,
@@ -106,9 +113,11 @@ export class StorageCleanupService {
               ),
             },
           );
+
         return due;
       },
     );
+
     for (const intent of intents) {
       try {
         if (intent.state === 'failed') await this.forwardFailure(intent);
@@ -132,9 +141,11 @@ export class StorageCleanupService {
       this.repository.manager,
       async (manager) => {
         const intent = await this.repository.findLocked(manager, id);
+
         if (!intent) return 'missing' as const;
         if (intent.state !== 'pending') return intent.state;
         const object = await this.objects.lock(manager, intent.storage_key);
+
         if (!object)
           throw new Error('Storage deletion has no ownership record.');
         if (
@@ -148,29 +159,39 @@ export class StorageCleanupService {
               last_error: 'Storage object is still referenced.',
             },
           );
+
           return 'blocked' as const;
         }
+
+        // Commit the ownership fence before remote deletion. Later attachment
+        // attempts must fail even if the provider call or this worker crashes.
         await this.objects.markDeleting(manager, intent.storage_key);
+
         return 'claimed' as const;
       },
     );
+
     if (claimed !== 'claimed') return claimed;
     const result = await runInTransaction(
       this.repository.manager,
       async (manager) => {
         const intent = await this.repository.findLocked(manager, id);
+
         if (!intent) return { failed: false, outcome: 'missing' as const };
         if (intent.state !== 'pending')
           return { failed: false, outcome: intent.state };
         const attempts = intent.attempts + 1;
+
         if (intent.attempts >= STORAGE_CLEANUP_ATTEMPTS) {
           await manager.update(
             StorageDeletionIntentEntity,
             { id },
             { state: 'failed', available_at: new Date() },
           );
+
           return { failed: true, outcome: 'failed' as const };
         }
+
         try {
           await bounded(this.storage.deleteObject({ key: intent.storage_key }));
         } catch {
@@ -186,8 +207,10 @@ export class StorageCleanupService {
               available_at: new Date(),
             },
           );
+
           return { failed: true, outcome: 'failed' as const };
         }
+
         await manager.update(
           StorageDeletionIntentEntity,
           { id },
@@ -199,10 +222,13 @@ export class StorageCleanupService {
           },
         );
         await this.objects.markDeleted(manager, intent.storage_key);
+
         return { failed: false, outcome: 'completed' as const };
       },
     );
+
     if (result.failed) throw new Error(failureReason);
+
     return result.outcome;
   }
 
@@ -224,6 +250,7 @@ export class StorageCleanupService {
           );
           continue;
         }
+
         if (
           object.state === 'deleted' &&
           !(await bounded(this.storage.objectExists(object.storage_key)))
@@ -235,6 +262,7 @@ export class StorageCleanupService {
           );
           continue;
         }
+
         await this.objects.markDeleting(manager, object.storage_key);
         await this.schedule(
           manager,

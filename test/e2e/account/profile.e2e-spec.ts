@@ -3,6 +3,9 @@ import { getOptionsToken } from '@nestjs/throttler';
 import { mkdir, rm, readdir } from 'node:fs/promises';
 import { jest } from '@jest/globals';
 import request from 'supertest';
+import sharp from 'sharp';
+import { ImageProcessingService } from '@/modules/system/image-processing/services/image-processing.service';
+import { ImageProcessingError } from '@/modules/system/image-processing/types/image-processing.types';
 
 import { env } from '@/config/environment.config';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
@@ -224,6 +227,23 @@ describe('authenticated account profile lifecycle', () => {
       .expect(201);
     const firstKey = first.body.profile.media.avatar.storage_key as string;
     expect(storage.objects.has(firstKey)).toBe(true);
+    const stored = storage.objects.get(firstKey)!;
+    expect(firstKey).toMatch(/\.webp$/);
+    expect(await sharp(stored).metadata()).toMatchObject({
+      format: 'webp',
+      width: 256,
+      height: 256,
+    });
+    expect(
+      await suite.dataSource.getRepository(ImageEntity).findOneByOrFail({
+        storage_key: firstKey,
+      }),
+    ).toMatchObject({
+      width: 256,
+      height: 256,
+      size_bytes: stored.length,
+      mime_type: 'image/webp',
+    });
     const second = await auth.agent
       .post(`${ACCOUNT}/profile/avatar`)
       .set(auth.headers)
@@ -262,6 +282,179 @@ describe('authenticated account profile lifecycle', () => {
       .expect(413);
     expect(storage.objects.size).toBe(0);
   });
+
+  it.each([false, true])(
+    'preserves the current avatar after corrupt processing and allows a retry (keyed=%s)',
+    async (keyed) => {
+      const auth = await authenticated();
+      const assigned = await auth.agent
+        .post(`${ACCOUNT}/profile/avatar`)
+        .set(auth.headers)
+        .attach('avatar', PNG, 'original.png')
+        .expect(201);
+      const oldKey = assigned.body.profile.media.avatar.storage_key as string;
+      const audits = suite.dataSource.getRepository(AuditEventEntity);
+      const baseline = await audits.count();
+      const put = jest.spyOn(storage, 'putObject');
+      const upload = (buffer: Buffer) => {
+        const req = auth.agent
+          .post(`${ACCOUNT}/profile/avatar`)
+          .set(auth.headers);
+        if (keyed) req.set('Idempotency-Key', 'processing-retry');
+        return req.attach('avatar', buffer, 'replacement.png');
+      };
+
+      // Valid PNG signature, but no decodable image body.
+      await upload(PNG.subarray(0, 8)).expect(400);
+
+      const current = await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneByOrFail({ id: auth.user.id });
+      expect(current.profile.media.avatar?.storage_key).toBe(oldKey);
+      expect(await audits.count()).toBe(baseline);
+      expect(await suite.dataSource.getRepository(ImageEntity).count()).toBe(1);
+      expect(storage.objects.size).toBe(1);
+      expect(put).not.toHaveBeenCalled();
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+
+      await upload(PNG).expect(201);
+      expect(put).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    ['busy', 503],
+    ['processing_failed', 400],
+    ['limit_exceeded', 400],
+  ] as const)(
+    'preserves state on processor %s failure and retries the same key safely',
+    async (code, status) => {
+      const auth = await authenticated();
+      const initial = await auth.agent
+        .post(`${ACCOUNT}/profile/avatar`)
+        .set(auth.headers)
+        .attach('avatar', PNG, 'initial.png')
+        .expect(201);
+      const previousKey = initial.body.profile.media.avatar
+        .storage_key as string;
+      const images = suite.dataSource.getRepository(ImageEntity);
+      const previous = await images.findOneByOrFail({
+        storage_key: previousKey,
+      });
+      const audits = suite.dataSource.getRepository(AuditEventEntity);
+      const baseline = await audits.count();
+      const put = jest.spyOn(storage, 'putObject');
+      const process = jest
+        .spyOn(app.get(ImageProcessingService), 'process')
+        .mockRejectedValueOnce(
+          new ImageProcessingError(code, 'Image processing failed.'),
+        );
+      const upload = () =>
+        auth.agent
+          .post(`${ACCOUNT}/profile/avatar`)
+          .set(auth.headers)
+          .set('Idempotency-Key', 'processor-failure')
+          .attach('avatar', PNG, 'replacement.png');
+
+      await upload().expect(status);
+
+      expect(await images.findOneByOrFail({ id: previous.id })).toEqual(
+        previous,
+      );
+      expect(await audits.count()).toBe(baseline);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(0);
+      expect(
+        await suite.dataSource
+          .getRepository(StorageDeletionIntentEntity)
+          .count(),
+      ).toBe(0);
+      expect([...storage.objects.keys()]).toEqual([previousKey]);
+      expect(put).not.toHaveBeenCalled();
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+
+      const retried = await upload().expect(201);
+      expect((await upload().expect(201)).body).toEqual(retried.body);
+      expect(process).toHaveBeenCalledTimes(2);
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(await audits.count()).toBe(baseline + 1);
+      await drainStorageCleanup(app);
+      expect([...storage.objects.keys()]).toEqual([
+        retried.body.profile.media.avatar.storage_key,
+      ]);
+    },
+  );
+
+  it.each(['audit', 'cleanup intent'] as const)(
+    'rolls back processed avatar replacement after %s failure and safely retries',
+    async (failure) => {
+      const auth = await authenticated();
+      const initial = await auth.agent
+        .post(`${ACCOUNT}/profile/avatar`)
+        .set(auth.headers)
+        .attach('avatar', PNG, 'initial.png')
+        .expect(201);
+      const previousKey = initial.body.profile.media.avatar
+        .storage_key as string;
+      const images = suite.dataSource.getRepository(ImageEntity);
+      const previous = await images.findOneByOrFail({
+        storage_key: previousKey,
+      });
+      const audits = suite.dataSource.getRepository(AuditEventEntity);
+      const baseline = await audits.count();
+
+      if (failure === 'audit') {
+        jest
+          .spyOn(app.get(AuditService), 'record')
+          .mockRejectedValueOnce(new Error('private audit failure'));
+      } else {
+        jest
+          .spyOn(app.get(StorageCleanupService), 'schedule')
+          .mockRejectedValueOnce(new Error('private cleanup intent failure'));
+      }
+
+      const upload = () =>
+        auth.agent
+          .post(`${ACCOUNT}/profile/avatar`)
+          .set(auth.headers)
+          .set('Idempotency-Key', 'replacement-rollback')
+          .attach('avatar', PNG, 'replacement.png');
+      const failed = await upload().expect(500);
+
+      expect(JSON.stringify(failed.body)).not.toContain('private');
+      expect(await images.findOneByOrFail({ id: previous.id })).toEqual(
+        previous,
+      );
+      const current = await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneByOrFail({
+          id: auth.user.id,
+        });
+      expect(current.profile.media.avatar?.storage_key).toBe(previousKey);
+      expect(await images.count()).toBe(1);
+      expect(await audits.count()).toBe(baseline);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(0);
+      expect(
+        await suite.dataSource
+          .getRepository(StorageDeletionIntentEntity)
+          .count(),
+      ).toBe(0);
+      expect(await readdir(env.UPLOAD_TMP_DIR)).toEqual([]);
+      await drainStorageCleanup(app);
+      expect([...storage.objects.keys()]).toEqual([previousKey]);
+
+      const retried = await upload().expect(201);
+      expect((await upload().expect(201)).body).toEqual(retried.body);
+      expect(await audits.count()).toBe(baseline + 1);
+      await drainStorageCleanup(app);
+      expect([...storage.objects.keys()]).toEqual([
+        retried.body.profile.media.avatar.storage_key,
+      ]);
+    },
+  );
 
   it('replays avatar assignment/replacement/removal without repeated storage or audit work', async () => {
     const auth = await authenticated();

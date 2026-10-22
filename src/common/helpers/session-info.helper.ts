@@ -50,6 +50,7 @@ export function getBrowser(userAgent: string | null): string | null {
   if (/Safari\//.test(userAgent) && /Version\//.test(userAgent))
     return 'Safari';
   if (/Firefox\//.test(userAgent)) return 'Firefox';
+
   return 'Unknown';
 }
 
@@ -63,6 +64,7 @@ export function getBrowserVersion(userAgent: string | null): string | null {
     /Version\/(\S+)/,
     /Firefox\/(\S+)/,
   ];
+
   return getFirstMatch(userAgent, patterns);
 }
 
@@ -71,6 +73,7 @@ export function getDevice(userAgent: string | null): string | null {
   if (/iPad|Tablet|PlayBook|Silk/i.test(userAgent)) return 'Tablet';
   if (/Mobile|Android|iPhone|iPod|IEMobile|BlackBerry/i.test(userAgent))
     return 'Mobile';
+
   return 'Desktop';
 }
 
@@ -81,6 +84,7 @@ export function getOs(userAgent: string | null): string | null {
   if (/iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
   if (/Mac OS X/i.test(userAgent)) return 'macOS';
   if (/Linux/i.test(userAgent)) return 'Linux';
+
   return 'Unknown';
 }
 
@@ -88,15 +92,19 @@ export function getOsVersion(userAgent: string | null): string | null {
   if (!userAgent) return null;
 
   const windowsVersion = /Windows NT ([^;)]+)/.exec(userAgent)?.[1] ?? null;
+
   if (windowsVersion) return windowsVersion;
 
   const androidVersion = /Android ([^;)]+)/.exec(userAgent)?.[1] ?? null;
+
   if (androidVersion) return androidVersion;
 
   const iosVersion = /OS ([\d_]+) like Mac OS X/.exec(userAgent)?.[1] ?? null;
+
   if (iosVersion) return iosVersion.replace(/_/g, '.');
 
   const macVersion = /Mac OS X ([\d_]+)/.exec(userAgent)?.[1] ?? null;
+
   if (macVersion) return macVersion.replace(/_/g, '.');
 
   return null;
@@ -111,6 +119,7 @@ export function getPreferredLanguage(
 function getFirstMatch(userAgent: string, patterns: RegExp[]): string | null {
   for (const pattern of patterns) {
     const match = pattern.exec(userAgent)?.[1] ?? null;
+
     if (match) return match;
   }
 

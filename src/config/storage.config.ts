@@ -17,6 +17,7 @@ const storage: multer.StorageEngine = diskStorage({
     callback: (error: Error | null, filename: string) => void,
   ) => {
     const filename = generateFilename(file);
+
     trackUpload(req, join(uploadTempRoot, filename));
     callback(null, filename);
   },
@@ -24,6 +25,7 @@ const storage: multer.StorageEngine = diskStorage({
 
 function generateFilename(file: Express.Multer.File) {
   const extension = extname(file.originalname).toLowerCase();
+
   return `quickapi-upload-${uuidv4()}${/^\.[a-z0-9]{1,10}$/.test(extension) ? extension : ''}`;
 }
 

@@ -73,6 +73,7 @@ export class CloudflareStorageService extends StorageService {
           ?.httpStatusCode === 404
       )
         return false;
+
       // An outage or denied access is not proof that an object is absent.
       throw error;
     }

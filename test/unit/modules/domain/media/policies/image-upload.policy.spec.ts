@@ -1,11 +1,30 @@
 import { BadRequestException } from '@nestjs/common';
 import sharp from 'sharp';
-import { readValidatedImage } from '@/modules/domain/media/policies/image-upload.policy';
+import {
+  readImageUpload,
+  readValidatedImage,
+} from '@/modules/domain/media/policies/image-upload.policy';
 
 const upload = (buffer: Buffer, mimetype = 'image/png') =>
   ({ buffer, mimetype, size: buffer.length }) as Express.Multer.File;
 
 describe('image upload policy', () => {
+  it('caches boundary checks without decoding, but still fully validates unprocessed images', async () => {
+    const file = upload(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+    const stats = jest.spyOn(sharp.prototype, 'stats');
+
+    try {
+      const checked = await readImageUpload(file);
+
+      expect(await readImageUpload(file)).toBe(checked);
+      expect(stats).not.toHaveBeenCalled();
+      await expect(readImageUpload(file, 4)).rejects.toThrow('no larger than');
+      await expect(readValidatedImage(file)).rejects.toThrow('corrupt');
+    } finally {
+      stats.mockRestore();
+    }
+  });
+
   it.each([
     ['png', 'image/png', '.png'],
     ['jpeg', 'image/jpeg', '.jpg'],

@@ -21,9 +21,12 @@ export async function sweepTemporaryUploads(
     )
       continue;
     const path = join(root, entry.name);
+
     if (activeUploadPaths.has(path)) continue;
+
     try {
       const info = await stat(path);
+
       if (now - info.mtimeMs >= imageUploadPolicy.staleAfterMs)
         await rm(path, { force: true });
     } catch (error) {
@@ -56,6 +59,7 @@ export class TemporaryUploadCleanupService
   private async sweep(): Promise<void> {
     if (this.running) return;
     this.running = true;
+
     try {
       await sweepTemporaryUploads(uploadTempRoot);
     } catch (error) {

@@ -80,6 +80,7 @@ class RefreshTokenStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
         .digest('hex') !== session.refresh
     )
       throw new UnauthorizedException('Invalid refresh token');
+
     return { ...payload, userEntity: user, sessionEntity: session, refresh };
   }
 }

@@ -6,7 +6,9 @@ import { StorageObjectEntity } from '../entities/storage-object.entity';
 @Injectable()
 export class StorageObjectRepository implements OnModuleDestroy {
   private reservationSource?: Promise<DataSource>;
+
   public constructor(private readonly source: DataSource) {}
+
   public get manager(): EntityManager {
     return this.source.manager;
   }
@@ -27,13 +29,17 @@ export class StorageObjectRepository implements OnModuleDestroy {
           queueLimit: 0,
         },
       });
+
       this.reservationSource = source.initialize().catch((error: unknown) => {
         this.reservationSource = undefined;
+
         throw error;
       });
     }
+
     return (await this.reservationSource).manager;
   }
+
   public findLocked(
     manager: EntityManager,
     key: string,
@@ -43,6 +49,7 @@ export class StorageObjectRepository implements OnModuleDestroy {
       lock: { mode: 'pessimistic_write' },
     });
   }
+
   public findAbandoned(manager: EntityManager): Promise<StorageObjectEntity[]> {
     return manager
       .getRepository(StorageObjectEntity)
@@ -57,6 +64,7 @@ export class StorageObjectRepository implements OnModuleDestroy {
       .setOnLocked('skip_locked')
       .getMany();
   }
+
   public async onModuleDestroy(): Promise<void> {
     if (this.reservationSource) await (await this.reservationSource).destroy();
   }

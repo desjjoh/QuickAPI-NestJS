@@ -72,6 +72,7 @@ function useFileManager(): IUseFileManager {
 
   async function getFileSizeMB(filePath: string): Promise<number> {
     const stats = await stat(filePath);
+
     return stats.size / (1024 * 1024);
   }
 

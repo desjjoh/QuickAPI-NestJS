@@ -164,7 +164,7 @@ export class ProfileApiController {
   @ApiFileUpload({
     fieldName: 'avatar',
     description:
-      'PNG, JPEG, or GIF avatar no larger than 1 MB, 8192 pixels per side, and 40 million pixels across all frames.',
+      'PNG, JPEG, or GIF avatar no larger than 1 MB, 8192 pixels per side, and 40 million pixels across all frames. Stored as a static, center-cropped 256×256 WebP with transparency preserved; animated GIFs use the first frame.',
   })
   @ApiOkResponse({
     description:
@@ -183,6 +183,7 @@ export class ProfileApiController {
     @UploadedFile(
       new ImageUploadValidationPipe({
         maxSize: imageUploadPolicy.avatarMaxBytes,
+        processing: true,
         fileIsRequired: true,
       }),
     )

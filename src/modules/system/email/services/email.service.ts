@@ -57,6 +57,7 @@ export class EmailService {
             : 1440) *
             60_000,
       );
+
     await this.outbox.storeIntent(
       {
         to: options.to,

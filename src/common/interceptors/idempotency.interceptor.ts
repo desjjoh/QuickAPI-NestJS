@@ -28,6 +28,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
   ): Observable<unknown> {
     const request = context.switchToHttp().getRequest<Request>();
     const key = request.headers['idempotency-key'];
+
     if (key === undefined) return next.handle();
     if (
       typeof key !== 'string' ||
@@ -41,12 +42,14 @@ export class IdempotencyInterceptor implements NestInterceptor {
       );
     const actor = (request.user as { userEntity?: { id?: string } } | undefined)
       ?.userEntity?.id;
+
     if (!actor) throw new UnauthorizedException();
     const response = context.switchToHttp().getResponse<Response>();
     const operation = this.reflector.get<string>(
       IDEMPOTENCY_OPERATION,
       context.getHandler(),
     );
+
     return from(
       (async () => {
         const fingerprint = await requestFingerprint(request);
@@ -63,7 +66,9 @@ export class IdempotencyInterceptor implements NestInterceptor {
             status: response.statusCode,
           }),
         );
+
         response.status(result.status);
+
         return result.status === 204 ? undefined : result.body;
       })(),
     );

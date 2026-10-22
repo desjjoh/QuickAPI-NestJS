@@ -34,6 +34,11 @@ test/
 - **API services/controllers** handle audience authorization, request/response models, and orchestration through domain services.
 - **System services** own queue, storage, cleanup, delivery, and reusable request infrastructure. Media imports these capabilities; it does not implement provider or queue mechanics.
 
+The standalone [image processor](image-processing.md) owns raster transforms and
+WebP encoding. Feature presets belong to their consumers; persistence, upload
+tracking, and cleanup remain outside the processor. New avatar uploads use the
+media domain's static 256×256 policy; article uploads remain unprocessed.
+
 Identity capabilities are split into lifecycle, credentials, and administration services, with a shared user service where appropriate. Prefer a coherent capability over another service that duplicates persistence logic.
 
 Identity owns account statuses, genders, roles, and permissions, including their

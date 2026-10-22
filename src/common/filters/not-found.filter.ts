@@ -17,6 +17,7 @@ export class NotFoundFilter implements ExceptionFilter {
     )
       ? 'Route not found.'
       : raw;
+
     new GlobalExceptionFilter().catch(new NotFoundException(message), host);
   }
 }

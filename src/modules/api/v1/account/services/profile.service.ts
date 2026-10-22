@@ -1,4 +1,6 @@
 import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
+import { avatarProcessingPolicy } from '@/modules/domain/media/policies/avatar-processing.policy';
+import { imageUploadPolicy } from '@/config/image-upload.config';
 import {
   BadRequestException,
   Injectable,
@@ -138,6 +140,8 @@ export class ProfileApiService {
           file,
           alt_text: `Profile avatar for user id#${user.id}`,
           folder: 'users/avatars',
+          processing: avatarProcessingPolicy,
+          maxBytes: imageUploadPolicy.avatarMaxBytes,
         };
         const image = existing
           ? await this.imgSvc.update(
@@ -154,6 +158,7 @@ export class ProfileApiService {
           {},
           manager,
         );
+
         await this.record(
           manager,
           existing
@@ -166,9 +171,11 @@ export class ProfileApiService {
           user.id,
           true,
         );
+
         return after;
       },
     );
+
     return new UserDto(updated, session);
   }
 
@@ -180,6 +187,7 @@ export class ProfileApiService {
       async (manager, lifecycle) => {
         const current = await this.lockUser(manager, user.id);
         const avatar = current.profile.media.avatar;
+
         if (!avatar)
           throw new BadRequestException(
             'User does not have an avatar to remove.',
@@ -196,9 +204,11 @@ export class ProfileApiService {
           user.id,
           true,
         );
+
         return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
       },
     );
+
     return new UserDto(updated, session);
   }
 
@@ -213,6 +223,7 @@ export class ProfileApiService {
         dto.region_id,
         dto.country_id,
       );
+
     if (!region)
       throw new BadRequestException(
         'Region must belong to the selected country.',
@@ -236,6 +247,7 @@ export class ProfileApiService {
         manager,
       );
       const result = after.profile.contact.address!;
+
       await this.record(
         manager,
         address
@@ -248,8 +260,10 @@ export class ProfileApiService {
         user.id,
         true,
       );
+
       return after;
     });
+
     return new UserDto(updated, session);
   }
 
@@ -277,6 +291,7 @@ export class ProfileApiService {
         manager,
       );
       const result = after.profile.contact.phone!;
+
       await this.record(
         manager,
         phone
@@ -289,8 +304,10 @@ export class ProfileApiService {
         user.id,
         true,
       );
+
       return after;
     });
+
     return new UserDto(updated, session);
   }
 
@@ -320,6 +337,7 @@ export class ProfileApiService {
         field === 'country_id'
           ? entity.profile.region.country.id
           : entity.profile.region.timezone.id;
+
       await this.record(
         manager,
         event,
@@ -392,7 +410,9 @@ export class ProfileApiService {
       where: { id },
       lock: { mode: 'pessimistic_write' },
     });
+
     if (isUserDeleted(user)) throw new NotFoundException('User not found.');
+
     return user;
   }
 

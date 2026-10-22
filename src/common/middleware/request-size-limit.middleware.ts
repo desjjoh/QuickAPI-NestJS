@@ -50,6 +50,7 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
   ): void {
     if (!isJsonRequest(req)) {
       next();
+
       return;
     }
 
@@ -140,6 +141,7 @@ export function bodyLimitMiddleware(opts: BodyLimitOptions): RequestHandler {
       if (actualLength === 0) {
         req.body = {};
         finish();
+
         return;
       }
 

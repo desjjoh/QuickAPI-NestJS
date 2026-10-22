@@ -108,6 +108,7 @@ export class AuditRedactionService {
       this.inputRecord(before),
       this.inputRecord(after),
     );
+
     return {
       before: this.fit(diff.before),
       after: this.fit(diff.after),
@@ -138,10 +139,12 @@ export class AuditRedactionService {
 
   private policy(resourceType: string): FieldTree {
     const policy = this.registry.get(resourceType);
+
     if (!policy)
       throw new Error(
         `No audit redaction policy registered for ${resourceType}`,
       );
+
     return policy;
   }
 
@@ -158,9 +161,11 @@ export class AuditRedactionService {
 
     const source = input as Record<string, unknown>;
     const result: Record<string, AuditValue> = {};
+
     for (const key of Object.keys(tree).sort()) {
       if (!(key in source)) continue;
       const policy = tree[key];
+
       // This guard is deliberately applied even to allowlisted future fields.
       if (
         (SECRET_KEY.test(key) &&
@@ -173,7 +178,9 @@ export class AuditRedactionService {
         result[key] = this.applyPolicy(source[key], policy, seen, depth + 1);
       }
     }
+
     seen.delete(input);
+
     return result;
   }
 
@@ -191,23 +198,27 @@ export class AuditRedactionService {
         value instanceof Date && Number.isFinite(value.getTime())
           ? value.toISOString()
           : value;
+
       if (
         typeof candidate !== 'string' ||
         !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(candidate)
       )
         return OMITTED;
       const parsed = new Date(candidate);
+
       return Number.isFinite(parsed.getTime()) &&
         parsed.toISOString() === candidate
         ? candidate
         : OMITTED;
     }
+
     if (policy.kind === 'changed-only') return CHANGED;
     if (policy.kind === 'masked')
       return policy.mask === 'email' ? this.maskEmail(value) : this.hash(value);
     if (policy.kind === 'scalar') return this.scalar(value);
     if (policy.kind === 'relationship-ids')
       return this.relationIds(value, policy.preserveOrder === true);
+
     return this.applyTree(value, policy.fields, seen, depth);
   }
 
@@ -221,6 +232,7 @@ export class AuditRedactionService {
 
     const ids: string[] = [];
     const unique = new Set<string>();
+
     for (const item of value) {
       const candidate =
         typeof item === 'string'
@@ -228,9 +240,11 @@ export class AuditRedactionService {
           : item !== null && typeof item === 'object' && 'id' in item
             ? (item as { id?: unknown }).id
             : undefined;
+
       if (typeof candidate !== 'string' || candidate.trim().length === 0)
         continue;
       const id = this.safeString(candidate);
+
       if (!unique.has(id)) {
         unique.add(id);
         ids.push(id);
@@ -239,6 +253,7 @@ export class AuditRedactionService {
 
     if (!preserveOrder) ids.sort();
     if (ids.length <= this.limits.maxArrayLength) return ids;
+
     return [...ids.slice(0, this.limits.maxArrayLength), TRUNCATED];
   }
 
@@ -253,6 +268,7 @@ export class AuditRedactionService {
         : value.toISOString();
     // Raw bytes and relations/embedded objects require an explicit nested tree.
     if (Buffer.isBuffer(value) || ArrayBuffer.isView(value)) return '[BINARY]';
+
     return '[OBJECT]';
   }
 
@@ -265,12 +281,15 @@ export class AuditRedactionService {
   private maskEmail(value: unknown): string {
     if (typeof value !== 'string') return CHANGED;
     const at = value.lastIndexOf('@');
+
     if (at < 1) return CHANGED;
+
     return `${value[0]}***@${value.slice(at + 1)}`;
   }
 
   private hash(value: unknown): string {
     if (typeof value !== 'string' || value.length === 0) return CHANGED;
+
     return `sha256:${createHash('sha256').update(value).digest('hex')}`;
   }
 
@@ -313,6 +332,7 @@ export class AuditRedactionService {
           rawAfter,
           field,
         );
+
         if (
           rawHasBefore === rawHasAfter &&
           this.rawEqual(rawBefore[field], rawAfter[field])
@@ -335,11 +355,13 @@ export class AuditRedactionService {
           this.inputRecord(rawBefore[field]),
           this.inputRecord(rawAfter[field]),
         );
+
         if (Object.keys(nested.changes).length > 0) {
           result.before[field] = nested.before;
           result.after[field] = nested.after;
           result.changes[field] = nested.changes;
         }
+
         continue;
       }
 
@@ -376,6 +398,7 @@ export class AuditRedactionService {
         };
       }
     }
+
     return result;
   }
 

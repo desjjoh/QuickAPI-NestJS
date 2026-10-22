@@ -182,6 +182,7 @@ export class AccountTokenService {
       !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
     ) {
       await this.recordFailedAttempt(entity.id);
+
       throw new UnauthorizedException('Invalid or expired token.');
     }
 
@@ -271,6 +272,7 @@ export class AccountTokenService {
 
     if (!entity.mfa_code_hash || !isVerificationCode(code)) {
       await this.recordFailedAttempt(entity.id);
+
       throw new UnauthorizedException('Invalid verification code.');
     }
 
@@ -278,6 +280,7 @@ export class AccountTokenService {
       !compareIdentityTokenHashes(entity.mfa_code_hash, hashIdentityToken(code))
     ) {
       await this.recordFailedAttempt(entity.id);
+
       throw new UnauthorizedException('Invalid verification code.');
     }
 

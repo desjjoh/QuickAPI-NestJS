@@ -6,6 +6,8 @@ export function normalizeArticleSearch(search?: string): string {
 /** Literal substring search with ! as the explicit SQL LIKE escape character. */
 export function articleSearchPattern(search?: string): string | undefined {
   const term = normalizeArticleSearch(search);
+
   if (!term) return undefined;
+
   return `%${term.replace(/[!%_]/g, '!$&')}%`;
 }

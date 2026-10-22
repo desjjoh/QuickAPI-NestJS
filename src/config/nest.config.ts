@@ -44,6 +44,7 @@ export function configureNestApplication(app: INestApplication): void {
   configureTrustProxy(app as NestExpressApplication, env.TRUST_PROXY);
   // Resolve and attach request context store
   const requestContext = app.get(RequestContext);
+
   attachRequestContext(requestContext);
 
   // MIDDLEWARE

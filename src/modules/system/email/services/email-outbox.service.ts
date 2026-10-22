@@ -19,9 +19,11 @@ import { EmailQueueService } from '../queues/queue.service';
 import { EmailTransportService } from './email-transport.service';
 
 const day = 24 * 60 * 60 * 1000;
+
 // A disconnected Redis producer must not hold database locks indefinitely.
 async function boundedDispatch(work: Promise<void>): Promise<void> {
   let timer: NodeJS.Timeout | undefined;
+
   try {
     await Promise.race([
       work,
@@ -36,25 +38,34 @@ async function boundedDispatch(work: Promise<void>): Promise<void> {
     if (timer) clearTimeout(timer);
   }
 }
+
 const encryptionKey = () =>
   createHash('sha256').update(`email-outbox-v1:${env.CRYPTO_SECRET}`).digest();
+
 export function sealEmail(payload: EmailJobPayload): string {
+  // Each intent gets a fresh 96-bit GCM nonce; the authentication tag detects
+  // ciphertext tampering when the worker reconstructs the encrypted payload.
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', encryptionKey(), iv);
   const body = Buffer.concat([
     cipher.update(JSON.stringify(payload), 'utf8'),
     cipher.final(),
   ]);
+
   return [iv, cipher.getAuthTag(), body]
     .map((part) => part.toString('base64'))
     .join('.');
 }
+
 export function openEmail(value: string): EmailJobPayload {
   const parts = value.split('.');
+
   if (parts.length !== 3) throw new Error('Invalid email intent ciphertext.');
   const [iv, tag, body] = parts.map((part) => Buffer.from(part, 'base64'));
   const cipher = createDecipheriv('aes-256-gcm', encryptionKey(), iv);
+
   cipher.setAuthTag(tag);
+
   return JSON.parse(
     Buffer.concat([cipher.update(body), cipher.final()]).toString('utf8'),
   ) as EmailJobPayload;
@@ -67,6 +78,7 @@ export class EmailOutboxService {
     private readonly queue: EmailQueueService,
     private readonly transport: EmailTransportService,
   ) {}
+
   public async storeIntent(
     payload: EmailJobPayload,
     expiresAt = new Date(Date.now() + day),
@@ -74,6 +86,7 @@ export class EmailOutboxService {
   ): Promise<void> {
     await runInTransaction(this.repository.manager, async (manager) => {
       const userId = payload.metadata?.userId;
+
       if (userId) {
         // Same root lock as account deletion: a stale security request cannot
         // enqueue an email for an already deleted account.
@@ -81,8 +94,10 @@ export class EmailOutboxService {
           where: { id: userId },
           lock: { mode: 'pessimistic_write' },
         });
+
         if (!user || isUserDeleted(user)) return;
       }
+
       if (scope)
         await manager.update(
           EmailIntentEntity,
@@ -100,6 +115,7 @@ export class EmailOutboxService {
       });
     });
   }
+
   public async cancelForUser(
     userId: string,
     email: string,
@@ -108,6 +124,7 @@ export class EmailOutboxService {
     // Existing payloads are encrypted and have no user index. Inspect only
     // pending intents, in bounded pages, and never emit decrypted data.
     let after = '';
+
     for (;;) {
       const intents = await manager
         .getRepository(EmailIntentEntity)
@@ -117,10 +134,12 @@ export class EmailOutboxService {
         .orderBy('intent.delivery_id', 'ASC')
         .take(100)
         .getMany();
+
       if (!intents.length) return;
       for (const intent of intents) {
         if (!intent.ciphertext) continue;
         const payload = openEmail(intent.ciphertext);
+
         if (
           payload.metadata?.userId === userId ||
           payload.to.trim().toLowerCase() === email.trim().toLowerCase()
@@ -132,9 +151,11 @@ export class EmailOutboxService {
           );
         }
       }
+
       after = intents[intents.length - 1].delivery_id;
     }
   }
+
   public async dispatch(): Promise<void> {
     await this.repository.manager.update(
       EmailIntentEntity,
@@ -166,9 +187,11 @@ export class EmailOutboxService {
       }
     });
   }
+
   public async deliver(id: string): Promise<void> {
     await runInTransaction(this.repository.manager, async (manager) => {
       const intent = await this.repository.findForDelivery(manager, id);
+
       if (!intent || intent.state !== 'pending') return;
       if (intent.expires_at.getTime() <= Date.now()) {
         await manager.update(
@@ -176,11 +199,14 @@ export class EmailOutboxService {
           { delivery_id: id },
           { state: 'expired', ciphertext: null },
         );
+
         return;
       }
+
       if (!intent.ciphertext)
         throw new Error('Pending email intent has no payload.');
       const payload = openEmail(intent.ciphertext);
+
       await this.transport.sendCompiledEmail({
         ...payload,
         metadata: { ...payload.metadata, deliveryId: id },

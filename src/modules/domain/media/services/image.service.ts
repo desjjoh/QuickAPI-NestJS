@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 import { Base } from '@/common/models/base.model';
 import { removeTemporaryUpload } from '@/common/helpers/upload-cleanup.helper';
 import {
   readValidatedImage,
+  readImageUpload,
   type ValidatedImage,
 } from '../policies/image-upload.policy';
 import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
@@ -18,20 +24,23 @@ import { ImageRepository } from '../repositories/image.repository';
 import { StorageCleanupService } from '@/modules/system/storage-cleanup/services/storage-cleanup.service';
 import { StorageUploadService } from '@/modules/system/storage/services/storage-upload.service';
 import type { DeepPartial, EntityManager } from 'typeorm';
+import { ImageProcessingService } from '@/modules/system/image-processing/services/image-processing.service';
+import {
+  ImageProcessingError,
+  type ImageProcessingOptions,
+} from '@/modules/system/image-processing/types/image-processing.types';
 
 export type CreateImageInput = {
   file: Express.Multer.File;
   alt_text?: string | null;
   decorative?: boolean;
   folder: string;
+  processing?: ImageProcessingOptions;
+  maxBytes?: number;
 };
 
-export type UpdateImageInput = {
+export type UpdateImageInput = CreateImageInput & {
   image: ImageEntity;
-  file: Express.Multer.File;
-  alt_text?: string | null;
-  decorative?: boolean;
-  folder: string;
 };
 
 @Injectable()
@@ -40,6 +49,7 @@ export class ImageService {
     private readonly imgRepo: ImageRepository,
     private readonly uploads: StorageUploadService,
     private readonly cleanup: StorageCleanupService,
+    private readonly processor: ImageProcessingService,
   ) {}
 
   public async findById(
@@ -63,12 +73,13 @@ export class ImageService {
       return runInTransaction(manager, (manager, lifecycle) =>
         this.create(input, manager, lifecycle),
       );
-    const metadata = await this.prepareImage(input.file, manager, lifecycle);
+    const metadata = await this.prepareImage(input, manager, lifecycle);
     const storedFile = await this.uploads.upload({
       originalName: input.file.originalname,
       folder: input.folder,
       ...metadata,
     });
+
     lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
     await this.uploads.attach(manager, storedFile.storage_key);
     const payload: Base<ImageEntity> = {
@@ -97,6 +108,7 @@ export class ImageService {
       return runInTransaction(manager, (manager, lifecycle) =>
         this.updateImage(input, manager, lifecycle),
       );
+
     return this.updateImage(input, manager, lifecycle);
   }
 
@@ -106,12 +118,13 @@ export class ImageService {
     lifecycle: TransactionLifecycle,
   ): Promise<ImageEntity> {
     const previousStorageKey = input.image.storage_key;
-    const metadata = await this.prepareImage(input.file, manager, lifecycle);
+    const metadata = await this.prepareImage(input, manager, lifecycle);
     const storedFile = await this.uploads.upload({
       originalName: input.file.originalname,
       folder: input.folder,
       ...metadata,
     });
+
     lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
 
     await this.uploads.attach(manager, storedFile.storage_key);
@@ -136,6 +149,7 @@ export class ImageService {
       omitUndefinedDeep(payload),
     );
     const savedImage = await manager.save(ImageEntity, updatedImage);
+
     await this.cleanup.schedule(manager, previousStorageKey, 'image_replaced');
 
     return savedImage;
@@ -168,19 +182,43 @@ export class ImageService {
   }
 
   private async prepareImage(
-    file: Express.Multer.File,
+    input: CreateImageInput,
     manager: EntityManager,
     lifecycle?: TransactionLifecycle,
   ): Promise<ValidatedImage> {
+    const { file, processing, maxBytes } = input;
     let image: ValidatedImage;
+
     try {
       this.assertTransactionLifecycle(manager, lifecycle);
-      image = await readValidatedImage(file);
+
+      if (processing) {
+        // Transformation performs the corruption/pixel checks; do not decode
+        // the original separately with readValidatedImage on this path.
+        const upload = await readImageUpload(file, maxBytes);
+
+        image = await this.processor.process(upload.buffer, processing);
+      } else {
+        image = await readValidatedImage(file, maxBytes);
+      }
     } catch (error) {
       await removeTemporaryUpload(file).catch(() => undefined);
+
+      if (error instanceof ImageProcessingError) {
+        if (error.code === 'busy')
+          throw new ServiceUnavailableException(
+            'Image processing is temporarily busy. Please retry.',
+          );
+
+        throw new BadRequestException(error.message);
+      }
+
       throw error;
     }
+
+    // Storage receives owned bytes, so the disk upload is no longer needed.
     await removeTemporaryUpload(file);
+
     return image;
   }
 }
