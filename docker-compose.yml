@@ -67,7 +67,14 @@ services:
       DB_PASSWORD: quickapi_password
       DB_DATABASE: quickapi
       DB_SYNC: 'false'
-    command: ['npm', 'run', 'migration:run:prod']
+    command:
+      [
+        'node',
+        './node_modules/typeorm/cli.js',
+        'migration:run',
+        '-d',
+        'dist/database/typeorm.datasource.js',
+      ]
 
   api:
     build:

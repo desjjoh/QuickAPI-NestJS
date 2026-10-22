@@ -6,7 +6,12 @@ This is an engineering follow-up list, not a claim that every item blocks every 
 
 ## Verified implementation gaps
 
-Production image scans also cover the npm tooling bundled with the Node base image, outside the application's production lockfile. Current local release evidence reports noncritical findings there. Keep these visible and triage base-image/tooling updates or removal with migration/preflight compatibility checks; a clean `npm audit --omit=dev` is not proof that the entire image has no findings. No critical-risk exceptions were added for bundled tooling.
+Production image scans cover the final OS and application dependency tree, not
+just the application's lockfile. Runtime package managers are intentionally
+excluded; npm remains in build stages only. Continue triaging future Node,
+Alpine, native-library, and application findings against the exact candidate.
+A clean `npm audit --omit=dev` is not proof that the entire image has no findings.
+No critical-risk exceptions were added for bundled tooling.
 
 | Item                 | Evidence and impact                                                                                                                                                                                       | Follow-up                                                                                                                                                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

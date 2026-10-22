@@ -2,7 +2,10 @@
 # Dependencies
 # ============================================================
 
-FROM node:22-alpine AS deps
+# Keep the Node build and minimal runtime on the same musl/Alpine release.
+ARG ALPINE_VERSION=3.24
+
+FROM node:22-alpine${ALPINE_VERSION} AS deps
 
 WORKDIR /app
 
@@ -15,7 +18,7 @@ RUN npm ci
 # Build
 # ============================================================
 
-FROM node:22-alpine AS build
+FROM node:22-alpine${ALPINE_VERSION} AS build
 
 WORKDIR /app
 
@@ -32,7 +35,7 @@ RUN npm run build
 # Production dependencies
 # ============================================================
 
-FROM node:22-alpine AS prod-deps
+FROM node:22-alpine${ALPINE_VERSION} AS prod-deps
 
 WORKDIR /app
 
@@ -45,17 +48,20 @@ RUN npm ci --omit=dev
 # Runtime
 # ============================================================
 
-FROM node:22-alpine AS runtime
+FROM alpine:${ALPINE_VERSION} AS runtime
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Copy Node alone: npm, npx, Yarn, and Corepack stay in the build images.
+COPY --from=prod-deps /usr/local/bin/node /usr/local/bin/node
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY package*.json ./
 
-RUN apk upgrade --no-cache \
+RUN apk add --no-cache libstdc++ \
+  && apk upgrade --no-cache \
   && addgroup -S nodeapp \
   && adduser -S nodeapp -G nodeapp \
   && mkdir -p /app/public /app/tmp /app/data/geoip \

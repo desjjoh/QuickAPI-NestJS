@@ -32,7 +32,7 @@ services:
     image: ${SMOKE_IMAGE:?Set SMOKE_IMAGE to the built image ID}
     env_file: ci-smoke.env
     volumes: ['./ci-smoke.env:/app/.env.staging:ro']
-    command: [npm, run, staging:preflight:prod]
+    command: [node, dist/config/staging-preflight.js, .env.staging]
     networks: [smoke]
 
   geoip-init:
@@ -51,7 +51,14 @@ services:
   migration:
     image: ${SMOKE_IMAGE:?Set SMOKE_IMAGE to the built image ID}
     env_file: ci-smoke.env
-    command: [npm, run, migration:run:prod]
+    command:
+      [
+        node,
+        ./node_modules/typeorm/cli.js,
+        migration:run,
+        '-d',
+        dist/database/typeorm.datasource.js,
+      ]
     networks: [smoke]
 
   api:
