@@ -46,8 +46,8 @@ domains, a wildcard CORS origin, or a trust-all proxy setting.
 ## Release images and supply-chain evidence
 
 After the `CI` workflow succeeds on `main` or `staging`, the
-`.github/workflows/release-image.yml` workflow builds the production image once
-and pushes that manifest with the full commit SHA and `package.json` version
+`.github/workflows/release-image.yml` workflow builds and scans the production
+candidate once, then publishes the approved manifest with the full commit SHA and `package.json` version
 tags. Set the repository variables `CONTAINER_REGISTRY` and
 `CONTAINER_REPOSITORY` to select a registry/repository (they default to GHCR and
 the GitHub repository name). Non-GHCR registries require the environment secrets

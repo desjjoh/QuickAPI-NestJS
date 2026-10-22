@@ -31,21 +31,26 @@ export function ImageFileInterceptor(fieldName: string, maxBytes: number) {
     ): Promise<Observable<unknown>> {
       const request = context.switchToHttp().getRequest<Request>();
       let stream: Observable<unknown>;
+
       try {
         stream = await super.intercept(context, next);
       } catch (error) {
         await cleanupRequestUpload(request).catch(() => undefined);
+
         throw error;
       }
+
       return stream.pipe(
         concatMap(async (value) => {
           await cleanupRequestUpload(request);
+
           return value;
         }),
         catchError((error: unknown) =>
           from(
             (async () => {
               await cleanupRequestUpload(request).catch(() => undefined);
+
               throw error;
             })(),
           ),

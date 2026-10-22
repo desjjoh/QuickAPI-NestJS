@@ -190,8 +190,10 @@ export class ArticleService {
     work: (snapshot: EntityManager) => Promise<ArticleListPage>,
   ): Promise<ArticleListPage> {
     const current = applicationManager(manager);
+
     // Caller-owned transactions retain their isolation and lifecycle.
     if (current.queryRunner?.isTransactionActive) return work(current);
+
     return current.transaction('REPEATABLE READ', work);
   }
 
@@ -218,6 +220,7 @@ export class ArticleService {
     manager: EntityManager = this.articleRepo.manager,
   ): Promise<ArticleEntity[]> {
     await this.getStatus(statusKey, manager);
+
     return this.articleRepo.findByStatusKey(manager, statusKey);
   }
 
@@ -355,6 +358,7 @@ export class ArticleService {
       input.altText,
       input.decorative,
     );
+
     // Claim the article revision before touching storage; failures roll it back.
     await this.saveDetached(article, {}, manager);
     await this.imageSvc.update(
@@ -466,6 +470,7 @@ export class ArticleService {
     manager: EntityManager = this.articleRepo.manager,
   ): Promise<ArticleEntity> {
     await manager.delete(ArticleEntity, { id: article.id });
+
     return article;
   }
 
@@ -518,6 +523,7 @@ export class ArticleService {
         version: () => '`version` + 1',
       } as QueryDeepPartialEntity<ArticleEntity>,
     );
+
     if (result.affected !== 1)
       throw new ConflictException(
         'Article has changed. Reload it before retrying.',

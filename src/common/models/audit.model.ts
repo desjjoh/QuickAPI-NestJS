@@ -349,6 +349,7 @@ export class AuditEventDto {
     this.changes = event.changes;
     this.metadata = event.metadata;
     const reasonCode = event.metadata?.reason_code;
+
     this.reasonCode =
       typeof reasonCode === 'string' &&
       administrationReasonCodes.has(reasonCode)

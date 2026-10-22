@@ -34,18 +34,22 @@ export class TimeoutInterceptor implements NestInterceptor {
         res.off('finish', cleanup);
         res.off('close', disconnected);
       };
+
       const disconnected = () => {
         if (!res.writableFinished)
           deadline.expire('Client disconnected before request completion.');
         cleanup();
       };
+
       const timer = setTimeout(() => {
         const error = deadline.expire(`Request timed out after ${ms}ms`);
+
         // Error through Nest, never an uncaught timer throw. Once headers are
         // sent, the response cannot be replaced with a JSON timeout.
         if (!res.headersSent && !res.destroyed) observer.error(error);
         cleanup();
       }, ms);
+
       res.once('finish', cleanup);
       res.once('close', disconnected);
 
@@ -79,6 +83,7 @@ export class TimeoutInterceptor implements NestInterceptor {
           observer.error(error);
         }
       });
+
       return cleanup;
     });
   }

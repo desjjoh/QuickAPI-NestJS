@@ -26,6 +26,7 @@ export class SessionsApiService {
 
   public async findAll(user: UserEntity): Promise<SessionDto[]> {
     const sessions = await this.refreshSvc.findSessions(user.id);
+
     return sessions.map((session) => new SessionDto(session));
   }
 
@@ -48,6 +49,7 @@ export class SessionsApiService {
     }
 
     const updated = await this.refreshSvc.sessionForAudit(user.id, sessionId);
+
     if (!updated)
       throw new NotFoundException('Session not found after revocation.');
     await this.auditSvc.record({
@@ -74,6 +76,7 @@ export class SessionsApiService {
     );
 
     const before = { id: user.id, sessions: [...sessionIds] };
+
     await this.refreshSvc.revokeAllSessions(user.id, res);
 
     const remainingSessionIds = (

@@ -11,6 +11,7 @@ export class RequestDeadline {
 
   public expire(message = 'Request deadline exceeded.'): RequestTimeoutError {
     this.failure ??= new RequestTimeoutError(message);
+
     return this.failure;
   }
 

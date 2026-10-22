@@ -310,6 +310,7 @@ export const EnvSchema = z
     if (env.NODE_ENV === 'production') {
       for (const [name, value] of secrets) {
         const result = generatedSecret.safeParse(value);
+
         if (!result.success || value === exampleSentinels[name]) {
           ctx.addIssue({
             code: 'custom',

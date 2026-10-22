@@ -61,10 +61,13 @@ export class UserAdminService {
   ): Promise<void> {
     await this.userSvc.transaction(async (manager, lifecycle) => {
       const before = await this.lockUser(manager, id);
+
       assertUserAdministrationVersion(before, dto.expected_version);
       const beforeSnapshot = this.auditSnapshot(before);
+
       await this.lifecycle.deleteUser(before, manager, lifecycle);
       const after = await manager.findOneOrFail(UserEntity, { where: { id } });
+
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_DELETED,
@@ -84,6 +87,7 @@ export class UserAdminService {
   ): Promise<UserAdministrationDto> {
     const user = await this.userSvc.transaction(async (manager) => {
       const before = await this.lockUser(manager, id);
+
       assertUserAdministrationVersion(before, dto.expected_version);
       const beforeSnapshot = this.auditSnapshot(before);
       const after = await this.userAdministration.updateAdministration(
@@ -91,6 +95,7 @@ export class UserAdminService {
         dto,
         manager,
       );
+
       await this.audit.record(
         this.successInput(
           IdentityAuditEvents.ADMIN_USER_UPDATED,
@@ -101,8 +106,10 @@ export class UserAdminService {
         ),
         manager,
       );
+
       return after;
     });
+
     return new UserAdministrationDto(user);
   }
 
@@ -115,7 +122,9 @@ export class UserAdminService {
       where: { id },
       lock: { mode: 'pessimistic_write' },
     });
+
     if (isUserDeleted(user)) throw new NotFoundException('User not found.');
+
     return user;
   }
 

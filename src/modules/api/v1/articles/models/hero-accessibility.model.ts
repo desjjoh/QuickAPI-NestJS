@@ -15,7 +15,9 @@ class HeroAccessibilityConstraint implements ValidatorConstraintInterface {
   public validate(value: unknown, args: ValidationArguments): boolean {
     try {
       const dto = args.object as HeroAccessibilityDto;
+
       resolveHeroAccessibility(value, dto.hero_decorative);
+
       return true;
     } catch {
       return false;

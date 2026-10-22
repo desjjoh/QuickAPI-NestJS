@@ -14,6 +14,7 @@ export function assertUserAdministrationVersion(
       'A positive integer expected_version is required.',
     );
   }
+
   if (user.administration_version !== expectedVersion) {
     throw new ConflictException(
       'User administration state has changed. Reload the user before retrying.',

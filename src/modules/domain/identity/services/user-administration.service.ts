@@ -107,6 +107,8 @@ export class UserAdministrationService {
       if (roles && roles.length !== new Set(input.role_ids).size)
         throw new BadRequestException('One or more roles were not found.');
 
+      // Claim the expected revision before changing relations. A competing
+      // administrator must fail without partially replacing roles or status.
       const revision = await manager.increment(
         UserEntity,
         {
@@ -116,6 +118,7 @@ export class UserAdministrationService {
         'administration_version',
         1,
       );
+
       if (revision.affected !== 1)
         throw new ConflictException(
           'User administration state has changed. Reload the user before retrying.',

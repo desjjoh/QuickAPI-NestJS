@@ -33,6 +33,7 @@ export class AuditRepository extends DomainRepository<AuditEventEntity> {
     order: Order,
   ): Promise<[AuditEventEntity[], number]> {
     const builder = this.getRepository(manager).createQueryBuilder('audit');
+
     this.applyFilters(builder, query);
 
     return builder
@@ -49,6 +50,7 @@ export class AuditRepository extends DomainRepository<AuditEventEntity> {
     ids: readonly string[],
   ): Promise<AuditUserRead[]> {
     if (!ids.length) return Promise.resolve([]);
+
     return manager
       .getRepository(UserEntity)
       .createQueryBuilder('actor')
@@ -89,6 +91,7 @@ export class AuditRepository extends DomainRepository<AuditEventEntity> {
 
     for (const [property, column] of filters) {
       const value = query[property];
+
       if (value === undefined) continue;
       if (value === null) builder.andWhere(`audit.${column} IS NULL`);
       else

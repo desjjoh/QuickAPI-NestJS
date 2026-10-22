@@ -13,6 +13,7 @@ export class CustomFileTypeValidator extends FileValidator {
 
   isValid(file?: Express.Multer.File): boolean | Promise<boolean> {
     if (!file?.mimetype) return false;
+
     return this.allowedTypes.includes(file.mimetype);
   }
 

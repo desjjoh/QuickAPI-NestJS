@@ -31,10 +31,13 @@ export async function afterApplicationTransaction(
   action: TransactionAction,
 ): Promise<void> {
   const outer = applicationTransaction.getStore();
+
   if (!outer) {
     await action();
+
     return;
   }
+
   outer.lifecycle.afterCommit(action);
   outer.lifecycle.afterRollback(action);
 }
@@ -90,6 +93,7 @@ export class TransactionLifecycle {
 
     return () => {
       const index = actions.indexOf(action);
+
       if (index >= 0) actions.splice(index, 1);
     };
   }
@@ -126,6 +130,7 @@ export async function runInTransaction<T>(
 ): Promise<T> {
   assertRequestActive();
   const outer = applicationTransaction.getStore();
+
   if (outer) {
     if (!outer.manager.queryRunner?.isTransactionActive)
       throw new InvalidOperationError(
@@ -135,8 +140,10 @@ export async function runInTransaction<T>(
       throw new InvalidOperationError(
         'An application transaction cannot span different data sources.',
       );
+
     return work(outer.manager, outer.lifecycle);
   }
+
   if (manager.queryRunner?.isTransactionActive)
     throw new InvalidOperationError(
       'Reuse the outer transaction manager and lifecycle instead of starting a nested lifecycle.',
@@ -149,9 +156,11 @@ export async function runInTransaction<T>(
     result = await manager.transaction((transactionManager) =>
       withApplicationTransaction(transactionManager, lifecycle, async () => {
         const value = await work(transactionManager, lifecycle);
+
         // Never roll back/release while work is running. Reject expired HTTP
         // work only once it settles, immediately before TypeORM commits.
         assertRequestActive();
+
         return value;
       }),
     );
@@ -170,5 +179,6 @@ export async function runInTransaction<T>(
   }
 
   await lifecycle.commit();
+
   return result;
 }

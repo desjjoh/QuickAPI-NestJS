@@ -172,6 +172,7 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
   ): Promise<ArticleListPage> {
     const query = this.listScope(manager, scope);
     const count = await query.clone().getCount();
+
     if (!count) return [[], 0];
 
     // Only to-one filtering joins; LIMIT applies directly to article rows.
@@ -183,9 +184,11 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
       .limit(pageOptions.take)
       .offset(pageOptions.skip)
       .getRawMany<{ id: string }>();
+
     if (!page.length) return [[], count];
 
     const display = this.listScope(manager, scope);
+
     if (!scope.statusKey)
       display.innerJoin('article.publication.status', 'status');
     display
@@ -223,12 +226,15 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
         display.addSelect(`${alias}.${column}`, `${alias}_${column}`);
       }
     }
+
     const rows = await display.getRawMany<ListRow>();
     const byId = new Map(rows.map((row) => [row.id, this.listRead(row)]));
+
     // IN does not preserve ordering. Never depend on hydration query row order.
     return [
       page.flatMap((row) => {
         const article = byId.get(row.id);
+
         return article ? [article] : [];
       }),
       count,
@@ -241,6 +247,7 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
   ): SelectQueryBuilder<ArticleEntity> {
     // QueryBuilder deliberately bypasses eager relation graphs.
     const query = this.getRepository(manager).createQueryBuilder('article');
+
     if (scope.statusKey)
       query
         .innerJoin('article.publication.status', 'status')
@@ -250,11 +257,13 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
         authorId: scope.authorId,
       });
     const term = articleSearchPattern(scope.search);
+
     if (term)
       query.andWhere(
         "(CONVERT(article.content.title USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE :articleSearch ESCAPE '!' OR CONVERT(article.content.summary USING utf8mb4) COLLATE utf8mb4_0900_ai_ci LIKE :articleSearch ESCAPE '!')",
         { articleSearch: term },
       );
+
     return query;
   }
 
@@ -267,6 +276,7 @@ export class ArticleRepository extends DomainRepository<ArticleEntity> {
       alt_text: row[`${alias}_alt_text`],
       decorative: Boolean(row[`${alias}_decorative`]),
     });
+
     return {
       id: row.id,
       createdAt: row.createdAt,

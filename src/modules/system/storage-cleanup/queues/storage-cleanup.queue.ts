@@ -27,14 +27,18 @@ export class StorageCleanupQueue {
   public async enqueue(intentId: string): Promise<void> {
     const jobId = `storage-delete-${intentId}`;
     const existing = await this.queue.getJob(jobId);
+
     if (existing) {
       const state = await existing.getState();
+
       // Only the durable pending state permits recovery; the DB attempt budget
       // survives stalled jobs, removed jobs, restarts, and Redis data loss.
       if (state === 'failed' || state === 'completed')
         await existing.retry(state, { resetAttemptsMade: true });
+
       return;
     }
+
     await this.queue.add(
       'delete-object',
       { intentId },

@@ -38,6 +38,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     const requestId = requestContextRef?.get('requestId') ?? randomUUID();
     const diagnostics = { requestId, status, ...errorDiagnostics(exception) };
+
     if (status >= 500) logger.error(diagnostics, 'HTTP server failure.');
     else logger.warn(diagnostics, 'HTTP request rejected.');
     // Timed-out/disconnected work may fail after the HTTP response has ended.

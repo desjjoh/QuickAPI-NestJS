@@ -65,6 +65,7 @@ export class AuditUserDto {
 
   public constructor(user: AuditUserRead) {
     const deleted = user.status_key === ACCOUNT_STATUS_KEYS.DELETED;
+
     this.id = user.id;
     this.name =
       user.preferred?.trim() ||

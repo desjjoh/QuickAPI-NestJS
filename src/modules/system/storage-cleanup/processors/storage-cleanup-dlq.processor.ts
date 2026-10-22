@@ -29,6 +29,7 @@ export class StorageCleanupDeadLetterProcessor extends WorkerHost {
       'Storage cleanup exhausted automatic retries; awaiting intervention.',
     );
   }
+
   @OnWorkerEvent('error')
   public onWorkerError(): void {
     logger.error('Storage cleanup DLQ worker error.');

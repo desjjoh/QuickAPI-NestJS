@@ -47,6 +47,7 @@ export class AuditQueryService {
       page: filters.page ?? 1,
       take: filters.take ?? 25,
     });
+
     this.validate(filters, pageOptions);
 
     const [entities, itemCount] = await this.repository.query(
@@ -63,6 +64,7 @@ export class AuditQueryService {
           manager,
         )
       : new Map<string, AuditUserDto>();
+
     return new PaginationDto(
       entities.map(
         (entity) =>
@@ -83,10 +85,12 @@ export class AuditQueryService {
     options: { readonly includeActorUsers?: boolean } = {},
   ): Promise<AuditEvent | null> {
     const entity = await this.repository.findById(manager, id);
+
     if (!entity) return null;
     const actors = options.includeActorUsers
       ? await this.actorUsers([entity.actor_user_id], manager)
       : new Map<string, AuditUserDto>();
+
     return new AuditEvent(
       entity,
       entity.actor_user_id ? (actors.get(entity.actor_user_id) ?? null) : null,
@@ -104,8 +108,10 @@ export class AuditQueryService {
         ),
       ),
     ];
+
     if (!unique.length) return new Map();
     const users = await this.repository.findActorUsers(manager, unique);
+
     return new Map(users.map((user) => [user.id, new AuditUserDto(user)]));
   }
 

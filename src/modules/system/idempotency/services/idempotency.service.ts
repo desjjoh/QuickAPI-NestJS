@@ -91,6 +91,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
     const runner = this.repository.createQueryRunner();
     let locked = false;
     let connection: { destroy?: () => void } | undefined;
+
     try {
       connection = await runner.connect();
       // A non-waiting, connection-scoped MySQL lock also coordinates other API instances.
@@ -98,6 +99,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
       const locks = await runner.query('SELECT GET_LOCK(?, 0) AS acquired', [
         scopeHash,
       ]);
+
       if (Number(locks[0]?.acquired) !== 1)
         throw new ConflictException(
           'This idempotent request is already processing. Retry with the same key.',
@@ -111,6 +113,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
             manager,
             scopeHash,
           );
+
           if (existing && existing.expires_at.getTime() > Date.now()) {
             if (existing.fingerprint !== fingerprint)
               throw new ConflictException(
@@ -124,11 +127,13 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
               throw new ConflictException(
                 'This idempotent request is already processing.',
               );
+
             return {
               status: existing.response_status!,
               body: existing.response_body,
             };
           }
+
           if (existing)
             await manager.delete(IdempotencyEntity, { scope_hash: scopeHash });
           await manager.insert(IdempotencyEntity, {
@@ -146,6 +151,8 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
             () => withIdempotencyKey(key, work),
           );
           // Store the original JSON response, not a later projection of a mutable resource.
+          // Match JSON transport semantics before storing replay state (Dates,
+          // undefined fields, and bodyless responses must replay consistently).
           const body = JSON.parse(
             JSON.stringify(
               response.status === 204 ? null : (response.body ?? null),
@@ -158,6 +165,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
             typeof body.id === 'string'
               ? body.id
               : null;
+
           await manager.update(
             IdempotencyEntity,
             { scope_hash: scopeHash },
@@ -168,6 +176,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
               response_identity: identity,
             },
           );
+
           return { status: response.status, body };
         },
       );

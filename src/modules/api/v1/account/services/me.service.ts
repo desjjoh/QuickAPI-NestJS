@@ -75,16 +75,19 @@ export class MeApiService {
         where: { id: userId },
         lock: { mode: 'pessimistic_write' },
       });
+
       await this.credentials.validateUser(
         current.identity.email,
         dto.password,
         manager,
       );
       const before = identityUserSnapshot(current);
+
       await this.lifecycle.deleteUser(current, manager, lifecycle);
       const after = await manager.findOneOrFail(UserEntity, {
         where: { id: userId },
       });
+
       await this.auditSvc.record(
         {
           event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
@@ -118,8 +121,10 @@ export class MeApiService {
       const before = identityUserSnapshot(
         await this.userSvc.findByIdOrFail(user.id),
       );
+
       await this.mfaSvc.disable(user);
       const updated = await this.credentials.recordMfaChanged(user, false);
+
       await this.auditSvc.record({
         event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_DISABLED,
         domain: AuditEventDomain.IDENTITY,
@@ -159,14 +164,17 @@ export class MeApiService {
       MfaChallengePurpose.ENABLE,
       user.id,
     );
+
     if (challengeUser.id !== user.id)
       throw new UnauthorizedException('Invalid MFA challenge.');
 
     const before = identityUserSnapshot(
       await this.userSvc.findByIdOrFail(user.id),
     );
+
     await this.mfaSvc.enable(user);
     const updated = await this.credentials.recordMfaChanged(user, true);
+
     await this.refreshSvc.revokeOtherSessions(user.id, currentSession.id);
     await this.auditSvc.record({
       event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].MFA_ENABLED,

@@ -5,12 +5,15 @@ import { StorageDeletionIntentEntity } from '../entities/storage-deletion-intent
 @Injectable()
 export class StorageDeletionIntentRepository {
   private readonly persistence: Repository<StorageDeletionIntentEntity>;
+
   public constructor(source: DataSource) {
     this.persistence = source.getRepository(StorageDeletionIntentEntity);
   }
+
   public get manager(): EntityManager {
     return this.persistence.manager;
   }
+
   private getRepository(
     manager: EntityManager,
   ): Repository<StorageDeletionIntentEntity> {

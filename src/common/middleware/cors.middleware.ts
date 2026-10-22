@@ -68,6 +68,7 @@ export function corsMiddleware(opts: CorsOptions): RequestHandler {
     // --- Preflight handling
     if (req.method === 'OPTIONS') {
       res.status(204).send();
+
       return;
     }
 

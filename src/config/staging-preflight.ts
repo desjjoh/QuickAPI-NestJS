@@ -61,6 +61,7 @@ function assertPublicHttps(name: string, value: string): void {
 
 function isNarrowProxy(value: string): boolean {
   const entries = value.split(',').map((entry) => entry.trim());
+
   return (
     entries.length > 0 &&
     entries.every((entry) => {

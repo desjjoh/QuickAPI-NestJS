@@ -30,6 +30,7 @@ export class LibraryService {
     const countries: CountryEntity[] = await this.countryRepo.findAll(
       this.countryRepo.manager,
     );
+
     return countries.map((e: CountryEntity) => new BaseCountryDto(e));
   }
 
@@ -37,6 +38,7 @@ export class LibraryService {
     const timezones: TimezoneEntity[] = await this.timezoneRepo.findAll(
       this.timezoneRepo.manager,
     );
+
     return timezones.map((e: TimezoneEntity) => new BaseTimezoneDto(e));
   }
 
@@ -44,6 +46,7 @@ export class LibraryService {
     const genders: GenderEntity[] = await this.genderRepo.findAll(
       this.genderRepo.manager,
     );
+
     return genders.map((e: GenderEntity) => new BaseGenderDto(e));
   }
 
@@ -51,6 +54,7 @@ export class LibraryService {
     const roles: RoleEntity[] = await this.roleRepo.findAll(
       this.roleRepo.manager,
     );
+
     return roles.map((role: RoleEntity) => new BaseRoleDto(role));
   }
 
@@ -58,6 +62,7 @@ export class LibraryService {
     const statuses: AccountStatusEntity[] = await this.statusRepo.findAll(
       this.statusRepo.manager,
     );
+
     return statuses.map(
       (role: AccountStatusEntity) => new BaseAccountStatusDto(role),
     );

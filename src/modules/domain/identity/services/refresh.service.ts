@@ -46,20 +46,24 @@ export class RefreshService {
         where: { id: user.id },
         lock: { mode: 'pessimistic_write' },
       });
+
       if (!current || isUserDeleted(current))
         throw new UnauthorizedException('Account is no longer available.');
     }
+
     if (manager.queryRunner?.isTransactionActive && existingSession?.refresh) {
       const current = await manager.findOne(UserSessionEntity, {
         where: { id: existingSession.id, user: { id: user.id }, active: true },
         lock: { mode: 'pessimistic_write' },
       });
+
       if (!current || current.refresh !== existingSession.refresh)
         throw new UnauthorizedException(
           'Session credentials have already rotated or been revoked. Sign in again.',
         );
       existingSession = current;
     }
+
     const contextSessionId = this.requestContext.get('sessionId');
     const currentSession = contextSessionId
       ? await this.sessionRepo.findByUser(manager, user.id, contextSessionId)

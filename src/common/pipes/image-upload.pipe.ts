@@ -32,15 +32,21 @@ export class ImageUploadValidationPipe implements PipeTransform {
 
   async transform(value: unknown) {
     const file = value as Express.Multer.File | undefined;
+
     try {
       await this.pipe.transform(value);
       if (file) {
+        // Deferral requires the caller's image service to transform before PUT;
+        // this pipe itself never transforms or authorizes unvalidated storage.
         const validate = this.processing ? readImageUpload : readValidatedImage;
+
         await validate(file, this.maxSize);
       }
+
       return file;
     } catch (error) {
       await removeTemporaryUpload(file).catch(() => undefined);
+
       throw error;
     }
   }

@@ -21,6 +21,7 @@ export class EmailQueueProcessor extends WorkerHost {
 
   public async process(job: Job<EmailQueuePayload>): Promise<void> {
     const payload = job?.data;
+
     if (payload && 'deliveryId' in payload) {
       if (
         typeof payload.deliveryId !== 'string' ||
@@ -30,6 +31,7 @@ export class EmailQueueProcessor extends WorkerHost {
         !this.outbox
       )
         throw new Error('Malformed email delivery job.');
+
       try {
         await this.outbox.deliver(payload.deliveryId);
       } catch {
@@ -38,6 +40,7 @@ export class EmailQueueProcessor extends WorkerHost {
           'Email delivery failed; durable intent remains pending.',
         );
       }
+
       return;
     }
 

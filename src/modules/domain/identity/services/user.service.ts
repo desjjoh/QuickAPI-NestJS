@@ -64,12 +64,14 @@ export class UserService {
         where: { id: user.id },
         lock: { mode: 'pessimistic_write' },
       });
+
       if (isUserDeleted(current))
         throw new NotFoundException('User not found.');
       const shouldTouchLastUpdatedAt = options.touchLastUpdatedAt ?? true;
       const dtoMetadata = (dto.metadata ? { ...dto.metadata } : undefined) as
         | Partial<UserEntity['metadata']>
         | undefined;
+
       // Only the deletion lifecycle can assign this historical timestamp.
       if (dtoMetadata) Reflect.deleteProperty(dtoMetadata, 'deleted_at');
       const metadata = shouldTouchLastUpdatedAt
@@ -103,10 +105,12 @@ export class UserService {
         ...Object.keys(omitUndefinedDeep(dto)),
         ...(metadata ? ['metadata'] : []),
       ]);
+
       for (const field of Object.keys(updatedUser)) {
         if (!fields.has(field) || field === 'administration_version')
           Reflect.deleteProperty(updatedUser, field);
       }
+
       await manager.save(UserEntity, updatedUser);
       if (dto.status !== undefined || dto.roles !== undefined) {
         await manager.increment(

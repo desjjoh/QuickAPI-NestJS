@@ -80,6 +80,7 @@ export class AuditService {
     this.validateBase(input);
     const hasBefore = Object.prototype.hasOwnProperty.call(input, 'before');
     const hasAfter = Object.prototype.hasOwnProperty.call(input, 'after');
+
     if (hasBefore !== hasAfter)
       throw new BadRequestException(
         'before and after must be supplied together',
@@ -125,6 +126,7 @@ export class AuditService {
         : diff.after,
     );
     const changes = this.asRecord(diff.changes);
+
     if (
       Object.keys(changes).length === 0 &&
       input.meaningfulWithoutChanges !== true
@@ -224,6 +226,7 @@ export class AuditService {
     contextValue: string | undefined,
   ): string | null {
     const value = input[key] as string | null | undefined;
+
     return Object.prototype.hasOwnProperty.call(input, key) &&
       value !== undefined
       ? value

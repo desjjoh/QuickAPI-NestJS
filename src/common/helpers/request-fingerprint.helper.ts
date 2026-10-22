@@ -13,13 +13,17 @@ export function canonicalJson(value: unknown): string {
           `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`,
       )
       .join(',')}}`;
+
   return JSON.stringify(value);
 }
 
 /** Image bytes and client metadata matter; random server paths and filenames do not. */
 export async function requestFingerprint(request: Request): Promise<string> {
   const file = request.file;
+  // Fingerprint original client bytes, not a derivative whose encoding policy
+  // could change between retries. Boundary reads are cached with the upload.
   const image = file ? await readImageUpload(file) : undefined;
+
   return createHash('sha256')
     .update(
       canonicalJson({

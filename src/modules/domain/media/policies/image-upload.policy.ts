@@ -13,6 +13,7 @@ export type ValidatedImage = {
 };
 
 const validatedUploads = new WeakMap<Express.Multer.File, ValidatedImage>();
+
 type ImageUpload = Pick<ValidatedImage, 'buffer' | 'mimeType' | 'extension'>;
 const checkedUploads = new WeakMap<Express.Multer.File, ImageUpload>();
 const formats = {
@@ -32,13 +33,16 @@ export async function readImageUpload(
 
   if (cached) {
     assertSize(cached.buffer.length, maxBytes);
+
     return cached;
   }
 
   const size = file.path ? (await stat(file.path)).size : file.buffer?.length;
+
   assertSize(size ?? 0, maxBytes);
 
   const buffer = file.path ? await readFile(file.path) : file.buffer;
+
   assertSize(buffer?.length ?? 0, maxBytes);
 
   // Reject non-raster formats before handing untrusted input to the decoder.
@@ -61,6 +65,7 @@ export async function readImageUpload(
     );
 
   const result = { buffer, ...detected };
+
   checkedUploads.set(file, result);
 
   return result;
@@ -104,6 +109,7 @@ export async function readValidatedImage(
     await decoder.stats();
 
     const result = { ...upload, width, height };
+
     validatedUploads.set(file, result);
 
     return result;

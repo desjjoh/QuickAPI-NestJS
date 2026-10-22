@@ -155,8 +155,10 @@ export class EmailVerificationService {
           throw new BadRequestException('Invalid verification token.');
 
         const newEmail = this.getNewEmailFromMetadata(accountToken.metadata);
+
         if (!newEmail) {
           await this.verifyInitialEmail(tokenUser, manager);
+
           return { user: tokenUser, previousEmail: null };
         }
 
@@ -166,6 +168,7 @@ export class EmailVerificationService {
           newEmail,
           manager,
         );
+
         return { user: changed, previousEmail: oldEmail };
       },
     );
@@ -204,7 +207,9 @@ export class EmailVerificationService {
         registrationToken.metadata,
         manager,
       );
+
       await this.sendRegistrationSuccess(user);
+
       return user;
     });
   }

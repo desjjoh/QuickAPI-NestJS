@@ -79,6 +79,7 @@ export class ImageService {
       folder: input.folder,
       ...metadata,
     });
+
     lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
     await this.uploads.attach(manager, storedFile.storage_key);
     const payload: Base<ImageEntity> = {
@@ -107,6 +108,7 @@ export class ImageService {
       return runInTransaction(manager, (manager, lifecycle) =>
         this.updateImage(input, manager, lifecycle),
       );
+
     return this.updateImage(input, manager, lifecycle);
   }
 
@@ -122,6 +124,7 @@ export class ImageService {
       folder: input.folder,
       ...metadata,
     });
+
     lifecycle.afterRollback(() => this.uploads.abandon(storedFile.storage_key));
 
     await this.uploads.attach(manager, storedFile.storage_key);
@@ -146,6 +149,7 @@ export class ImageService {
       omitUndefinedDeep(payload),
     );
     const savedImage = await manager.save(ImageEntity, updatedImage);
+
     await this.cleanup.schedule(manager, previousStorageKey, 'image_replaced');
 
     return savedImage;
@@ -189,7 +193,10 @@ export class ImageService {
       this.assertTransactionLifecycle(manager, lifecycle);
 
       if (processing) {
+        // Transformation performs the corruption/pixel checks; do not decode
+        // the original separately with readValidatedImage on this path.
         const upload = await readImageUpload(file, maxBytes);
+
         image = await this.processor.process(upload.buffer, processing);
       } else {
         image = await readValidatedImage(file, maxBytes);
@@ -208,7 +215,10 @@ export class ImageService {
 
       throw error;
     }
+
+    // Storage receives owned bytes, so the disk upload is no longer needed.
     await removeTemporaryUpload(file);
+
     return image;
   }
 }

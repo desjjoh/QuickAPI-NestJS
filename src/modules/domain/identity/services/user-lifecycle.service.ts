@@ -87,6 +87,7 @@ export class UserLifecycleService {
       where: { id: user.id },
       lock: { mode: 'pessimistic_write' },
     });
+
     if (isUserDeleted(current)) throw new NotFoundException('User not found.');
     const deleted = await this.references.getAccountStatus(
       ACCOUNT_STATUS_KEYS.DELETED,
@@ -132,6 +133,7 @@ export class UserLifecycleService {
     );
     await this.idempotency.eraseUserResponses(current.id, manager);
     const avatar = current.profile.media.avatar;
+
     if (avatar) {
       await manager.update(
         UserProfileEntity,

@@ -35,9 +35,11 @@ export class ActivityApiService {
     const data = await Promise.all(
       result.data.map(async (event) => {
         const location = await this.ipLocations.resolveIp(event.ipAddress);
+
         return new AuditEventDto(event, location);
       }),
     );
+
     return new AuditEventPageDto(data, result.meta);
   }
 }

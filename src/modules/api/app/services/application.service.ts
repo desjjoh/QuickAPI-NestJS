@@ -35,6 +35,7 @@ export class ApplicationControllerService {
     const start = performance.now();
     const available = await this.run_readiness_check(async () => {
       const status = await this.health.get_status();
+
       return status === 'connected';
     });
 

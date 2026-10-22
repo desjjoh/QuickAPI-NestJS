@@ -27,6 +27,7 @@ export class UserCredentialsService {
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     let user = await this.users.findByEmail(email, manager);
+
     if (user && manager.queryRunner?.isTransactionActive) {
       user = await manager.findOne(UserEntity, {
         where: { id: user.id },
@@ -61,7 +62,9 @@ export class UserCredentialsService {
           lock: { mode: 'pessimistic_write' },
         })
       : await this.users.findByIdOrFail(user.id, manager);
+
     this.assertCanAuthenticate(current);
+
     return current;
   }
 
