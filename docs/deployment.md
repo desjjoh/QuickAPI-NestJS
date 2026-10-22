@@ -45,6 +45,15 @@ domains, a wildcard CORS origin, or a trust-all proxy setting.
 
 ## Release images and supply-chain evidence
 
+The runtime is a minimal Alpine image containing Node, compiled application code,
+production dependencies, and required native libraries. Build and runtime stages
+share `ALPINE_VERSION` to keep musl/native-module compatibility. npm, npx, Yarn,
+and Corepack are build-time tools and are not copied into the deployed image.
+Preflight, TypeORM migrations, and GeoIP initialization run directly with Node;
+container overrides must not invoke `npm run`. Host-development npm scripts
+remain available. Update the shared Alpine version deliberately and validate
+native dependencies and the production topology together.
+
 After the `CI` workflow succeeds on `main` or `staging`, the
 `.github/workflows/release-image.yml` workflow builds and scans the production
 candidate once, then publishes the approved manifest with the full commit SHA and `package.json` version

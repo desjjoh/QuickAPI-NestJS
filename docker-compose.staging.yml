@@ -19,7 +19,7 @@ services:
     restart: 'no'
     env_file:
       - .env.staging
-    command: ['npm', 'run', 'staging:preflight:prod']
+    command: ['node', 'dist/config/staging-preflight.js', '.env.staging']
     volumes:
       - ./.env.staging:/app/.env.staging:ro
     networks:
@@ -88,7 +88,14 @@ services:
     env_file:
       - .env.staging
     environment: *api-environment
-    command: ['npm', 'run', 'migration:run:prod']
+    command:
+      [
+        'node',
+        './node_modules/typeorm/cli.js',
+        'migration:run',
+        '-d',
+        'dist/database/typeorm.datasource.js',
+      ]
     networks:
       - private
 
@@ -102,7 +109,8 @@ services:
       - .env.staging
     environment:
       IP_LOCATION_DATA_DIR: /app/data/geoip
-    command: ['npm', 'run', 'geoip:update:prod']
+    command:
+      ['node', 'dist/modules/system/geolocation/scripts/seed-geolite2.js']
     volumes:
       - quickapi_geoip:/app/data/geoip
     networks:

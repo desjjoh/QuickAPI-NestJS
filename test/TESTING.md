@@ -114,6 +114,12 @@ npm run test:smoke
 
 This command requires Docker/Compose and Bash, plus outbound HTTPS for public MaxMind test databases. It builds the production image and runs an immutable-image disposable topology with authenticated MySQL/Redis, staging preflight, fresh GeoLite initialization, compiled migrations, the non-root API, HTTP policy/readiness probes, compiled migration revert/forward, and graceful shutdown.
 
+The smoke test also rejects runtime package managers and exercises real Sharp
+WebP encoding and bcrypt hashing inside the production container. Operational
+commands execute compiled entry points directly with Node, without npm. These
+checks protect the minimal-runtime/native-library boundary, not just TypeScript
+behavior on the host.
+
 It removes its disposable containers/network/volumes on completion or failure and writes failure diagnostics to `smoke-logs/`. Run `test:smoke:config` in a POSIX shell to check Compose rendering only. Neither command is a real-provider test or a production deployment.
 
 Release review should use evidence from the exact release commit, including failures that prevent suites from reaching their tests. Do not embed transient suite counts or “tests not run here” notes in product documentation. See [deployment](../docs/deployment.md) and [remaining gaps](../docs/backlog.md).

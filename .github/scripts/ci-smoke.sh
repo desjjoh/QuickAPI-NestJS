@@ -53,6 +53,34 @@ run_migration_cli() {
 
 # Every run starts with new anonymous database state and a newly-created GeoLite volume.
 cleanup
+
+echo "::group::Smoke: minimal runtime and native dependencies"
+docker run --rm --entrypoint sh "$SMOKE_IMAGE" -ec '
+  for tool in npm npx yarn yarnpkg corepack; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      echo "unexpected runtime package manager: $tool" >&2
+      exit 1
+    fi
+  done
+  test ! -d /usr/local/lib/node_modules/npm
+  test ! -d /usr/local/lib/node_modules/corepack
+  command -v tar >/dev/null
+  node --check dist/modules/system/geolocation/scripts/seed-geolite2.js
+'
+docker run --rm --entrypoint node "$SMOKE_IMAGE" -e '
+  (async () => {
+    const sharp = require("sharp");
+    const bcrypt = require("bcrypt");
+    const { info } = await sharp({create:{width:2,height:2,channels:4,background:{r:255,g:0,b:0,alpha:0.5}}})
+      .resize(256,256).webp().toBuffer({resolveWithObject:true});
+    if (info.format !== "webp" || info.width !== 256 || info.height !== 256)
+      throw new Error("native image encoding failed");
+    if (!await bcrypt.compare("smoke", await bcrypt.hash("smoke", 4)))
+      throw new Error("native password hashing failed");
+    console.log("Package-manager-free runtime and native dependencies verified.");
+  })().catch(error => { console.error(error); process.exit(1); });
+'
+echo "::endgroup::"
 run_one_shot preflight
 run_one_shot geoip-init
 echo "::group::Smoke: ephemeral dependencies"
@@ -126,7 +154,7 @@ run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/data
   echo 'expected exactly one pending migration after revert' >&2
   exit 1
 }
-run_migration_cli npm run migration:run:prod
+run_migration_cli node ./node_modules/typeorm/cli.js migration:run -d dist/database/typeorm.datasource.js
 run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/database/typeorm.datasource.js \
   | tee "$artifact_dir/pending-after-reapply.txt"
 [[ "$(grep -c '^\[ \]' "$artifact_dir/pending-after-reapply.txt" || true)" == 0 ]] || {
