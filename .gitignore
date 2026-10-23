@@ -144,3 +144,4 @@ data/geoip/
 .release-check/
 # Generated smoke evidence can contain a rendered local deployment configuration.
 migration-artifacts/
+smoke-logs/
