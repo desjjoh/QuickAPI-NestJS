@@ -94,6 +94,32 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  dependency-security:
+    name: Dependency security
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --no-audit
+      - run: npm run test:security
+      - name: Audit production dependencies and report development-only findings
+        run: npm run security:audit
+      - name: Retain dependency audit evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: dependency-audit-${{ github.run_attempt }}
+          path: |
+            .release-check/dependency-audit/
+            security/dependency-audit-exceptions.json
+          include-hidden-files: true
+          retention-days: 14
+          if-no-files-found: error
+
   type-checking:
     name: Type checking and build
     runs-on: ubuntu-latest
@@ -313,7 +339,8 @@ jobs:
     # Keep this job present on every CI run so branch protection sees a real
     # pass/fail check rather than an untested, conditionally skipped job.
     if: always()
-    needs: [migration-validation, e2e-tests, container-smoke]
+    needs:
+      [migration-validation, e2e-tests, container-smoke, dependency-security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -322,7 +349,8 @@ jobs:
           MIGRATIONS: ${{ needs.migration-validation.result }}
           E2E: ${{ needs.e2e-tests.result }}
           SMOKE: ${{ needs.container-smoke.result }}
-        run: test "$MIGRATIONS" = success -a "$E2E" = success -a "$SMOKE" = success
+          SECURITY: ${{ needs.dependency-security.result }}
+        run: test "$MIGRATIONS" = success -a "$E2E" = success -a "$SMOKE" = success -a "$SECURITY" = success
 
   # Keep the legacy required-check contexts reported while retaining the
   # independently named jobs above. Repository branch protection requires
@@ -331,6 +359,7 @@ jobs:
     name: Check
     if: always()
     needs:
+      - dependency-security
       - formatting
       - linting
       - type-checking
@@ -343,6 +372,7 @@ jobs:
     steps:
       - name: Require all application checks
         env:
+          DEPENDENCY_SECURITY: ${{ needs.dependency-security.result }}
           FORMATTING: ${{ needs.formatting.result }}
           LINTING: ${{ needs.linting.result }}
           TYPE_CHECKING: ${{ needs.type-checking.result }}
@@ -351,6 +381,7 @@ jobs:
           E2E_TESTS: ${{ needs.e2e-tests.result }}
           CONTAINER_SMOKE: ${{ needs.container-smoke.result }}
         run: |
+          test "$DEPENDENCY_SECURITY" = success
           test "$FORMATTING" = success
           test "$LINTING" = success
           test "$TYPE_CHECKING" = success

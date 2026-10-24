@@ -66,6 +66,8 @@ npm run check
 npm run test:cov
 ```
 
+CI audits production dependencies and retains a separate development-only report; unexcepted critical production findings block the aggregate checks; high and lower findings remain reported. See the [dependency audit policy](security/dependency-audit-exceptions.md). The release-image scan remains a separate OS/application gate.
+
 E2E tests reset their explicitly selected disposable database. Read [Testing](test/TESTING.md) before running them. CI also checks migration/readiness and production topology; a green run does not replace real-provider, backup-restore, or deployment validation.
 
 ## License

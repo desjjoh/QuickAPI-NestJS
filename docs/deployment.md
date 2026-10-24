@@ -54,6 +54,14 @@ container overrides must not invoke `npm run`. Host-development npm scripts
 remain available. Update the shared Alpine version deliberately and validate
 native dependencies and the production topology together.
 
+Base CI also runs a production dependency audit before release eligibility.
+Unexcepted critical production advisories and missing/invalid audit evidence
+block `Check` and `Staging deployment gate`; development-only findings are retained
+separately, and high/lower production findings remain visible. The [dependency audit policy](../security/dependency-audit-exceptions.md)
+defines exact scopes, ownership, justification, and expiry limited to 30 days.
+This base-CI audit supplements the final-image gate below; it does not change the
+release-image severity policy.
+
 After the `CI` workflow succeeds on `main` or `staging`, the
 `.github/workflows/release-image.yml` workflow builds and scans the production
 candidate once, then publishes the approved manifest with the full commit SHA and `package.json` version

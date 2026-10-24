@@ -34,8 +34,8 @@
     "release:check": "node .github/scripts/release-check.cjs",
     "test:release": "node --test .github/scripts/release-check.test.cjs .github/scripts/release-registry.test.cjs",
     "test:smoke:config": "SMOKE_IMAGE=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa docker compose --file .github/compose.ci-smoke.yml config --quiet",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm test && npm run build",
-    "check:e2e": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm test && npm run test:e2e && npm run build",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm run test:security && npm test && npm run build",
+    "check:e2e": "npm run format:check && npm run lint && npm run typecheck && npm run test:release && npm run test:security && npm test && npm run test:e2e && npm run build",
     "typeorm": "node -r ts-node/register -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:create": "npm run typeorm -- migration:create src/database/migrations/migration",
     "migration:generate": "npm run typeorm -- migration:generate src/database/migrations/migration -d src/database/typeorm.datasource.ts",
@@ -65,7 +65,9 @@
     "geoip:update": "ts-node -r tsconfig-paths/register src/modules/system/geolocation/scripts/seed-geolite2.ts",
     "geoip:update:prod": "node dist/modules/system/geolocation/scripts/seed-geolite2.js",
     "staging:preflight": "ts-node -r tsconfig-paths/register src/config/staging-preflight.ts .env.staging",
-    "staging:preflight:prod": "node dist/config/staging-preflight.js .env.staging"
+    "staging:preflight:prod": "node dist/config/staging-preflight.js .env.staging",
+    "security:audit": "node .github/scripts/dependency-audit.cjs",
+    "test:security": "node --test .github/scripts/dependency-audit.test.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1052.0",
