@@ -22,6 +22,22 @@ CI selects the two categories by directory, not an `integration.spec.ts` suffix.
 
 Test setup explicitly selects the supported R2 driver and supplies inert R2 credentials/URLs before configuration loads, independent of a developer's `.env`. Storage tests mock the SDK or replace `StorageService` with an in-memory provider; they do not enable a nonexistent local driver or use live bucket credentials.
 
+## Dependency security in base CI
+
+`npm run test:security` exercises the dependency-audit gate without network access,
+including high/critical blocking, exact exception matching, UTC expiry, the 30-day
+exception limit, malformed evidence, command failures, and separate development
+reporting. `npm run check` includes these tests.
+
+`npm run security:audit` performs real production and full-tree npm audits. CI's
+`Dependency security` job blocks both `Check` and `Staging deployment gate` on
+unexcepted production high/critical findings or invalid/unavailable evidence.
+Development-only findings are reported separately and do not block by severity.
+Reports and the empty-by-default register are retained even on failure; see the
+[dependency audit policy](../security/dependency-audit-exceptions.md). The existing
+release-image scan remains separate and retains its critical-only blocking policy.
+Neither audit command installs updates or applies fixes automatically.
+
 ## Disposable E2E infrastructure
 
 E2E global setup **drops, migrates, and seeds the selected schema**. Never point these tests at development, staging, or production data. Safety requires explicit `TEST_DB_ENABLED=true`, `NODE_ENV=test`, `DB_SYNC=false`, and an active database exactly matching `TEST_DB_DATABASE`; a name containing “test” is not sufficient protection.
