@@ -9,7 +9,7 @@ import { DataSource } from 'typeorm';
 import { env } from '@/config/environment.config';
 import { logger } from '@/config/logger.config';
 
-import { SEEDERS } from '../tokens/seeder.tokens';
+import { SEEDERS, SEEDER_GROUP } from '../tokens/seeder.tokens';
 import type { Seeder } from '../types/seeder.types';
 
 type SeederTotals = {
@@ -26,6 +26,8 @@ export class SeederService implements OnApplicationBootstrap {
 
     @Inject(SEEDERS)
     private readonly seeders: Seeder[],
+    @Inject(SEEDER_GROUP)
+    private readonly group: string,
   ) {}
 
   public async onApplicationBootstrap(): Promise<void> {
@@ -36,19 +38,24 @@ export class SeederService implements OnApplicationBootstrap {
       (a: Seeder, b: Seeder) => a.order - b.order,
     );
 
-    logger.debug(`Running seeders (${orderedSeeders.length} total)`);
+    logger.debug(
+      `Running seeder group → ${this.group} (${orderedSeeders.length} total)`,
+    );
 
     try {
       const totals: SeederTotals = await this.runSeeders(orderedSeeders);
       const duration: string = (performance.now() - start).toFixed(2);
 
       logger.debug(
-        `Seeders completed in ${duration}ms — created=${totals.created} skipped=${totals.skipped}`,
+        `Seeder completed in ${duration}ms — created=${totals.created} skipped=${totals.skipped}`,
       );
     } catch (err: unknown) {
       const error: Error = err instanceof Error ? err : new Error(String(err));
 
-      logger.error({ stack: error.stack }, `Seeder error — ${error.message}`);
+      logger.error(
+        { stack: error.stack },
+        `Seeder error [${this.group}] — ${error.message}`,
+      );
 
       throw error;
     }

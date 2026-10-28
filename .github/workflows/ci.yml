@@ -17,7 +17,7 @@ env:
   PUBLIC_WEB_URL: http://127.0.0.1:5173
   CORS_ORIGINS: http://127.0.0.1:5173
   CORS_METHODS: GET,POST,PUT,PATCH,DELETE
-  CORS_ALLOWED_HEADERS: Content-Type,Authorization,X-CSRF-Token
+  CORS_ALLOWED_HEADERS: Content-Type,Authorization,X-CSRF-Token,Idempotency-Key
   CORS_EXPOSED_HEADERS: Authorization,Set-Cookie
   CORS_CREDENTIALS: 'true'
   CORS_MAX_AGE_SECONDS: '60'
@@ -47,6 +47,15 @@ env:
   DB_USER: quickapi_test
   DB_PASSWORD: quickapi_test_password
   DB_DATABASE: unit_test
+  TEST_DB_ENABLED: 'false'
+  TEST_DB_HOST: 127.0.0.1
+  TEST_DB_PORT: '1'
+  TEST_DB_USER: quickapi_test
+  TEST_DB_PASSWORD: quickapi_test_password
+  TEST_DB_DATABASE: unit_test
+  TEST_REDIS_HOST: 127.0.0.1
+  TEST_REDIS_PORT: '1'
+  TEST_REDIS_PASSWORD: ''
   # Quote numeric-looking secrets: otherwise YAML parses them as numbers and
   # GitHub's string conversion loses the intended 64-character value.
   JWT_SECRET_KEY: '1111111111111111111111111111111111111111111111111111111111111111'
@@ -133,6 +142,8 @@ jobs:
         run: npm run typecheck
       - name: Verify release gate without building or publishing images
         run: npm run test:release
+      - name: Verify cross-platform disposable test commands
+        run: npm run test:infra:checks
       - run: npm run build
 
   unit-tests:
@@ -220,6 +231,9 @@ jobs:
       TEST_DB_DATABASE: integration_test
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
+      TEST_REDIS_HOST: 127.0.0.1
+      TEST_REDIS_PORT: '6379'
+      TEST_REDIS_PASSWORD: ''
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -293,6 +307,9 @@ jobs:
       TEST_DB_DATABASE: ${{ matrix.database }}
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: '6379'
+      TEST_REDIS_HOST: 127.0.0.1
+      TEST_REDIS_PORT: '6379'
+      TEST_REDIS_PASSWORD: ''
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

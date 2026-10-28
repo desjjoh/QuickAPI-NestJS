@@ -62,7 +62,7 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
       PermissionEntity,
       RoleEntity,
     ]),
-    SeedingModule.forFeature([
+    SeedingModule.forFeature('Identity', [
       new GenderSeeder(),
       new PermissionSeeder(),
       new RoleSeeder(),

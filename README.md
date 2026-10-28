@@ -70,6 +70,11 @@ CI audits production dependencies and retains a separate development-only report
 
 E2E tests reset their explicitly selected disposable database. Read [Testing](test/TESTING.md) before running them. CI also checks migration/readiness and production topology; a green run does not replace real-provider, backup-restore, or deployment validation.
 
+Development and test dependencies use separate Compose projects,
+`quickapi-nestjs-dev` and `quickapi-nestjs-test`. Tests load `.env.test`, never
+development `.env`. With Docker running, `npm run test:e2e:local` starts the
+disposable test stack, runs E2E, and cleans it up on completion.
+
 ## License
 
 [MIT](LICENSE).
