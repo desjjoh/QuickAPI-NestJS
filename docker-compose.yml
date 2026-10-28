@@ -2,13 +2,14 @@
 # Staging is defined separately in docker-compose.staging.yml; do not layer that
 # file over this one because these credentials and published data-store ports
 # are intentionally convenient local defaults.
+name: quickapi-nestjs-dev
+
 services:
   redis:
     image: redis:7-alpine
-    container_name: quickapi-redis
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     command: ['redis-server', '--appendonly', 'yes']
     volumes:
       - quickapi_redis_data:/data
@@ -20,14 +21,13 @@ services:
 
   mysql:
     image: mysql:8.4
-    container_name: quickapi-mysql
     restart: unless-stopped
 
     cpus: '1.0'
     mem_limit: 2g
 
     ports:
-      - '3307:3306'
+      - '127.0.0.1:3307:3306'
 
     command:
       - '--innodb-buffer-pool-size=512M'
@@ -84,7 +84,6 @@ services:
     cpus: '0.5'
     mem_limit: 512m
 
-    container_name: quickapi-api
     restart: unless-stopped
 
     depends_on:

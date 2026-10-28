@@ -4,7 +4,12 @@ import { config as loadEnv } from 'dotenv';
 
 import { AppEnv, parseEnv } from './environment.schema';
 
-loadEnv({ quiet: true });
+// Test bootstrap selects its own inert file; never fill missing test values
+// from a developer's credentials or data-store configuration.
+loadEnv({
+  path: process.env.NODE_ENV === 'test' ? '.env.test' : '.env',
+  quiet: true,
+});
 
 function formatIssue(issue: z.core.$ZodIssue): string {
   const field: string = issue.path.join('.') || '(root)';

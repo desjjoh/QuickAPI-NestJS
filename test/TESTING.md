@@ -42,48 +42,61 @@ Neither audit command installs updates or applies fixes automatically.
 
 E2E global setup **drops, migrates, and seeds the selected schema**. Never point these tests at development, staging, or production data. Safety requires explicit `TEST_DB_ENABLED=true`, `NODE_ENV=test`, `DB_SYNC=false`, and an active database exactly matching `TEST_DB_DATABASE`; a name containing “test” is not sufficient protection.
 
-`test/load-test-env.ts` sets the test runtime and copies explicit test connection values before configuration loads. The checked-in [test Compose topology](../docker-compose.test.yml) uses MySQL port 3308 and authenticated Redis port 6380, separate from development services.
+Tests load the checked-in, inert [`.env.test`](../.env.test), never development
+`.env` or `.env.example`. `test/load-test-env.ts` selects database and Redis
+connections exclusively from `TEST_DB_*` and `TEST_REDIS_*`; inherited ordinary
+`DB_*`/`REDIS_*` values cannot redirect tests. CI can override the test-scoped
+values, including an empty Redis password. External provider clients remain
+fake/disabled. Do not put real credentials in this file.
 
-### POSIX shells
+Development uses Compose project `quickapi-nestjs-dev` with persistent volumes.
+The [test topology](../docker-compose.test.yml) uses `quickapi-nestjs-test`,
+loopback MySQL port 3308 and authenticated Redis port 6380, and tmpfs storage.
+Stopping/removing test containers discards their data; development ports are
+3307/6379. Containers and networks use project-scoped generated names.
+
+### Managed local E2E (PowerShell and POSIX)
 
 ```bash
-npm run test:infra:up
 npm run test:e2e:local
 ```
 
-Global setup applies all migrations, so a separate `test:db:prepare` is not required. That command is available for manual inspection of a disposable database.
+The cross-platform Node launcher validates the test target, starts and waits for
+the disposable test dependencies, runs Jest, and tears down the test project on
+success, failure, or handled interruption. Test failures retain their exit code;
+a cleanup failure also fails an otherwise successful run. No Bash or inline
+environment assignments are needed. `npm run check:e2e` uses this managed path.
+Run one invocation at a time per test topology: schema resets are destructive.
 
-### PowerShell
-
-The convenience `test:e2e:local` and `test:db:prepare` scripts use POSIX environment assignment. In a dedicated PowerShell session instead run:
-
-```powershell
-npm run test:infra:up
-$env:TEST_DB_ENABLED = 'true'
-$env:TEST_DB_HOST = '127.0.0.1'
-$env:TEST_DB_PORT = '3308'
-$env:TEST_DB_USER = 'quickapi_test_app'
-$env:TEST_DB_PASSWORD = 'quickapi_test_password'
-$env:TEST_DB_DATABASE = 'quickapi_test'
-$env:REDIS_HOST = '127.0.0.1'
-$env:REDIS_PORT = '6380'
-$env:REDIS_PASSWORD = 'quickapi_test_redis_password'
-npm run test:e2e
-```
-
-These credentials are for the disposable checked-in topology only. Close the dedicated shell afterwards to avoid carrying test overrides into development.
-
-Run one E2E invocation at a time per database/Redis topology; another invocation's global setup can destroy the first one's fixtures. CI shards use separate infrastructure.
-
-For a focused run after setting the same environment:
+For a focused run:
 
 ```bash
-npm run test:e2e -- --runInBand --runTestsByPath test/e2e/articles/articles.e2e-spec.ts
+npm run test:e2e:local -- --runInBand --runTestsByPath test/e2e/account/profile.e2e-spec.ts
 ```
 
-For teardown diagnostics, append `--detectOpenHandles`. Do not use `--forceExit` to hide leaked connections/workers.
+### Manual infrastructure and CI
 
-`npm run test:infra:down` **deletes disposable containers and volumes**. It is not a shutdown command for a database you want to preserve.
+```bash
+npm run test:infra:up
+npm run test:e2e
+npm run test:infra:down
+```
+
+`test:e2e` runs Jest against already provisioned test services without managing
+Docker. CI uses this path with separate service containers per shard. Global
+setup drops, migrates, and seeds the test schema; `test:db:prepare` is an optional
+migration-only command, not required before E2E. `test:infra:logs` shows local
+test service logs. Managed infrastructure commands reject targets that differ
+from the local test Compose topology; use the direct runner for custom CI targets.
+
+Safety checks reject protected database names, development/root users, mismatched
+schema names, and nonlocal hosts. An exceptional CI host requires an explicit
+`TEST_DB_ALLOWED_HOSTS` allowlist; Redis has a separate
+`TEST_REDIS_ALLOWED_HOSTS` allowlist. `test:infra:down` only targets
+`quickapi-nestjs-test`; it never tears down the development project.
+
+For teardown diagnostics, append `--detectOpenHandles`. Do not use `--forceExit`
+to hide leaked connections/workers. Unit/component tests still do not require Docker.
 
 ## Regression map
 

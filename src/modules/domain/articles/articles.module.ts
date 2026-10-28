@@ -16,7 +16,7 @@ import { ArticleStatusTransitionPolicy } from './policies/article-status-transit
 @Module({
   imports: [
     TypeOrmModule.forFeature([ArticleEntity, ArticleStatusEntity]),
-    SeedingModule.forFeature([new ArticleStatusSeeder()]),
+    SeedingModule.forFeature('Articles', [new ArticleStatusSeeder()]),
     IdentityModule,
     MediaModule,
   ],

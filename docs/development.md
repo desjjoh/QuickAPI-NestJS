@@ -38,6 +38,13 @@ npm run start:dev
 
 Wait for MySQL to become healthy before running migrations. Docker service names resolve inside Compose; a host-run application uses the published localhost ports.
 
+Local infrastructure is grouped under `quickapi-nestjs-dev`; Compose generates
+project-scoped container/network/volume names instead of generic fixed names.
+MySQL and Redis bind only to loopback (3307/6379). Fresh project volumes are
+intentional; old project data is not migrated. Test infrastructure belongs to
+`quickapi-nestjs-test` and never shares these data stores. Tests use the inert
+checked-in `.env.test`, not this development environment.
+
 The API never runs migrations automatically. Set `DB_SEED=true` for initial application startup to populate required library, authorization, and article-status records, then disable it. Review seeders before using startup seeding on a deployed database; seeding is not a migration or deployment strategy.
 
 `npm run docker:redis:down` stops Redis without deleting its volume. `docker:status` shows services. `docker:api:up` runs the containerized API, whose production configuration has stricter validation; disable Bull Board and supply valid deployment values before using that alternative. The host-run development flow above is simpler for code iteration.
@@ -84,4 +91,5 @@ Use `npm run check` for formatting, lint, type checking, unit/in-process integra
 
 Application and test code use TypeScript `strict` mode and reject switch fallthrough. The build and E2E configurations inherit these protections from the root configuration. `npm run typecheck` checks both the main NodeNext configuration and the E2E bundler configuration; CI runs this same command. The individual commands are `typecheck:main` and `typecheck:e2e`. Dependency declaration checking remains skipped with `skipLibCheck`; application/test checking is not weakened.
 
-[package.json](../package.json) defines available commands. The convenience E2E scripts use POSIX environment assignment; PowerShell users should follow the explicit Windows instructions in the testing guide.
+[package.json](../package.json) defines available commands. Local test-infrastructure
+and E2E launchers are cross-platform Node scripts; see the [testing guide](../test/TESTING.md).

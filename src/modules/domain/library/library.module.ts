@@ -18,7 +18,7 @@ import { TimezoneSeeder } from './seeders/time-zone.seeder';
 @Module({
   imports: [
     TypeOrmModule.forFeature([CountryEntity, RegionEntity, TimezoneEntity]),
-    SeedingModule.forFeature([
+    SeedingModule.forFeature('Library', [
       new CountrySeeder(),
       new RegionSeeder(),
       new TimezoneSeeder(),
