@@ -32,6 +32,7 @@ For app-owned local TLS, create certificates and configure `HTTPS_KEY_PATH`/`HTT
 npm run docker:mysql:up
 npm run docker:redis:up
 npm run migration:run
+npm run db:seed
 npm run geoip:update
 npm run start:dev
 ```
@@ -45,7 +46,11 @@ intentional; old project data is not migrated. Test infrastructure belongs to
 `quickapi-nestjs-test` and never shares these data stores. Tests use the inert
 checked-in `.env.test`, not this development environment.
 
-The API never runs migrations automatically. Set `DB_SEED=true` for initial application startup to populate required library, authorization, and article-status records, then disable it. Review seeders before using startup seeding on a deployed database; seeding is not a migration or deployment strategy.
+The API never runs migrations or seeders automatically. Run `npm run db:seed` after migrations to populate required library, authorization, and article-status records. The database-only runner executes Library, Identity, then Articles in one transaction and closes its connection on success or failure. A failed run rolls back every group and returns a nonzero exit code. Group completion logs describe execution; the final committed message confirms persistence.
+
+Seeding is repeatable: existing reference records are preserved, and the role seeder adds missing baseline permissions without removing custom assignments. Consequently, rerunning seeding can restore deliberately removed baseline permissions; review catalog changes before deployment. Serialize seed jobs per database. Seeders do not replace schema migrations or deliberate updates to existing reference labels.
+
+The development Compose API waits for its one-shot migration and seed services. A host-run API requires the commands above. `npm run test:db:prepare` applies migrations and seeds only the configured test database; Jest also seeds explicitly after resetting its disposable schema.
 
 `npm run docker:redis:down` stops Redis without deleting its volume. `docker:status` shows services. `docker:api:up` runs the containerized API, whose production configuration has stricter validation; disable Bull Board and supply valid deployment values before using that alternative. The host-run development flow above is simpler for code iteration.
 
@@ -59,7 +64,7 @@ npm run migration:run
 
 Review generated SQL before applying it. Use `migration:create` for a hand-written migration, and `migration:revert` only against a known disposable database or a reviewed recovery plan. Reverts can destroy data and MySQL DDL is not fully transactional.
 
-Production uses `migration:run:prod` against the compiled datasource. Apply all pending migrations rather than naming historical files in tests or deployment instructions. Check entity metadata, migration discovery, forward/revert compatibility, and foreign-key supporting indexes together.
+Production uses `migration:run:prod` against the compiled datasource, followed by `node dist/database/seed.js` (or `npm run db:seed:prod` where npm is available). Apply all pending migrations rather than naming historical files in tests or deployment instructions. Check entity metadata, migration discovery, forward/revert compatibility, and foreign-key supporting indexes together.
 
 ## GeoIP and runtime files
 

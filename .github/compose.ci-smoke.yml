@@ -61,11 +61,22 @@ services:
       ]
     networks: [smoke]
 
+  seed:
+    image: ${SMOKE_IMAGE:?Set SMOKE_IMAGE to the built image ID}
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    env_file: ci-smoke.env
+    command: ['node', 'dist/database/seed.js']
+    networks: [smoke]
+
   api:
     image: ${SMOKE_IMAGE:?Set SMOKE_IMAGE to the built image ID}
     env_file: ci-smoke.env
     init: true
     depends_on:
+      seed:
+        condition: service_completed_successfully
       migration:
         condition: service_completed_successfully
     ports: ['127.0.0.1:4000:4000']

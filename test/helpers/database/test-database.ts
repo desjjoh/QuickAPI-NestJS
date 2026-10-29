@@ -1,28 +1,9 @@
+import { seedDatabase } from '@/database/seeders';
 import { DataSource, QueryRunner } from 'typeorm';
 
 import applicationDataSource from '@/database/typeorm.datasource';
-import { AccountStatusSeeder } from '@/modules/domain/identity/seeders/accountstatus.seeder';
-import { CountrySeeder } from '@/modules/domain/library/seeders/country.seeder';
-import { GenderSeeder } from '@/modules/domain/identity/seeders/gender.seeder';
-import { PermissionSeeder } from '@/modules/domain/identity/seeders/permission.seeder';
-import { RegionSeeder } from '@/modules/domain/library/seeders/region.seeder';
-import { RoleSeeder } from '@/modules/domain/identity/seeders/role.seeder';
-import { TimezoneSeeder } from '@/modules/domain/library/seeders/time-zone.seeder';
-import type { Seeder } from '@/modules/system/seeder/types/seeder.types';
 
 import { assertSafeTestDatabase } from './safety';
-import { ArticleStatusSeeder } from '@/modules/domain/articles/seeders/status.seeder';
-
-const REFERENCE_SEEDERS: Seeder[] = [
-  new GenderSeeder(),
-  new AccountStatusSeeder(),
-  new CountrySeeder(),
-  new RegionSeeder(),
-  new TimezoneSeeder(),
-  new PermissionSeeder(),
-  new RoleSeeder(),
-  new ArticleStatusSeeder(),
-].sort((left, right) => left.order - right.order);
 
 // Children precede parents. Reference tables and TypeORM's migration ledger
 // are intentionally absent: reset preserves the known baseline data.
@@ -84,8 +65,7 @@ export async function migrateAndSeedEmptyTestSchema(): Promise<void> {
   try {
     await dataSource.dropDatabase();
     await dataSource.runMigrations({ transaction: 'all' });
-    for (const seeder of REFERENCE_SEEDERS)
-      await seeder.run(dataSource.manager);
+    await seedDatabase(dataSource);
   } finally {
     await closeTestDataSource(dataSource);
   }

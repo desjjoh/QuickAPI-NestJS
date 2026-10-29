@@ -26,7 +26,7 @@ Use Node.js 22, npm, Docker Engine, and Docker Compose v2.
    npm run geoip:update
    ```
 
-4. Set `DB_SEED=true` for the first application start to populate required reference data, then run `npm run start:dev`. Disable startup seeding after initialization.
+4. Run `npm run db:seed` after migrations to populate required reference data, then run `npm run start:dev`.
 
 The default local API is `http://localhost:4000`. Swagger at `/docs` is opt-in through `DOCUMENTATION_ENABLED=true`; when enabled it is public unless restricted by your ingress. See [operational access](docs/deployment.md#observability-and-operations).
 

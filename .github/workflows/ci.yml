@@ -38,7 +38,6 @@ env:
   GLOBAL_THROTTLE_TTL_MINUTES: '1'
   GLOBAL_THROTTLE_LIMIT: '200'
   DB_SYNC: 'false'
-  DB_SEED: 'false'
   DB_SSL: 'false'
   # The unit job never connects to these deliberately unreachable endpoints;
   # infrastructure jobs override them with their own ephemeral services.

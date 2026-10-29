@@ -39,8 +39,8 @@ async function runTask(action, args, run) {
   if (action === 'up') return docker('up', '-d', '--wait');
   if (action === 'down') return docker('down', '--volumes', '--remove-orphans');
   if (action === 'logs') return docker('logs', '--tail=200');
-  if (action === 'prepare')
-    return run(process.execPath, [
+  if (action === 'prepare') {
+    const migrationStatus = await run(process.execPath, [
       '-r',
       'ts-node/register',
       '-r',
@@ -50,6 +50,15 @@ async function runTask(action, args, run) {
       '-d',
       'src/database/typeorm.datasource.ts',
     ]);
+    if (migrationStatus !== 0) return migrationStatus;
+    return run(process.execPath, [
+      '-r',
+      'ts-node/register',
+      '-r',
+      'tsconfig-paths/register',
+      'src/database/seed.ts',
+    ]);
+  }
   if (action === 'safety') return 0;
   if (action !== 'e2e') throw new Error(`Unsupported test action: ${action}`);
 
