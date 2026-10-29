@@ -19,6 +19,14 @@ No critical-risk exceptions were added for bundled tooling.
 | Base-CI runtime image security   | Final-image scanning currently runs in the release workflow. Express now runs a critical-only scan of the immutable runtime image already used by PR/branch smoke tests.                                                                                                                | Add the same OS/Node image scan to base CI, retain every severity and failure report, enforce exact expiring exceptions, and require it in both aggregate gates. Keep release-time revalidation of the actual published candidate.                                                                                                                  |
 | Legacy email privacy             | Legacy compiled-payload jobs remain supported; the generic failure/DLQ path can retain original payloads and failure details. New outbox jobs use identifier-only payloads and sanitized delivery errors.                                                                               | Drain legacy work, remove compatibility when safe, sanitize/redact retained failure metadata, and include Redis/DLQ backups in erasure policy. Never include raw email/challenge contents in tickets or logs.                                                                                                                                       |
 
+## Intermittent production-image shutdown timeout
+
+The local production-image smoke test (`.github/scripts/ci-smoke.sh`) intermittently exceeded its 25-second final shutdown wait after sending `SIGTERM` to the API container, returning exit code `124`. The captured API log confirms receipt of `SIGTERM`, but does not establish which cleanup operation remained pending.
+
+Migration, explicit seeding, repeated seeding, seed-failure exit codes, and API readiness checks passed before the timeout. A separate uninstrumented smoke run and a diagnostic run tracing Nest shutdown hooks completed successfully. The full E2E suite also passed. These passing runs do not resolve the intermittent failure, and there is no confirmed link to the seeding changes or to the separate Windows launcher termination issue.
+
+Follow up by reproducing the timeout while retaining per-hook shutdown timings, container state, and database/Redis connectivity evidence. Identify the pending operation and verify cleanup completion before changing shutdown behavior or the deadline. Keep the existing timeout and failure check intact; do not treat receipt of a shutdown signal as successful cleanup.
+
 ## Deliberately deferred
 
 - Deployment access policy for enabled Swagger: `/docs` and `/docs-json` are not protected by the operations-key guards. Keep them disabled or restrict access at ingress; do not assume the metrics/diagnostics credential also protects documentation.

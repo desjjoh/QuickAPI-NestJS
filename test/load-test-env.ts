@@ -55,6 +55,5 @@ for (const name of ['HOST', 'PORT', 'PASSWORD']) {
   process.env[`REDIS_${name}`] = value;
 }
 process.env.DB_SYNC = 'false';
-process.env.DB_SEED = 'false';
 process.env.DB_SSL = 'false';
 assertSafeTestRedis();

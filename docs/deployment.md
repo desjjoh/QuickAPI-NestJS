@@ -8,7 +8,7 @@ Recommended deployment contract:
 
 - Build the Docker image from the repository.
 - Inject secrets and environment variables through the hosting platform.
-- Run all pending database migrations before starting or replacing API instances.
+- Run all pending database migrations, then the reference-data seed command, before starting or replacing API instances. Serialize these jobs per database.
 - Keep `DB_SYNC=false` in production.
 - Use `STORAGE_DRIVER=r2` (the only supported provider, also the default) with all R2 credentials, bucket, endpoint, and public URL configured. Previous `local` settings must be updated; production rejects the shipped credential placeholders. Configuration validation does not verify provider connectivity or permissions—verify those against the actual R2 bucket before rollout.
 - Use HTTPS publicly.
@@ -33,6 +33,7 @@ cp .env.staging.example .env.staging # then inject secrets and deployment values
 npm run staging:preflight
 docker compose --env-file .env.staging -f docker-compose.staging.yml config --quiet
 docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm migration
+docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm seed
 docker compose --env-file .env.staging -f docker-compose.staging.yml up -d api
 ```
 
@@ -49,7 +50,7 @@ The runtime is a minimal Alpine image containing Node, compiled application code
 production dependencies, and required native libraries. Build and runtime stages
 share `ALPINE_VERSION` to keep musl/native-module compatibility. npm, npx, Yarn,
 and Corepack are build-time tools and are not copied into the deployed image.
-Preflight, TypeORM migrations, and GeoIP initialization run directly with Node;
+Preflight, TypeORM migrations, reference-data seeding, and GeoIP initialization run directly with Node;
 container overrides must not invoke `npm run`. Host-development npm scripts
 remain available. Update the shared Alpine version deliberately and validate
 native dependencies and the production topology together.
@@ -76,7 +77,7 @@ Automated runs can instead read `STAGING_RELEASE_IDENTIFIER` from repository
 variables. Tags are convenient discovery aliases only: deployment automation
 must download the `release-image.env` evidence artifact and inject its
 `QUICKAPI_IMAGE=registry/repository@sha256:...` value into `.env.staging`. The
-migration, GeoLite initializer, preflight, and API services all pull that exact
+migration, seed, GeoLite initializer, preflight, and API services all pull that exact
 digest; the staging Compose definition has no local build fallback.
 
 The image carries OCI source, revision, version, and creation-time labels and a
@@ -94,7 +95,7 @@ external network, and proxy plain HTTP to port 4000. Consequently application
 TLS is disabled while secure cookies remain enabled. The API health check probes
 `/health`; configure the ingress/orchestrator readiness probe to use `/ready`.
 
-The `preflight` service loads and validates `.env.staging` and must finish successfully before the migration or GeoLite jobs can run. Those jobs, in turn, must finish before the API deployment. Targeted deployment automation must run `npm run staging:preflight` first as shown above.
+The `preflight` service loads and validates `.env.staging` and must finish successfully before the migration or GeoLite jobs can run. The seed job waits for migrations; seeding and GeoLite initialization must finish before the API deployment. Targeted deployment automation must run `npm run staging:preflight` first as shown above.
 
 The one-shot `migration` service uses the same immutable image and database
 configuration as the API. It must complete successfully before API replacement;
@@ -167,3 +168,9 @@ when `DOCUMENTATION_ENABLED=true`; `/docs` and `/docs-json` do not require an op
 The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms when metrics are enabled.
 
 No new periodic monitoring checks, alert routing, or support-ticket automation were added. Metrics expose HTTP and Node.js signals; they are not a backlog/expiry/contention monitoring system. Existing DLQ behavior is described in [Reliability](reliability.md). The deferred scope is tracked in [the backlog](backlog.md).
+
+### Reference-data preparation
+
+The production application image includes `dist/database/seed.js` and its seed catalogs. The one-shot `seed` service runs it directly with Node after migrations; it does not start HTTP, Redis clients, workers, or scheduled jobs. MySQL uses its standard image. API creation waits for successful seeding. For subsequent releases, explicitly rerun migrations and seeding using the new immutable image rather than relying on an old completed Compose container.
+
+A seed failure blocks rollout and rolls back all seed groups. Fix the underlying error and rerun the same command; do not delete database volumes. Existing reference records are preserved, except that missing baseline role permissions are restored. Review authorization catalog changes accordingly. See [development](development.md) for repeat-run behavior.

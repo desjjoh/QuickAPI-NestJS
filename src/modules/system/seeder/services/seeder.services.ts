@@ -1,15 +1,7 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-  OnApplicationBootstrap,
-} from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
-import { env } from '@/config/environment.config';
 import { logger } from '@/config/logger.config';
 
-import { SEEDERS, SEEDER_GROUP } from '../tokens/seeder.tokens';
 import type { Seeder } from '../types/seeder.types';
 
 type SeederTotals = {
@@ -17,22 +9,14 @@ type SeederTotals = {
   skipped: number;
 };
 
-@Injectable()
-export class SeederService implements OnApplicationBootstrap {
-  private readonly logger = new Logger(SeederService.name);
-
+export class SeederService {
   public constructor(
-    private readonly dataSource: DataSource,
-
-    @Inject(SEEDERS)
+    private readonly manager: EntityManager,
     private readonly seeders: Seeder[],
-    @Inject(SEEDER_GROUP)
     private readonly group: string,
   ) {}
 
-  public async onApplicationBootstrap(): Promise<void> {
-    if (!env.DB_SEED) return;
-
+  public async run(): Promise<void> {
     const start: number = performance.now();
     const orderedSeeders: Seeder[] = [...this.seeders].sort(
       (a: Seeder, b: Seeder) => a.order - b.order,
@@ -69,7 +53,7 @@ export class SeederService implements OnApplicationBootstrap {
 
     for (const seeder of seeders) {
       try {
-        const result = await seeder.run(this.dataSource.manager);
+        const result = await seeder.run(this.manager);
 
         totals.created += result.created;
         totals.skipped += result.skipped;

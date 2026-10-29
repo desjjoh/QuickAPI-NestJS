@@ -22,7 +22,7 @@ cleanup() {
 }
 capture() {
   mkdir -p smoke-logs
-  for service in api migration redis mysql geoip-init preflight; do
+  for service in api seed migration redis mysql geoip-init preflight; do
     "${compose[@]}" logs --no-color "$service" >"smoke-logs/$service.log" 2>&1 || true
   done
 }
@@ -104,6 +104,9 @@ run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/data
   | tee "$artifact_dir/pending-before.txt"
 echo "::endgroup::"
 run_one_shot migration
+run_one_shot seed
+# Re-running the compiled seed command must be safe on an initialized database.
+run_one_shot seed
 
 # Read release evidence from the same database using only production-image
 # dependencies. TypeORM stores class names here, which are the useful release
@@ -170,6 +173,11 @@ if "${compose[@]}" run --rm --no-deps -e DB_PASSWORD=deliberately-wrong migratio
   echo 'migration service unexpectedly succeeded with invalid credentials' >&2
   exit 1
 fi
+if "${compose[@]}" run --rm --no-deps -e DB_PASSWORD=deliberately-wrong seed; then
+  echo 'seed service unexpectedly succeeded with invalid credentials' >&2
+  exit 1
+fi
+
 # Staging deliberately references an uncommitted .env.staging file. Supply the
 # inert smoke environment only for Compose model validation on clean CI checkouts.
 if [[ ! -e .env.staging ]]; then
@@ -189,7 +197,7 @@ for (const [name, service] of Object.entries(model.services)) {
   }
 }
 
-for (const name of ['preflight', 'migration', 'geoip-init', 'api']) {
+for (const name of ['preflight', 'migration', 'seed', 'geoip-init', 'api']) {
   if (model.services[name]?.image !== process.env.QUICKAPI_IMAGE) {
     throw new Error(
       `staging service ${name} image ${JSON.stringify(model.services[name]?.image)} ` +
@@ -198,7 +206,11 @@ for (const name of ['preflight', 'migration', 'geoip-init', 'api']) {
   }
 }
 
-for (const serviceName of ['migration', 'api']) {
+if (model.services.seed?.depends_on?.migration?.condition !== 'service_completed_successfully') {
+  throw new Error('staging seeding is not blocked by migration failure');
+}
+
+for (const serviceName of ['migration', 'seed', 'api']) {
   const mysqlEnvironment = model.services.mysql?.environment;
   const serviceEnvironment = model.services[serviceName]?.environment;
   if (mysqlEnvironment?.MYSQL_DATABASE !== serviceEnvironment?.DB_DATABASE) {
@@ -213,9 +225,9 @@ for (const serviceName of ['migration', 'api']) {
   }
 }
 NODE
-staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(model.services.api.depends_on.migration.condition)' "$artifact_dir/staging-compose.json")"
+staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));process.stdout.write(model.services.api.depends_on.seed.condition)' "$artifact_dir/staging-compose.json")"
 [[ "$staging_api_condition" == service_completed_successfully ]] || {
-  echo 'staging API is not blocked by migration failure' >&2
+  echo 'staging API is not blocked by seeding failure' >&2
   exit 1
 }
 

@@ -76,6 +76,26 @@ services:
         'dist/database/typeorm.datasource.js',
       ]
 
+  seed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: quickapi_app
+      DB_PASSWORD: quickapi_password
+      DB_DATABASE: quickapi
+      DB_SYNC: 'false'
+    command: ['node', 'dist/database/seed.js']
+
   api:
     build:
       context: .
@@ -87,6 +107,8 @@ services:
     restart: unless-stopped
 
     depends_on:
+      seed:
+        condition: service_completed_successfully
       migration:
         condition: service_completed_successfully
       mysql:

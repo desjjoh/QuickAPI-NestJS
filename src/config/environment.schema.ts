@@ -226,7 +226,6 @@ export const EnvSchema = z
     DB_DATABASE: z.string(),
 
     DB_SYNC: booleanFromEnv.default(false),
-    DB_SEED: booleanFromEnv.default(false),
 
     DB_SSL: booleanFromEnv.default(false),
     DB_SSL_REJECT_UNAUTHORIZED: booleanFromEnv.default(true),

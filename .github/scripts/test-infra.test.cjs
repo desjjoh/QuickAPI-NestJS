@@ -88,3 +88,21 @@ nodeTest(
     );
   },
 );
+
+nodeTest(
+  'preparation seeds only after successful migrations and propagates failures',
+  async () => {
+    for (const [results, expected, count] of [
+      [[0, 0], 0, 2],
+      [[8], 8, 1],
+      [[0, 9], 9, 2],
+    ]) {
+      const fake = runner([...results]);
+      assert.equal(await runTask('prepare', [], fake.run), expected);
+      assert.equal(fake.calls.length, count);
+      assert.ok(fake.calls[0][1].includes('migration:run'));
+      if (count === 2)
+        assert.ok(fake.calls[1][1].includes('src/database/seed.ts'));
+    }
+  },
+);
