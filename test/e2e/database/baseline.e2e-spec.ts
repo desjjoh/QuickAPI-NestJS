@@ -1,3 +1,5 @@
+import { SEEDER_GROUPS } from '@/database/seeders';
+import { SeederService } from '@/modules/system/seeder/services/seeder.services';
 import { DataSource } from 'typeorm';
 import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
 import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
@@ -6,6 +8,8 @@ import { ROLES_SEED } from '@/modules/domain/identity/seeders/role.seeder';
 import {
   closeTestDataSource,
   initializeTestDataSource,
+  resetMutableTables,
+  withRollbackTransaction,
 } from '../../helpers/database/test-database';
 
 describe('fresh database baseline', () => {
@@ -13,6 +17,7 @@ describe('fresh database baseline', () => {
 
   beforeAll(async () => {
     source = await initializeTestDataSource();
+    await resetMutableTables(source);
   });
 
   afterAll(async () => {
@@ -36,22 +41,32 @@ describe('fresh database baseline', () => {
   });
 
   it('seeds only the current authorization catalog', async () => {
-    const roles = await source.getRepository(RoleEntity).find();
-    const permissions = await source.getRepository(PermissionEntity).find();
+    // Other suites add custom roles. Test the seed catalog from a clean,
+    // transaction-local authorization state rather than relying on suite order.
+    await withRollbackTransaction(source, async ({ manager }) => {
+      for (const table of ['role_permissions', 'roles', 'permissions']) {
+        await manager.query(`DELETE FROM \`${table}\``);
+      }
+      for (const group of SEEDER_GROUPS) {
+        await new SeederService(manager, group.seeders, group.name).run();
+      }
+      const roles = await manager.getRepository(RoleEntity).find();
+      const permissions = await manager.getRepository(PermissionEntity).find();
 
-    expect(roles.map((role) => role.key).sort()).toEqual(
-      ROLES_SEED.map((role) => role.key).sort(),
-    );
-    expect(permissions.map((permission) => permission.key).sort()).toEqual(
-      PERMISSIONS_SEED.map((permission) => permission.key).sort(),
-    );
+      expect(roles.map((role) => role.key).sort()).toEqual(
+        ROLES_SEED.map((role) => role.key).sort(),
+      );
+      expect(permissions.map((permission) => permission.key).sort()).toEqual(
+        PERMISSIONS_SEED.map((permission) => permission.key).sort(),
+      );
 
-    for (const seed of ROLES_SEED) {
-      const role = roles.find((candidate) => candidate.key === seed.key)!;
+      for (const seed of ROLES_SEED) {
+        const role = roles.find((candidate) => candidate.key === seed.key)!;
 
-      expect(
-        role.permissions?.map((permission) => permission.key).sort(),
-      ).toEqual([...seed.permissions].sort());
-    }
+        expect(
+          role.permissions?.map((permission) => permission.key).sort(),
+        ).toEqual([...seed.permissions].sort());
+      }
+    });
   });
 });

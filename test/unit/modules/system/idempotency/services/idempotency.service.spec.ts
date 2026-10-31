@@ -1,4 +1,6 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+import type { IdempotencyScope } from '@/modules/system/idempotency/types/idempotency.types';
 import { IdempotencyService } from '@/modules/system/idempotency/services/idempotency.service';
 import { idempotencyTestStore } from '../../../../../helpers/idempotency-test-store';
 import { runInTransaction } from '@/common/helpers/transaction.helper';
@@ -16,6 +18,94 @@ describe('durable request idempotency', () => {
   beforeEach(() => {
     store = idempotencyTestStore();
     service = new IdempotencyService(store.repository);
+  });
+  it.each([undefined, null, '', '   ', 42, {}])(
+    'rejects missing or invalid user identity without opening a transaction: %p',
+    async (actorId) => {
+      const work = jest.fn();
+
+      await expect(
+        service.execute(
+          { ...scope, actorId } as unknown as IdempotencyScope,
+          'key',
+          'fp',
+          work,
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(work).not.toHaveBeenCalled();
+      expect(store.runners).toHaveLength(0);
+    },
+  );
+
+  it('keeps public scope separate from a user whose ID is the string public', async () => {
+    const publicScope = {
+      operation: scope.operation,
+      route: scope.route,
+      callerScope: 'public' as const,
+    };
+    const publicWork = jest.fn(async () => ({
+      status: 201,
+      body: { id: 'anonymous-result' },
+    }));
+    const userWork = jest.fn(async () => ({
+      status: 201,
+      body: { id: 'user-result' },
+    }));
+    const original = await service.execute(
+      publicScope,
+      'key',
+      'fp',
+      publicWork,
+    );
+
+    await service.execute(
+      { ...scope, actorId: 'public' },
+      'key',
+      'fp',
+      userWork,
+    );
+    expect(await service.execute(publicScope, 'key', 'fp', publicWork)).toEqual(
+      original,
+    );
+    expect([...store.rows.values()].map((row) => row.actor_id)).toEqual([
+      null,
+      'public',
+    ]);
+    expect(publicWork).toHaveBeenCalledTimes(1);
+    expect(userWork).toHaveBeenCalledTimes(1);
+  });
+
+  it('replays an existing user record using the original scope hash format', async () => {
+    const hash = createHash('sha256')
+      .update(
+        JSON.stringify([
+          store.repository.namespace,
+          scope.actorId,
+          scope.operation,
+          scope.route,
+          'legacy-key',
+        ]),
+      )
+      .digest('hex');
+    store.rows.set(hash, {
+      scope_hash: hash,
+      actor_id: scope.actorId,
+      operation: scope.operation,
+      route: scope.route,
+      fingerprint: 'fp',
+      state: 'completed',
+      response_status: 201,
+      response_body: { id: 'original' },
+      response_identity: 'original',
+      expires_at: new Date(Date.now() + 60_000),
+    });
+    const work = jest.fn();
+
+    expect(await service.execute(scope, 'legacy-key', 'fp', work)).toEqual({
+      status: 201,
+      body: { id: 'original' },
+    });
+    expect(work).not.toHaveBeenCalled();
   });
   it('does not replay or execute an erased response', async () => {
     const work = jest.fn(async () => ({

@@ -101,6 +101,6 @@ and E2E launchers are cross-platform Node scripts; see the [testing guide](../te
 
 ## Database preparation
 
-The migration chain is a single baseline generated from the current entity model. It is intended for a fresh database; it is not an upgrade path from the retired migration history. Do not apply it over an older populated schema or mark it as applied without verifying the schema. Reset only explicitly disposable local/test schemas before adopting this baseline.
+Migration history starts with a baseline generated from the entity model, followed by forward migrations for subsequent schema changes. It is intended for a fresh database; it is not an upgrade path from the retired migration history. Do not apply it over an older populated schema or mark it as applied without verifying the schema. Reset only explicitly disposable local/test schemas before adopting this baseline.
 
 Prepare a fresh database with `npm run migration:run` followed by `npm run db:seed`. Docker Compose enforces the same migration/seed ordering before the API starts. Existing API behavior and stored reference catalogs are validated against this baseline by the E2E suite. Future schema changes require new forward migrations; do not edit the baseline after it has been deployed to a retained environment.

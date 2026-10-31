@@ -5,8 +5,9 @@ export class IdempotencyEntity {
   @PrimaryColumn({ type: 'char', length: 64 })
   public readonly scope_hash!: string;
 
-  @Column({ type: 'varchar', length: 128 })
-  public readonly actor_id!: string;
+  /** User scope owner; null belongs to the explicit public replay namespace. */
+  @Column({ type: 'varchar', length: 128, nullable: true })
+  public readonly actor_id!: string | null;
 
   @Column({ type: 'varchar', length: 128 })
   public readonly operation!: string;

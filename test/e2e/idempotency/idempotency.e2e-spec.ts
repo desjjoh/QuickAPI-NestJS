@@ -50,6 +50,86 @@ describe('request idempotency (disposable MySQL)', () => {
       return { status: 201, body: { id: image.id } };
     });
 
+  it('serializes public requests across connections, persists no user ID, and isolates user replay', async () => {
+    const publicScope = {
+      callerScope: 'public' as const,
+      operation: scope.operation,
+      route: scope.route,
+    };
+    let entered!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const work = jest.fn(async () => {
+      entered();
+      await pending;
+      return createImage();
+    });
+    const first = service.execute(publicScope, 'public-key', 'fp', work);
+    await started;
+
+    try {
+      const other = new IdempotencyService(new IdempotencyRepository(source));
+
+      await expect(
+        other.execute(publicScope, 'public-key', 'fp', work),
+      ).rejects.toBeInstanceOf(ConflictException);
+    } finally {
+      release();
+    }
+
+    const original = await first;
+
+    expect(
+      await service.execute(publicScope, 'public-key', 'fp', work),
+    ).toEqual(original);
+    await expect(
+      service.execute(publicScope, 'public-key', 'changed', work),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(
+      await source
+        .getRepository(IdempotencyEntity)
+        .findOneByOrFail({ operation: scope.operation }),
+    ).toMatchObject({ actor_id: null, response_status: 201 });
+
+    const userResponse = await service.execute(
+      { ...scope, actorId: 'public' },
+      'public-key',
+      'fp',
+      createImage,
+    );
+
+    expect(userResponse.body).not.toEqual(original.body);
+    expect(await source.getRepository(ImageEntity).count()).toBe(2);
+    expect(await source.getRepository(IdempotencyEntity).count()).toBe(2);
+  });
+
+  it('rolls back a public mutation and claim, then safely retries', async () => {
+    const publicScope = {
+      callerScope: 'public' as const,
+      operation: scope.operation,
+      route: scope.route,
+    };
+
+    await expect(
+      service.execute(publicScope, 'public-rollback', 'fp', async () => {
+        await createImage();
+        throw new Error('public mutation failed');
+      }),
+    ).rejects.toThrow('public mutation failed');
+    expect(await source.getRepository(ImageEntity).count()).toBe(0);
+    expect(await source.getRepository(IdempotencyEntity).count()).toBe(0);
+
+    await service.execute(publicScope, 'public-rollback', 'fp', createImage);
+    expect(await source.getRepository(ImageEntity).count()).toBe(1);
+    expect(await source.getRepository(IdempotencyEntity).count()).toBe(1);
+  });
+
   it('drains timed-out work before rollback and releases its claim for a safe retry', async () => {
     const deadline = new RequestDeadline(Date.now() + 10_000);
     let entered!: () => void;
