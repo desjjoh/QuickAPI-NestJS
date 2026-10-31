@@ -18,20 +18,20 @@ The optional `RELEASE_REGISTRY_TEST=true` transport regression requires `RELEASE
 
 `npm test` includes all suites beneath `test/unit` and `test/integration`. Both directories mirror the paths beneath `src` (for example, `src/modules/domain/identity/services/user.service.ts` is tested by `test/unit/modules/domain/identity/services/user.service.spec.ts`). Unit tests isolate behavior with mocked dependencies. Integration tests exercise real component boundaries such as the Nest HTTP pipeline, TypeORM SQL/metadata, and filesystem/image processing; they do not require live providers or the E2E database. Classify by behavior, not by filename. E2E suites remain in `test/e2e`, and shared support stays in `test/helpers` and `test/unit`.
 
-CI selects the two categories by directory, not an `integration.spec.ts` suffix. Coverage targets production files beneath `src`, not test files. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](unit/README.md).
+CI selects the two categories by directory, not an `integration.spec.ts` suffix. Coverage targets production files beneath `src`, not test files. `npm run check` also checks formatting, lint, types, and build, but does not start Docker or run E2E. Shared unit-test conventions are in [test/unit](../test/unit/README.md).
 
 Test setup explicitly selects the supported R2 driver and supplies inert R2 credentials/URLs before configuration loads, independent of a developer's `.env`. Storage tests mock the SDK or replace `StorageService` with an in-memory provider; they do not enable a nonexistent local driver or use live bucket credentials.
 
 ## Dependency security in base CI
 
 `npm run test:security` exercises the dependency-audit gate without network access,
-including high/critical blocking, exact exception matching, UTC expiry, the 30-day
+including critical blocking and nonblocking high findings, exact exception matching, UTC expiry, the 30-day
 exception limit, malformed evidence, command failures, and separate development
 reporting. `npm run check` includes these tests.
 
 `npm run security:audit` performs real production and full-tree npm audits. CI's
 `Dependency security` job blocks both `Check` and `Staging deployment gate` on
-unexcepted production high/critical findings or invalid/unavailable evidence.
+unexcepted production critical findings or invalid/unavailable evidence.
 Development-only findings are reported separately and do not block by severity.
 Reports and the empty-by-default register are retained even on failure; see the
 [dependency audit policy](../security/dependency-audit-exceptions.md). The existing
@@ -85,7 +85,7 @@ npm run test:infra:down
 `test:e2e` runs Jest against already provisioned test services without managing
 Docker. CI uses this path with separate service containers per shard. Global
 setup drops, migrates, and seeds the test schema; `test:db:prepare` is an optional
-migration-only command, not required before E2E. `test:infra:logs` shows local
+migration-and-seeding command, not required before E2E. `test:infra:logs` shows local
 test service logs. Managed infrastructure commands reject targets that differ
 from the local test Compose topology; use the direct runner for custom CI targets.
 
@@ -102,18 +102,18 @@ to hide leaked connections/workers. Unit/component tests still do not require Do
 
 These are existing suites, not placeholders or a claim that every possible failure has been tested.
 
-| Boundary                                                                                         | Suites                                                                                                                                                                                                                    |
-| ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Database-backed claims, rollback, 204 replay, expiry/concurrency                                 | [idempotency](e2e/idempotency/idempotency.e2e-spec.ts)                                                                                                                                                                    |
-| Admin authorization, revisions, deletion, replay, audit                                          | [users](e2e/administration/users.e2e-spec.ts)                                                                                                                                                                             |
-| Profile settings/contact/avatar replay, foreign-key rollback, permission loss, upload validation | [profile](e2e/account/profile.e2e-spec.ts)                                                                                                                                                                                |
-| Registration and verification                                                                    | [registration](e2e/authentication/registration.e2e-spec.ts), [verification](e2e/authentication/email-verification.e2e-spec.ts)                                                                                            |
-| MFA, reset, credentials, sessions                                                                | [MFA](e2e/authentication/mfa.e2e-spec.ts), [reset](e2e/authentication/password-reset.e2e-spec.ts), [credentials](e2e/authentication/account-credentials.e2e-spec.ts), [sessions](e2e/authentication/sessions.e2e-spec.ts) |
-| Encrypted email intents, cancellation/expiry/retry, real Redis worker with fake transport        | [security delivery](e2e/authentication/security-delivery.e2e-spec.ts)                                                                                                                                                     |
-| Storage intents, upload reconciliation, reference fencing, retries/DLQ                           | [storage cleanup](e2e/storage/storage-cleanup.e2e-spec.ts)                                                                                                                                                                |
-| User repository against MySQL                                                                    | [user repository](e2e/repositries/user.repository.e2e-spec.ts)                                                                                                                                                            |
-| Account activity visibility                                                                      | [activity](e2e/account/activity.e2e-spec.ts)                                                                                                                                                                              |
-| Dependency readiness                                                                             | [readiness](e2e/ready.e2e-spec.ts)                                                                                                                                                                                        |
+| Boundary                                                                                         | Suites                                                                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database-backed claims, rollback, 204 replay, expiry/concurrency                                 | [idempotency](../test/e2e/idempotency/idempotency.e2e-spec.ts)                                                                                                                                                                                            |
+| Admin authorization, revisions, deletion, replay, audit                                          | [users](../test/e2e/administration/users.e2e-spec.ts)                                                                                                                                                                                                     |
+| Profile settings/contact/avatar replay, foreign-key rollback, permission loss, upload validation | [profile](../test/e2e/account/profile.e2e-spec.ts)                                                                                                                                                                                                        |
+| Registration and verification                                                                    | [registration](../test/e2e/authentication/registration.e2e-spec.ts), [verification](../test/e2e/authentication/email-verification.e2e-spec.ts)                                                                                                            |
+| MFA, reset, credentials, sessions                                                                | [MFA](../test/e2e/authentication/mfa.e2e-spec.ts), [reset](../test/e2e/authentication/password-reset.e2e-spec.ts), [credentials](../test/e2e/authentication/account-credentials.e2e-spec.ts), [sessions](../test/e2e/authentication/sessions.e2e-spec.ts) |
+| Encrypted email intents, cancellation/expiry/retry, real Redis worker with fake transport        | [security delivery](../test/e2e/authentication/security-delivery.e2e-spec.ts)                                                                                                                                                                             |
+| Storage intents, upload reconciliation, reference fencing, retries/DLQ                           | [storage cleanup](../test/e2e/storage/storage-cleanup.e2e-spec.ts)                                                                                                                                                                                        |
+| User repository against MySQL                                                                    | [user repository](../test/e2e/repositries/user.repository.e2e-spec.ts)                                                                                                                                                                                    |
+| Account activity visibility                                                                      | [activity](../test/e2e/account/activity.e2e-spec.ts)                                                                                                                                                                                                      |
+| Dependency readiness                                                                             | [readiness](../test/e2e/ready.e2e-spec.ts)                                                                                                                                                                                                                |
 
 HTTP test apps replace background dispatchers and pause their own workers to isolate request assertions. Dedicated delivery/cleanup tests create uniquely named queues/workers and exercise real Redis with fake external providers. Passing HTTP tests alone does not prove automatic production worker delivery or real-provider availability.
 
@@ -150,4 +150,4 @@ behavior on the host.
 
 It removes its disposable containers/network/volumes on completion or failure and writes failure diagnostics to `smoke-logs/`. Run `test:smoke:config` in a POSIX shell to check Compose rendering only. Neither command is a real-provider test or a production deployment.
 
-Release review should use evidence from the exact release commit, including failures that prevent suites from reaching their tests. Do not embed transient suite counts or “tests not run here” notes in product documentation. See [deployment](../docs/deployment.md) and [remaining gaps](../docs/backlog.md).
+Release review should use evidence from the exact release commit, including failures that prevent suites from reaching their tests. Do not embed transient suite counts or “tests not run here” notes in product documentation. See [deployment](deployment.md) and [remaining gaps](backlog.md).

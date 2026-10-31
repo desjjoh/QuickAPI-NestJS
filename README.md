@@ -15,33 +15,28 @@ This repository is more than a CRUD starter: it includes transaction-aware audit
 
 Use Node.js 22, npm, Docker Engine, and Docker Compose v2.
 
-1. Run `npm ci`, then copy [.env.example](.env.example) to a gitignored `.env`.
-2. Follow [local configuration](docs/development.md#local-configuration): replace secrets, set development logging, and configure GeoLite data. R2 is the only supported storage provider; all R2 settings are required at startup.
-3. Start dependencies and apply migrations:
-
-   ```bash
-   npm run docker:mysql:up
-   npm run docker:redis:up
-   npm run migration:run
-   npm run geoip:update
-   ```
-
-4. Run `npm run db:seed` after migrations to populate required reference data, then run `npm run start:dev`.
+Follow [Setup](docs/setup.md) to install dependencies, configure `.env`, start
+MySQL/Redis, apply migrations, seed reference data, and initialize GeoIP before
+starting the API. The required provider settings and local/test environment
+boundaries are documented in [Configuration](docs/configuration.md).
 
 The default local API is `http://localhost:4000`. Swagger at `/docs` is opt-in through `DOCUMENTATION_ENABLED=true`; when enabled it is public unless restricted by your ingress. See [operational access](docs/deployment.md#observability-and-operations).
 
 ## Documentation
 
-| Guide                                           | Contents                                                                         |
-| ----------------------------------------------- | -------------------------------------------------------------------------------- |
-| [Development](docs/development.md)              | Setup, configuration, migrations, seeding, GeoIP, and local infrastructure       |
-| [Architecture](docs/architecture.md)            | Layer boundaries, modules, transactions, and extension rules                     |
-| [Image processing](docs/image-processing.md)    | WebP transforms, avatar policy, validation, limits, and rollout                  |
-| [API contracts](docs/api-contracts.md)          | API routes, concurrency, idempotency, and security                               |
-| [Reliability and recovery](docs/reliability.md) | Durable email/storage, retries, DLQ boundaries, privacy, and recovery procedures |
-| [Testing](test/TESTING.md)                      | Test coverage, disposable databases, PowerShell commands, and CI                 |
-| [Deployment and operations](docs/deployment.md) | Staging topology, immutable releases, diagnostics, backups, and rollback         |
-| [Technical backlog](docs/backlog.md)            | Verified gaps and intentionally deferred work                                    |
+| Guide                                  | Contents                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------- |
+| [Setup](docs/setup.md)                 | Installation, local infrastructure, migrations, seeding, and development commands   |
+| [Architecture](docs/architecture.md)   | Layer boundaries, transaction ownership, audit invariants, and extension rules      |
+| [Configuration](docs/configuration.md) | Environment sources, validation, providers, and local/test/staging targets          |
+| [Testing](docs/testing.md)             | Test layers, coverage, disposable databases, and CI checks                          |
+| [Security](docs/security.md)           | Identity, permissions, cookies, proxy trust, operational access, and security gates |
+| [Deployment](docs/deployment.md)       | Staging topology, immutable releases, backups, and rollback                         |
+| [Backlog](docs/backlog.md)             | Known limitations and deferred work                                                 |
+
+Specialist guides: [API contracts](docs/api-contracts.md),
+[image processing](docs/image-processing.md), and
+[reliability and recovery](docs/reliability.md).
 
 Configuration keys live in [.env.example](.env.example) and [.env.staging.example](.env.staging.example); validation lives in [src/config](src/config). Commands are defined in [package.json](package.json). These are the source of truth rather than a second environment-variable dump in this README.
 
@@ -62,17 +57,10 @@ npm run check
 npm run test:cov
 ```
 
-CI audits production dependencies and retains a separate development-only report; unexcepted critical production findings block the aggregate checks; high and lower findings remain reported. See the [dependency audit policy](security/dependency-audit-exceptions.md). The release-image scan remains a separate OS/application gate.
-
-E2E tests reset their explicitly selected disposable database. Read [Testing](test/TESTING.md) before running them. CI also checks migration/readiness and production topology; a green run does not replace real-provider, backup-restore, or deployment validation.
-
-Development and test dependencies use separate Compose projects,
-`quickapi-nestjs-dev` and `quickapi-nestjs-test`. Tests load `.env.test`, never
-development `.env`. With Docker running, `npm run test:e2e:local` starts the
-disposable test stack, runs E2E, and cleans it up on completion.
+See [Testing](docs/testing.md) for E2E/database safety and production-image checks,
+and [Security](docs/security.md#dependency-and-image-security) for audit policies.
+Automated checks do not replace real-provider, backup-restore, or deployment validation.
 
 ## License
 
 [MIT](LICENSE).
-
-Database setup uses a single clean baseline for disposable databases. See [database preparation](docs/development.md#database-preparation).

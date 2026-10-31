@@ -1,6 +1,6 @@
 # System image processing
 
-[Architecture](architecture.md) · [Testing](../test/TESTING.md)
+[Architecture](architecture.md) · [Testing](testing.md)
 
 `ImageProcessingModule` exports `ImageProcessingService` and is also re-exported
 by `SystemModule`. Consumers may import the standalone module without initializing

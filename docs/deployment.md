@@ -4,7 +4,7 @@
 
 The checked-in staging topology and release workflows define the deployment contract. Hosting, ingress, secrets and backup ownership remain environment-specific.
 
-The current migration chain initializes a fresh schema from a baseline and then applies subsequent forward migrations. It replaces the former development migration history and cannot be applied over an older schema. Use a new database, or explicitly reset a disposable environment; retained environments require a separately reviewed migration path.
+The current migration chain initializes a fresh schema from a baseline and then applies subsequent forward migrations. It cannot be applied over a schema from the retired migration history. Use a new database, or explicitly reset a disposable environment; retained environments require a separately reviewed migration path.
 
 Recommended deployment contract:
 
@@ -12,7 +12,7 @@ Recommended deployment contract:
 - Inject secrets and environment variables through the hosting platform.
 - Run all pending database migrations, then the reference-data seed command, before starting or replacing API instances. Serialize these jobs per database.
 - Keep `DB_SYNC=false` in production.
-- Use `STORAGE_DRIVER=r2` (the only supported provider, also the default) with all R2 credentials, bucket, endpoint, and public URL configured. Previous `local` settings must be updated; production rejects the shipped credential placeholders. Configuration validation does not verify provider connectivity or permissions—verify those against the actual R2 bucket before rollout.
+- Use `STORAGE_DRIVER=r2` (the only supported provider, also the default) with all R2 credentials, bucket, endpoint, and public URL configured. Production rejects the shipped credential placeholders. Configuration validation does not verify provider connectivity or permissions—verify those against the actual R2 bucket before rollout.
 - Use HTTPS publicly.
 - Set `COOKIE_SECURE=true` for HTTPS environments.
 - Use `/ready` for readiness checks.
@@ -57,13 +57,10 @@ container overrides must not invoke `npm run`. Host-development npm scripts
 remain available. Update the shared Alpine version deliberately and validate
 native dependencies and the production topology together.
 
-Base CI also runs a production dependency audit before release eligibility.
-Unexcepted critical production advisories and missing/invalid audit evidence
-block `Check` and `Staging deployment gate`; development-only findings are retained
-separately, and high/lower production findings remain visible. The [dependency audit policy](../security/dependency-audit-exceptions.md)
-defines exact scopes, ownership, justification, and expiry limited to 30 days.
-This base-CI audit supplements the final-image gate below; it does not change the
-release-image severity policy.
+Release eligibility includes a separate production-dependency audit. See
+[Security](security.md#dependency-and-image-security) for blocking severities and
+[the dependency policy](../security/dependency-audit-exceptions.md) for exact
+exception and evidence rules.
 
 After the `CI` workflow succeeds on `main` or `staging`, the
 `.github/workflows/release-image.yml` workflow builds and scans the production
@@ -128,7 +125,7 @@ optional for the GeoLite download endpoint.
 - `quickapi_mysql_data` is the authoritative relational-data volume;
   `quickapi_redis_data` retains queues and rate-limit state. `quickapi_uploads`
   mounts the public-assets directory; it is not an implemented local upload-storage driver. `quickapi_geoip` is populated by the GeoIP update
-  job, and `quickapi_tmp` is scratch space and is not backed up. The storage provider currently binds R2 unconditionally; see [Known gaps](backlog.md). New durable email and storage jobs can be reconstructed from SQL, but legacy queue-only work cannot.
+  job, and `quickapi_tmp` is scratch space and is not backed up. R2 is the supported permanent-upload provider; see [Configuration](configuration.md). Durable email and storage jobs can be reconstructed from SQL, but legacy queue-only work cannot.
 - The platform/database owner owns encrypted MySQL backups, restore tests,
   retention, and point-in-time recovery. The application owner owns R2/uploads
   retention and validates restored object/database consistency. The operations
@@ -160,19 +157,18 @@ Built-in operational endpoints include:
 | `/system`  | Protected runtime and dependency diagnostics (opt-in) |
 | `/metrics` | Protected Prometheus-formatted metrics (opt-in)       |
 
-`/health` and `/ready` remain unauthenticated for platform probes, but do not
-return dependency identities or failure details. Outside development, set `METRICS_ENABLED=true` or
-`DETAILED_DIAGNOSTICS_ENABLED=true` independently and send the non-user
-deployment credential in `X-Operations-Key`. Disabled operational endpoints
-return 404; missing or invalid credentials return 401. Swagger is only mounted
-when `DOCUMENTATION_ENABLED=true`; `/docs` and `/docs-json` do not require an operations key. Keep documentation disabled or restrict it at ingress in deployed environments. Development diagnostics/metrics guards bypass enabled/key checks, so do not expose a development instance publicly.
+Use `/health` for process liveness and `/ready` for dependency readiness. Configure
+scrapers with the enabled metrics flag and a non-user `X-Operations-Key` credential.
+[Security](security.md#operational-access) defines flags, response codes, the
+development bypass, and Swagger exposure; [Configuration](configuration.md)
+describes environment sources. Restrict deployed operational surfaces at ingress.
 
 The Prometheus registry collects default Node.js metrics and custom HTTP request counters/duration histograms when metrics are enabled.
 
-No new periodic monitoring checks, alert routing, or support-ticket automation were added. Metrics expose HTTP and Node.js signals; they are not a backlog/expiry/contention monitoring system. Existing DLQ behavior is described in [Reliability](reliability.md). The deferred scope is tracked in [the backlog](backlog.md).
+Periodic operational monitoring checks, alert routing, and support-ticket automation are not implemented. Metrics expose HTTP and Node.js signals; they are not a backlog/expiry/contention monitoring system. Existing DLQ behavior is described in [Reliability](reliability.md). The deferred scope is tracked in [the backlog](backlog.md).
 
 ### Reference-data preparation
 
 The production application image includes `dist/database/seed.js` and its seed catalogs. The one-shot `seed` service runs it directly with Node after migrations; it does not start HTTP, Redis clients, workers, or scheduled jobs. MySQL uses its standard image. API creation waits for successful seeding. For subsequent releases, explicitly rerun migrations and seeding using the new immutable image rather than relying on an old completed Compose container.
 
-A seed failure blocks rollout and rolls back all seed groups. Fix the underlying error and rerun the same command; do not delete database volumes. Existing reference records are preserved, except that missing baseline role permissions are restored. Review authorization catalog changes accordingly. See [development](development.md) for repeat-run behavior.
+A seed failure blocks rollout and rolls back all seed groups. Fix the underlying error and rerun the same command; do not delete database volumes. Existing reference records are preserved, except that missing baseline role permissions are restored. Review authorization catalog changes accordingly. See [Setup](setup.md#start-dependencies-and-application) for repeat-run behavior.

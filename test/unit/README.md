@@ -1,6 +1,6 @@
 # Unit tests
 
-[Testing guide](../TESTING.md) · [Architecture](../../docs/architecture.md)
+[Testing guide](../../docs/testing.md) · [Architecture](../../docs/architecture.md)
 
 Import shared builders and typed mocks from `test/unit`. Builders return a small,
 valid baseline entity and accept `Partial<Entity>` overrides, so a test only names

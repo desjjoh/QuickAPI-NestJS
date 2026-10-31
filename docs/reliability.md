@@ -80,4 +80,4 @@ Keep the same stable `CRYPTO_SECRET` across API and worker replicas while encryp
 
 Before rollout, require complete CI for the exact commit, a verified backup, all pending migrations, and updated client retry/CORS contracts. In staging check permission loss on replay, old refresh rejection, queue/provider outage recovery with stable delivery IDs, expired challenge cancellation, and healthy readiness. Use test identities only.
 
-The detailed regression map is in [Testing](../test/TESTING.md). Periodic operational monitoring and support-ticket automation are intentionally deferred; the existence of a DLQ does not itself route an alert or create a ticket.
+The detailed regression map is in [Testing](testing.md). Periodic operational monitoring and support-ticket automation are intentionally deferred; the existence of a DLQ does not itself route an alert or create a ticket.
