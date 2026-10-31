@@ -7,9 +7,26 @@ import {
   hasApplicationTransaction,
   applicationManager,
   afterApplicationTransaction,
+  requireApplicationTransaction,
 } from '@/common/helpers/transaction.helper';
 
 describe('transaction helpers', () => {
+  it('requires a live route transaction instead of silently opening one', async () => {
+    expect(() => requireApplicationTransaction()).toThrow(
+      'active application transaction',
+    );
+    const queryRunner = { isTransactionActive: true };
+    const manager = { queryRunner } as EntityManager;
+    const lifecycle = new TransactionLifecycle();
+
+    await withApplicationTransaction(manager, lifecycle, async () => {
+      expect(requireApplicationTransaction()).toEqual({ manager, lifecycle });
+      queryRunner.isTransactionActive = false;
+      expect(() => requireApplicationTransaction()).toThrow(
+        'active application transaction',
+      );
+    });
+  });
   it.each([false, true])(
     'persists independent accounting after connection release (rollback=%s)',
     async (fail) => {

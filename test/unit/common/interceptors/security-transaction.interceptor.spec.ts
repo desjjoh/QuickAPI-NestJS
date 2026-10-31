@@ -23,7 +23,7 @@ describe('SecurityTransactionInterceptor', () => {
   } as ExecutionContext;
   const transaction = jest.fn();
   const interceptor = new SecurityTransactionInterceptor({
-    transaction,
+    run: transaction,
   } as never);
 
   beforeEach(() => {

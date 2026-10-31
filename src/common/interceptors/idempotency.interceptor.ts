@@ -13,15 +13,23 @@ import { requestFingerprint } from '@/common/helpers/request-fingerprint.helper'
 import { idempotencyPolicy } from '@/config/idempotency.config';
 import { idempotencyActorId } from '@/modules/system/idempotency/helpers/idempotency-scope.helper';
 import type { IdempotencyCallerScope } from '@/modules/system/idempotency/types/idempotency.types';
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
+import {
+  IDEMPOTENCY_OPERATION,
+  IDEMPOTENCY_SCOPE,
+} from '../constants/request-operation.constants';
 
-export const IDEMPOTENCY_OPERATION = 'idempotency:operation';
-export const IDEMPOTENCY_SCOPE = 'idempotency:scope';
+export {
+  IDEMPOTENCY_OPERATION,
+  IDEMPOTENCY_SCOPE,
+} from '../constants/request-operation.constants';
 
 @Injectable()
 export class IdempotencyInterceptor implements NestInterceptor {
   public constructor(
     private readonly idempotency: IdempotencyService,
     private readonly reflector: Reflector,
+    private readonly transactions: RequestTransactionService,
   ) {}
 
   public intercept(
@@ -41,7 +49,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
     );
     const key = request.headers['idempotency-key'];
 
-    if (key === undefined) return next.handle();
+    if (key === undefined)
+      return from(this.transactions.run(() => firstValueFrom(next.handle())));
     if (
       typeof key !== 'string' ||
       !key.length ||

@@ -1,3 +1,4 @@
+import { requireApplicationTransaction } from '@/common/helpers/transaction.helper';
 import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
@@ -59,58 +60,54 @@ export class UserAdminService {
     id: string,
     dto: UserAdministrationActionDto,
   ): Promise<void> {
-    await this.userSvc.transaction(async (manager, lifecycle) => {
-      const before = await this.lockUser(manager, id);
+    const { manager, lifecycle } = requireApplicationTransaction();
+    const before = await this.lockUser(manager, id);
 
-      assertUserAdministrationVersion(before, dto.expected_version);
-      const beforeSnapshot = this.auditSnapshot(before);
+    assertUserAdministrationVersion(before, dto.expected_version);
+    const beforeSnapshot = this.auditSnapshot(before);
 
-      await this.lifecycle.deleteUser(before, manager, lifecycle);
-      const after = await manager.findOneOrFail(UserEntity, { where: { id } });
+    await this.lifecycle.deleteUser(before, manager, lifecycle);
+    const after = await manager.findOneOrFail(UserEntity, { where: { id } });
 
-      await this.audit.record(
-        this.successInput(
-          IdentityAuditEvents.ADMIN_USER_DELETED,
-          id,
-          beforeSnapshot,
-          this.auditSnapshot(after),
-          dto.reason_code,
-        ),
-        manager,
-      );
-    });
+    await this.audit.record(
+      this.successInput(
+        IdentityAuditEvents.ADMIN_USER_DELETED,
+        id,
+        beforeSnapshot,
+        this.auditSnapshot(after),
+        dto.reason_code,
+      ),
+      manager,
+    );
   }
 
   public async updateUser(
     id: string,
     dto: UpdateUserAdministrationDto,
   ): Promise<UserAdministrationDto> {
-    const user = await this.userSvc.transaction(async (manager) => {
-      const before = await this.lockUser(manager, id);
+    const { manager } = requireApplicationTransaction();
+    const before = await this.lockUser(manager, id);
 
-      assertUserAdministrationVersion(before, dto.expected_version);
-      const beforeSnapshot = this.auditSnapshot(before);
-      const after = await this.userAdministration.updateAdministration(
-        before,
-        dto,
-        manager,
-      );
+    assertUserAdministrationVersion(before, dto.expected_version);
+    const beforeSnapshot = this.auditSnapshot(before);
+    const after = await this.userAdministration.updateAdministration(
+      before,
+      dto,
+      manager,
+    );
 
-      await this.audit.record(
-        this.successInput(
-          IdentityAuditEvents.ADMIN_USER_UPDATED,
-          id,
-          beforeSnapshot,
-          this.auditSnapshot(after),
-          dto.reason_code,
-        ),
-        manager,
-      );
+    await this.audit.record(
+      this.successInput(
+        IdentityAuditEvents.ADMIN_USER_UPDATED,
+        id,
+        beforeSnapshot,
+        this.auditSnapshot(after),
+        dto.reason_code,
+      ),
+      manager,
+    );
 
-      return after;
-    });
-
-    return new UserAdministrationDto(user);
+    return new UserAdministrationDto(after);
   }
 
   /** The pessimistic read makes the captured before value part of the mutation transaction. */

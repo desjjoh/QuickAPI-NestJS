@@ -11,6 +11,8 @@ import { env } from '@/config/environment.config';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { GenderEntity } from '@/modules/domain/identity/entities/gender.entity';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
+import { TimezoneEntity } from '@/modules/domain/library/entities/time-zone.entity';
+import { IdentityAuditEvents } from '@/config/audit-events.config';
 import { StorageService } from '@/modules/system/storage/types/storage.types';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
@@ -120,6 +122,280 @@ describe('authenticated account profile lifecycle', () => {
     };
     return { user, agent, headers, response };
   }
+
+  const profileState = (user: UserEntity) => ({
+    name: user.profile.name,
+    personal: {
+      dob: user.profile.personal.dob,
+      bio: user.profile.personal.bio,
+      gender: user.profile.personal.gender?.id,
+    },
+    country: user.profile.region.country.id,
+    timezone: user.profile.region.timezone.key,
+    metadata: user.metadata,
+    version: user.administration_version,
+  });
+
+  async function setting(
+    kind: 'details' | 'country' | 'timezone',
+    user: UserEntity,
+  ) {
+    if (kind === 'details') {
+      const genders = await suite.dataSource.getRepository(GenderEntity).find();
+      const first = genders.find(
+        (gender) => gender.id !== user.profile.personal.gender?.id,
+      )!;
+      const later = genders.find((gender) => gender.id !== first.id)!;
+      const body = {
+        first_name: 'First',
+        last_name: 'Tester',
+        preferred_name: null,
+        dob: '1991-02-03',
+        gender_id: first.id,
+        bio: 'First profile',
+      };
+
+      return {
+        method: 'patch' as const,
+        suffix: '',
+        first: body,
+        later: { ...body, first_name: 'Later', gender_id: later.id },
+        event: IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
+      };
+    }
+    if (kind === 'country') {
+      const countries = await suite.dataSource
+        .getRepository(CountryEntity)
+        .find();
+      const first = countries.find(
+        (country) => country.id !== user.profile.region.country.id,
+      )!;
+      const later = countries.find((country) => country.id !== first.id)!;
+
+      return {
+        method: 'put' as const,
+        suffix: '/country',
+        first: { country_id: first.id },
+        later: { country_id: later.id },
+        event: IdentityAuditEvents.PROFILE_COUNTRY_CHANGED,
+      };
+    }
+    const timezones = await suite.dataSource
+      .getRepository(TimezoneEntity)
+      .find({ take: 3, order: { key: 'ASC' } });
+    const first = timezones.find(
+      (timezone) => timezone.key !== user.profile.region.timezone.key,
+    )!;
+    const later = timezones.find((timezone) => timezone.key !== first.key)!;
+
+    return {
+      method: 'put' as const,
+      suffix: '/timezone',
+      first: { timezone_id: first.id },
+      later: { timezone_id: later.id },
+      event: IdentityAuditEvents.PROFILE_TIMEZONE_CHANGED,
+    };
+  }
+
+  it.each(['details', 'country', 'timezone'] as const)(
+    'replays %s updates without undoing a newer setting or duplicating audits',
+    async (kind) => {
+      const auth = await authenticated();
+      const mutation = await setting(kind, auth.user);
+      const users = suite.dataSource.getRepository(UserEntity);
+      const send = (key: string, body: object) =>
+        auth.agent[mutation.method](`${ACCOUNT}/profile${mutation.suffix}`)
+          .set(auth.headers)
+          .set('Idempotency-Key', key)
+          .send(body);
+      const original = await send('setting-first', mutation.first).expect(200);
+      await send('setting-later', mutation.later).expect(200);
+      const latest = profileState(
+        await users.findOneByOrFail({ id: auth.user.id }),
+      );
+
+      expect(
+        (await send('setting-first', mutation.first).expect(200)).body,
+      ).toEqual(original.body);
+      await send('setting-first', mutation.later).expect(409);
+      expect(
+        profileState(await users.findOneByOrFail({ id: auth.user.id })),
+      ).toEqual(latest);
+      const events = await suite.dataSource
+        .getRepository(AuditEventEntity)
+        .findBy({ event: mutation.event, actor_id: auth.user.id });
+
+      expect(events).toHaveLength(2);
+      expect(events.map((event) => event.idempotency_key).sort()).toEqual([
+        'setting-first',
+        'setting-later',
+      ]);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(2);
+    },
+  );
+
+  it.each(['details', 'country', 'timezone'] as const)(
+    'rechecks permissions before replaying a cached %s update',
+    async (kind) => {
+      const auth = await authenticated();
+      const mutation = await setting(kind, auth.user);
+      const send = () =>
+        auth.agent[mutation.method](`${ACCOUNT}/profile${mutation.suffix}`)
+          .set(auth.headers)
+          .set('Idempotency-Key', 'permission-retry')
+          .send(mutation.first);
+
+      await send().expect(200);
+      const current = await suite.dataSource
+        .getRepository(UserEntity)
+        .findOneByOrFail({ id: auth.user.id });
+      await suite.dataSource
+        .createQueryBuilder()
+        .relation(UserEntity, 'roles')
+        .of(current.id)
+        .remove(current.roles!.map((role) => role.id));
+      await send().expect(403);
+
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(1);
+      expect(
+        await suite.dataSource
+          .getRepository(AuditEventEntity)
+          .countBy({ event: mutation.event, actor_id: auth.user.id }),
+      ).toBe(1);
+    },
+  );
+
+  it('checks account-update permission for phone writes and cached phone replay', async () => {
+    const auth = await authenticated();
+    const country = await suite.dataSource
+      .getRepository(CountryEntity)
+      .findOneByOrFail({ key: 'canada' });
+    const body = {
+      phone_country_id: country.id,
+      phone_calling_code: '+1',
+      phone_national_number: '4165551234',
+      phone_e164: '+14165551234',
+    };
+    const send = () =>
+      auth.agent
+        .post(`${ACCOUNT}/profile/phone`)
+        .set(auth.headers)
+        .set('Idempotency-Key', 'phone-permission')
+        .send(body);
+
+    await send().expect(201);
+    const current = await suite.dataSource
+      .getRepository(UserEntity)
+      .findOneByOrFail({ id: auth.user.id });
+    await suite.dataSource
+      .createQueryBuilder()
+      .relation(UserEntity, 'roles')
+      .of(current.id)
+      .remove(current.roles!.map((role) => role.id));
+    await send().expect(403);
+    await auth.agent
+      .delete(`${ACCOUNT}/profile/phone`)
+      .set(auth.headers)
+      .expect(403);
+
+    expect(await suite.dataSource.getRepository(UserPhoneEntity).count()).toBe(
+      1,
+    );
+    expect(
+      await suite.dataSource.getRepository(IdempotencyEntity).count(),
+    ).toBe(1);
+  });
+
+  it.each(
+    (['details', 'country', 'timezone'] as const).flatMap((kind) =>
+      [false, true].map((keyed) => [kind, keyed] as const),
+    ),
+  )(
+    'rolls back %s reference changes with failed audits and permits retry (keyed=%s)',
+    async (kind, keyed) => {
+      const auth = await authenticated();
+      const mutation = await setting(kind, auth.user);
+      const users = suite.dataSource.getRepository(UserEntity);
+      const before = profileState(
+        await users.findOneByOrFail({ id: auth.user.id }),
+      );
+      const audit = app.get(AuditService);
+      const failure = jest
+        .spyOn(audit, 'record')
+        .mockRejectedValueOnce(new Error('injected audit failure'));
+      const send = () => {
+        const pending = auth.agent[mutation.method](
+          `${ACCOUNT}/profile${mutation.suffix}`,
+        ).set(auth.headers);
+
+        if (keyed) pending.set('Idempotency-Key', 'setting-retry');
+
+        return pending.send(mutation.first);
+      };
+
+      await send().expect(500);
+      failure.mockRestore();
+      expect(
+        profileState(await users.findOneByOrFail({ id: auth.user.id })),
+      ).toEqual(before);
+      expect(
+        await suite.dataSource
+          .getRepository(AuditEventEntity)
+          .countBy({ event: mutation.event, actor_id: auth.user.id }),
+      ).toBe(0);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(0);
+
+      await send().expect(200);
+      expect(
+        profileState(await users.findOneByOrFail({ id: auth.user.id })),
+      ).not.toEqual(before);
+      expect(
+        await suite.dataSource
+          .getRepository(AuditEventEntity)
+          .countBy({ event: mutation.event, actor_id: auth.user.id }),
+      ).toBe(1);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(keyed ? 1 : 0);
+    },
+  );
+
+  it.each(['America/Toronto', 'not-an-id', ''])(
+    'rejects malformed timezone IDs without a mutation or replay claim: %s',
+    async (timezone_id) => {
+      const auth = await authenticated();
+      const users = suite.dataSource.getRepository(UserEntity);
+      const before = profileState(
+        await users.findOneByOrFail({ id: auth.user.id }),
+      );
+
+      await auth.agent
+        .put(`${ACCOUNT}/profile/timezone`)
+        .set(auth.headers)
+        .set('Idempotency-Key', 'invalid-timezone')
+        .send({ timezone_id })
+        .expect(422);
+
+      expect(
+        profileState(await users.findOneByOrFail({ id: auth.user.id })),
+      ).toEqual(before);
+      expect(
+        await suite.dataSource.getRepository(IdempotencyEntity).count(),
+      ).toBe(0);
+      expect(
+        await suite.dataSource.getRepository(AuditEventEntity).countBy({
+          actor_id: auth.user.id,
+          event: IdentityAuditEvents.PROFILE_TIMEZONE_CHANGED,
+        }),
+      ).toBe(0);
+    },
+  );
 
   it('reads the authenticated profile and updates editable fields', async () => {
     const auth = await authenticated();

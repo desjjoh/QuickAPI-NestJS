@@ -1,3 +1,4 @@
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 import {
   Body,
   Delete,
@@ -113,6 +114,7 @@ describe('idempotency HTTP and multipart integration', () => {
       providers: [
         ActorGuard,
         IdempotencyInterceptor,
+        { provide: RequestTransactionService, useValue: store.transactions },
         {
           provide: IdempotencyService,
           useValue: new IdempotencyService(store.repository),

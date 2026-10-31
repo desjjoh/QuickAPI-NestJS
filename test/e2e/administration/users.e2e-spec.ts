@@ -1,3 +1,4 @@
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 import type { INestApplication } from '@nestjs/common';
 import { getOptionsToken } from '@nestjs/throttler';
 import request from 'supertest';
@@ -1039,6 +1040,7 @@ describe('user administration authorization and lifecycle', () => {
       .getRepository(AccountStatusEntity)
       .findOneByOrFail({ key: 'disabled' });
     const service = app.get(UserAdminService);
+    const transactions = app.get(RequestTransactionService);
     const context = app.get(RequestContext);
     const invoke = async () => {
       const currentVersion = (
@@ -1053,11 +1055,13 @@ describe('user administration authorization and lifecycle', () => {
           source: AuditSource.SERVICE,
         },
         () =>
-          service.updateUser(target.id, {
-            expected_version: currentVersion,
-            status_id: disabled.id,
-            reason_code: 'policy_enforcement',
-          }),
+          transactions.run(() =>
+            service.updateUser(target.id, {
+              expected_version: currentVersion,
+              status_id: disabled.id,
+              reason_code: 'policy_enforcement',
+            }),
+          ),
       );
     };
     await invoke();

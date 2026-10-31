@@ -6,6 +6,7 @@ import {
   IDEMPOTENCY_SCOPE,
 } from '../interceptors/idempotency.interceptor';
 import type { IdempotencyCallerScope } from '@/modules/system/idempotency/types/idempotency.types';
+import { Transactional } from './transactional.decorator';
 
 /** Apply above multipart interceptors so parsing runs before fingerprinting. */
 export function Idempotent(
@@ -15,6 +16,7 @@ export function Idempotent(
   const scope = options.scope ?? 'user';
 
   return applyDecorators(
+    Transactional(),
     SetMetadata(IDEMPOTENCY_OPERATION, operation),
     SetMetadata(IDEMPOTENCY_SCOPE, scope),
     UseInterceptors(IdempotencyInterceptor),

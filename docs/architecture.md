@@ -53,12 +53,28 @@ Application context allows opted-in services to join the request transaction. Re
 
 Success audit events must commit with the mutation. Idempotency records must commit with the protected operation. Security-operation handling stages cookies until commit; OTP failure accounting deliberately persists outside the rolled-back request transaction.
 
+HTTP mutation boundaries belong to route policies: `@Transactional()` for ordinary mutations, `@Idempotent(...)` for transactional mutations with optional replay, and `@SecurityOperation()` for credential/challenge/cookie flows. `TransactionsModule` supplies the shared request transaction entry point. Keyed requests use the idempotency engine's locked transaction; unkeyed requests use the same shared lifecycle without a replay claim. Combining `@Transactional()` with a specialized policy delegates to that policy regardless of decorator order, rather than opening competing transactions.
+
+API orchestration that previously opened its own transaction now uses `requireApplicationTransaction()` to obtain the active manager and lifecycle, failing before writes when no live boundary exists. Mutations and audits use that manager, including profile reference validation. Domain methods join the active context and retain explicit transaction entry points for workers, commands, and other non-HTTP callers. Ordinary reads are not automatically transactional; existing security-controller policies, including session reads, retain their existing behavior.
+
+Route mutation policy coverage is checked against the mounted v1 route tree, including class-level security policies. The inventory also prevents mixing credential security with response replay and checks consistent profile-update permissions.
+
+| Route family                                                | Transaction and replay policy                                                                                    |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Profile details, country, timezone, avatar, phone, address  | User-scoped `@Idempotent`; one transaction with or without a key                                                 |
+| Administrator user update/deletion                          | User-scoped `@Idempotent`, retaining expected-version checks                                                     |
+| Sign-in, refresh, sign-out, registration, password reset    | `@SecurityOperation`; no credential/challenge replay                                                             |
+| Account credentials, MFA, self-deletion, session revocation | `@SecurityOperation`; these flows may issue/clear cookies, consume challenges, or revoke the caller's own access |
+| Library, audit, and ordinary account reads                  | No automatic write transaction; existing security-controller session reads retain their declared policy          |
+
+Identity writes, audits, email intents, and cross-repository reference checks use the request manager. Media and audit query services also resolve default reads through the application context, so they can see the transaction's uncommitted state without acquiring an unrelated connection. Failed OTP/registration-attempt accounting runs independently after the request transaction releases its connection. Upload reservations and active-PUT ownership use their deliberate independent pool/transactions for crash reconciliation. Those exceptions must not be folded into the request rollback boundary.
+
 Remote storage/email cannot participate in MySQL rollback. Durable SQL intents and independently committed upload reservations bridge that boundary. Queue delivery is at least once, and worker reference checks protect current data. See [reliability contracts](reliability.md) before changing these paths.
 
 ## Adding a capability
 
 1. Define the audience's permissions and outbound contract.
-2. Add focused repository reads and service-owned mutations.
+2. Add focused repository reads and service-owned mutations, declaring the HTTP transaction policy on each mutation route.
 3. Keep transaction, audit, storage, and delivery effects consistent.
 4. Explicitly decide version and replay behavior.
 5. Add allow/deny, rollback, retry, and concurrency tests.

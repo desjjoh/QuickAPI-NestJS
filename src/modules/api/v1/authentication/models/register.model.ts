@@ -103,9 +103,9 @@ export class RegisterDto {
   public readonly country_id!: string;
 
   @ApiProperty({
-    example: 'America/Toronto',
+    example: 'SUwDyXR7iSBnyWmr',
     description:
-      'Stable IANA time zone key selected from the configured time zone reference data.',
+      'The database ID of the selected time zone returned by the public library endpoint.',
     maxLength: 64,
   })
   @IsString()

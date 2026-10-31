@@ -1,3 +1,4 @@
+import { requireApplicationTransaction } from '@/common/helpers/transaction.helper';
 import { Response } from 'express';
 
 import {
@@ -70,43 +71,42 @@ export class MeApiService {
   ): Promise<void> {
     const userId = user.id;
 
-    await this.userSvc.transaction(async (manager, lifecycle) => {
-      const current = await manager.findOneOrFail(UserEntity, {
-        where: { id: userId },
-        lock: { mode: 'pessimistic_write' },
-      });
-
-      await this.credentials.validateUser(
-        current.identity.email,
-        dto.password,
-        manager,
-      );
-      const before = identityUserSnapshot(current);
-
-      await this.lifecycle.deleteUser(current, manager, lifecycle);
-      const after = await manager.findOneOrFail(UserEntity, {
-        where: { id: userId },
-      });
-
-      await this.auditSvc.record(
-        {
-          event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
-          domain: AuditEventDomain.IDENTITY,
-          actorType: AuditActorType.USER,
-          actorId: userId,
-          subjectType: AuditSubjectType.USER,
-          subjectId: userId,
-          resourceType: AuditResourceType.IDENTITY_USER,
-          resourceId: userId,
-          source: AuditSource.HTTP,
-          metadata: {},
-          before,
-          after: identityUserSnapshot(after),
-          includeSnapshotContext: true,
-        },
-        manager,
-      );
+    const { manager, lifecycle } = requireApplicationTransaction();
+    const current = await manager.findOneOrFail(UserEntity, {
+      where: { id: userId },
+      lock: { mode: 'pessimistic_write' },
     });
+
+    await this.credentials.validateUser(
+      current.identity.email,
+      dto.password,
+      manager,
+    );
+    const before = identityUserSnapshot(current);
+
+    await this.lifecycle.deleteUser(current, manager, lifecycle);
+    const after = await manager.findOneOrFail(UserEntity, {
+      where: { id: userId },
+    });
+
+    await this.auditSvc.record(
+      {
+        event: AUDIT_EVENT_MATRIX[AuditEventDomain.IDENTITY].ACCOUNT_DELETED,
+        domain: AuditEventDomain.IDENTITY,
+        actorType: AuditActorType.USER,
+        actorId: userId,
+        subjectType: AuditSubjectType.USER,
+        subjectId: userId,
+        resourceType: AuditResourceType.IDENTITY_USER,
+        resourceId: userId,
+        source: AuditSource.HTTP,
+        metadata: {},
+        before,
+        after: identityUserSnapshot(after),
+        includeSnapshotContext: true,
+      },
+      manager,
+    );
 
     res.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }

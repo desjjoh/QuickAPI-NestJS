@@ -1,3 +1,4 @@
+import { TransactionsModule } from '@/modules/system/transactions/transactions.module';
 import { IdentityModule } from '@/modules/domain/identity/identity.module';
 import { TokenModule } from '@/modules/system/tokens/token.module';
 import { Module } from '@nestjs/common';
@@ -17,6 +18,7 @@ import { SecurityTransactionInterceptor } from '@/common/interceptors/security-t
 
 @Module({
   imports: [
+    TransactionsModule,
     IdentityModule,
     TokenModule,
     LibraryModule,

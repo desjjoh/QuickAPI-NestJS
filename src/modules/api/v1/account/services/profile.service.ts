@@ -1,3 +1,4 @@
+import { requireApplicationTransaction } from '@/common/helpers/transaction.helper';
 import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
 import { avatarProcessingPolicy } from '@/modules/domain/media/policies/avatar-processing.policy';
 import { imageUploadPolicy } from '@/config/image-upload.config';
@@ -59,44 +60,41 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdateProfileDto,
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(async (manager) => {
-      const current = await this.lockUser(manager, user.id);
-      const personalBefore = this.profilePersonal(current);
-      const after = await this.userSvc.updateUser(
-        current,
-        {
-          profile: {
-            name: {
-              first: dto.first_name,
-              last: dto.last_name,
-              preferred: dto.preferred_name,
-            },
-            personal: {
-              dob: dto.dob,
-              gender: { id: dto.gender_id },
-              bio: dto.bio,
-            },
+    const { manager } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const personalBefore = this.profilePersonal(current);
+    const after = await this.userSvc.updateUser(
+      current,
+      {
+        profile: {
+          name: {
+            first: dto.first_name,
+            last: dto.last_name,
+            preferred: dto.preferred_name,
+          },
+          personal: {
+            dob: dto.dob,
+            gender: { id: dto.gender_id },
+            bio: dto.bio,
           },
         },
-        {},
-        manager,
-      );
+      },
+      {},
+      manager,
+    );
 
-      await this.record(
-        manager,
-        IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
-        AuditResourceType.IDENTITY_PROFILE,
-        current.profile.id,
-        personalBefore,
-        this.profilePersonal(after),
-        user.id,
-        false,
-      );
+    await this.record(
+      manager,
+      IdentityAuditEvents.PROFILE_PERSONAL_INFORMATION_CHANGED,
+      AuditResourceType.IDENTITY_PROFILE,
+      current.profile.id,
+      personalBefore,
+      this.profilePersonal(after),
+      user.id,
+      false,
+    );
 
-      return after;
-    });
-
-    return new UserDto(updated, session);
+    return new UserDto(after, session);
   }
 
   public async updateCountry(
@@ -132,82 +130,73 @@ export class ProfileApiService {
     session: UserSessionEntity,
     file: Express.Multer.File,
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(
-      async (manager, lifecycle) => {
-        const current = await this.lockUser(manager, user.id);
-        const existing = current.profile.media.avatar ?? null;
-        const metadata: CreateImageInput = {
-          file,
-          alt_text: `Profile avatar for user id#${user.id}`,
-          folder: 'users/avatars',
-          processing: avatarProcessingPolicy,
-          maxBytes: imageUploadPolicy.avatarMaxBytes,
-        };
-        const image = existing
-          ? await this.imgSvc.update(
-              { ...metadata, image: existing },
-              manager,
-              lifecycle,
-            )
-          : await this.imgSvc.create(metadata, manager, lifecycle);
-        const after = await this.userSvc.updateUser(
-          current,
-          {
-            profile: { media: { avatar: { id: image.id } } },
-          },
-          {},
+    const { manager, lifecycle } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const existing = current.profile.media.avatar ?? null;
+    const metadata: CreateImageInput = {
+      file,
+      alt_text: `Profile avatar for user id#${user.id}`,
+      folder: 'users/avatars',
+      processing: avatarProcessingPolicy,
+      maxBytes: imageUploadPolicy.avatarMaxBytes,
+    };
+    const image = existing
+      ? await this.imgSvc.update(
+          { ...metadata, image: existing },
           manager,
-        );
-
-        await this.record(
-          manager,
-          existing
-            ? IdentityAuditEvents.PROFILE_AVATAR_REPLACED
-            : IdentityAuditEvents.PROFILE_AVATAR_ASSIGNED,
-          AuditResourceType.IDENTITY_IMAGE,
-          image.id,
-          this.imageDocument(existing),
-          this.imageDocument(image),
-          user.id,
-          true,
-        );
-
-        return after;
+          lifecycle,
+        )
+      : await this.imgSvc.create(metadata, manager, lifecycle);
+    const after = await this.userSvc.updateUser(
+      current,
+      {
+        profile: { media: { avatar: { id: image.id } } },
       },
+      {},
+      manager,
     );
 
-    return new UserDto(updated, session);
+    await this.record(
+      manager,
+      existing
+        ? IdentityAuditEvents.PROFILE_AVATAR_REPLACED
+        : IdentityAuditEvents.PROFILE_AVATAR_ASSIGNED,
+      AuditResourceType.IDENTITY_IMAGE,
+      image.id,
+      this.imageDocument(existing),
+      this.imageDocument(image),
+      user.id,
+      true,
+    );
+
+    return new UserDto(after, session);
   }
 
   public async removeAvatar(
     user: UserEntity,
     session: UserSessionEntity,
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(
-      async (manager, lifecycle) => {
-        const current = await this.lockUser(manager, user.id);
-        const avatar = current.profile.media.avatar;
+    const { manager, lifecycle } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const avatar = current.profile.media.avatar;
 
-        if (!avatar)
-          throw new BadRequestException(
-            'User does not have an avatar to remove.',
-          );
-        await this.userProfileSvc.clearAvatar(current.profile.id, manager);
-        await this.imgSvc.remove(avatar, manager, lifecycle);
-        await this.record(
-          manager,
-          IdentityAuditEvents.PROFILE_AVATAR_REMOVED,
-          AuditResourceType.IDENTITY_IMAGE,
-          avatar.id,
-          this.imageDocument(avatar),
-          null,
-          user.id,
-          true,
-        );
-
-        return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
-      },
+    if (!avatar)
+      throw new BadRequestException('User does not have an avatar to remove.');
+    await this.userProfileSvc.clearAvatar(current.profile.id, manager);
+    await this.imgSvc.remove(avatar, manager, lifecycle);
+    await this.record(
+      manager,
+      IdentityAuditEvents.PROFILE_AVATAR_REMOVED,
+      AuditResourceType.IDENTITY_IMAGE,
+      avatar.id,
+      this.imageDocument(avatar),
+      null,
+      user.id,
+      true,
     );
+    const updated = await manager.findOneOrFail(UserEntity, {
+      where: { id: user.id },
+    });
 
     return new UserDto(updated, session);
   }
@@ -217,9 +206,10 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdateAddressDto,
   ): Promise<UserDto> {
+    const { manager } = requireApplicationTransaction();
     const region: RegionEntity | null =
       await this.regionRepo.findByIdAndCountry(
-        this.regionRepo.manager,
+        manager,
         dto.region_id,
         dto.country_id,
       );
@@ -228,43 +218,40 @@ export class ProfileApiService {
       throw new BadRequestException(
         'Region must belong to the selected country.',
       );
-    const updated = await this.userSvc.transaction(async (manager) => {
-      const current = await this.lockUser(manager, user.id);
-      const address = current.profile.contact.address;
-      const payload: DeepPartial<AddressEntity> = {
-        ...(address ? { id: address.id } : {}),
-        address_line_1: dto.address_line_1,
-        address_line_2: dto.address_line_2 ?? null,
-        city: dto.city,
-        region: { id: dto.region_id },
-        postal_code: dto.postal_code,
-        country: { id: dto.country_id },
-      };
-      const after = await this.userSvc.updateUser(
-        current,
-        { profile: { contact: { address: payload } } },
-        {},
-        manager,
-      );
-      const result = after.profile.contact.address!;
 
-      await this.record(
-        manager,
-        address
-          ? IdentityAuditEvents.PROFILE_ADDRESS_UPDATED
-          : IdentityAuditEvents.PROFILE_ADDRESS_CREATED,
-        AuditResourceType.IDENTITY_ADDRESS,
-        result.id,
-        this.addressDocument(address),
-        this.addressDocument(result),
-        user.id,
-        true,
-      );
+    const current = await this.lockUser(manager, user.id);
+    const address = current.profile.contact.address;
+    const payload: DeepPartial<AddressEntity> = {
+      ...(address ? { id: address.id } : {}),
+      address_line_1: dto.address_line_1,
+      address_line_2: dto.address_line_2 ?? null,
+      city: dto.city,
+      region: { id: dto.region_id },
+      postal_code: dto.postal_code,
+      country: { id: dto.country_id },
+    };
+    const after = await this.userSvc.updateUser(
+      current,
+      { profile: { contact: { address: payload } } },
+      {},
+      manager,
+    );
+    const result = after.profile.contact.address!;
 
-      return after;
-    });
+    await this.record(
+      manager,
+      address
+        ? IdentityAuditEvents.PROFILE_ADDRESS_UPDATED
+        : IdentityAuditEvents.PROFILE_ADDRESS_CREATED,
+      AuditResourceType.IDENTITY_ADDRESS,
+      result.id,
+      this.addressDocument(address),
+      this.addressDocument(result),
+      user.id,
+      true,
+    );
 
-    return new UserDto(updated, session);
+    return new UserDto(after, session);
   }
 
   public async removeAddress(
@@ -279,36 +266,33 @@ export class ProfileApiService {
     session: UserSessionEntity,
     dto: UpdatePhoneDto,
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(async (manager) => {
-      const current = await this.lockUser(manager, user.id);
-      const phone = current.profile.contact.phone;
-      const after = await this.userSvc.updateUser(
-        current,
-        {
-          profile: { contact: { phone: this.getPhonePayload(dto, phone) } },
-        },
-        {},
-        manager,
-      );
-      const result = after.profile.contact.phone!;
+    const { manager } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const phone = current.profile.contact.phone;
+    const after = await this.userSvc.updateUser(
+      current,
+      {
+        profile: { contact: { phone: this.getPhonePayload(dto, phone) } },
+      },
+      {},
+      manager,
+    );
+    const result = after.profile.contact.phone!;
 
-      await this.record(
-        manager,
-        phone
-          ? IdentityAuditEvents.PROFILE_PHONE_UPDATED
-          : IdentityAuditEvents.PROFILE_PHONE_CREATED,
-        AuditResourceType.IDENTITY_PHONE,
-        result.id,
-        this.phoneDocument(phone),
-        this.phoneDocument(result),
-        user.id,
-        true,
-      );
+    await this.record(
+      manager,
+      phone
+        ? IdentityAuditEvents.PROFILE_PHONE_UPDATED
+        : IdentityAuditEvents.PROFILE_PHONE_CREATED,
+      AuditResourceType.IDENTITY_PHONE,
+      result.id,
+      this.phoneDocument(phone),
+      this.phoneDocument(result),
+      user.id,
+      true,
+    );
 
-      return after;
-    });
-
-    return new UserDto(updated, session);
+    return new UserDto(after, session);
   }
 
   public async removePhone(
@@ -325,33 +309,25 @@ export class ProfileApiService {
     payload: DeepPartial<UserEntity>,
     field: 'country_id' | 'timezone_id',
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(async (manager) => {
-      const current = await this.lockUser(manager, user.id);
-      const after = await this.userSvc.updateUser(
-        current,
-        payload,
-        {},
-        manager,
-      );
-      const value = (entity: UserEntity) =>
-        field === 'country_id'
-          ? entity.profile.region.country.id
-          : entity.profile.region.timezone.id;
+    const { manager } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const after = await this.userSvc.updateUser(current, payload, {}, manager);
+    const value = (entity: UserEntity) =>
+      field === 'country_id'
+        ? entity.profile.region.country.id
+        : entity.profile.region.timezone.id;
 
-      await this.record(
-        manager,
-        event,
-        AuditResourceType.IDENTITY_PROFILE,
-        current.profile.id,
-        { id: current.profile.id, [field]: value(current) },
-        { id: after.profile.id, [field]: value(after) },
-        user.id,
-      );
+    await this.record(
+      manager,
+      event,
+      AuditResourceType.IDENTITY_PROFILE,
+      current.profile.id,
+      { id: current.profile.id, [field]: value(current) },
+      { id: after.profile.id, [field]: value(after) },
+      user.id,
+    );
 
-      return after;
-    });
-
-    return new UserDto(updated, session);
+    return new UserDto(after, session);
   }
 
   private async removeContact(
@@ -359,44 +335,42 @@ export class ProfileApiService {
     session: UserSessionEntity,
     kind: 'phone' | 'address',
   ): Promise<UserDto> {
-    const updated = await this.userSvc.transaction(async (manager) => {
-      const current = await this.lockUser(manager, user.id);
-      const contact = current.profile.contact[kind];
+    const { manager } = requireApplicationTransaction();
+    const current = await this.lockUser(manager, user.id);
+    const contact = current.profile.contact[kind];
 
-      if (!contact)
-        throw new BadRequestException(
-          `User does not have an ${kind === 'address' ? 'address' : 'phone'} to remove.`,
-        );
-
-      if (kind === 'address')
-        await this.userProfileSvc.deleteAddress(
-          contact as UserAddressEntity,
-          manager,
-        );
-      else
-        await this.userProfileSvc.deletePhone(
-          contact as UserPhoneEntity,
-          manager,
-        );
-
-      await this.record(
-        manager,
-        kind === 'address'
-          ? IdentityAuditEvents.PROFILE_ADDRESS_REMOVED
-          : IdentityAuditEvents.PROFILE_PHONE_REMOVED,
-        kind === 'address'
-          ? AuditResourceType.IDENTITY_ADDRESS
-          : AuditResourceType.IDENTITY_PHONE,
-        contact.id,
-        kind === 'address'
-          ? this.addressDocument(contact as UserAddressEntity)
-          : this.phoneDocument(contact as UserPhoneEntity),
-        null,
-        user.id,
-        true,
+    if (!contact)
+      throw new BadRequestException(
+        `User does not have an ${kind === 'address' ? 'address' : 'phone'} to remove.`,
       );
-
-      return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+    if (kind === 'address')
+      await this.userProfileSvc.deleteAddress(
+        contact as UserAddressEntity,
+        manager,
+      );
+    else
+      await this.userProfileSvc.deletePhone(
+        contact as UserPhoneEntity,
+        manager,
+      );
+    await this.record(
+      manager,
+      kind === 'address'
+        ? IdentityAuditEvents.PROFILE_ADDRESS_REMOVED
+        : IdentityAuditEvents.PROFILE_PHONE_REMOVED,
+      kind === 'address'
+        ? AuditResourceType.IDENTITY_ADDRESS
+        : AuditResourceType.IDENTITY_PHONE,
+      contact.id,
+      kind === 'address'
+        ? this.addressDocument(contact as UserAddressEntity)
+        : this.phoneDocument(contact as UserPhoneEntity),
+      null,
+      user.id,
+      true,
+    );
+    const updated = await manager.findOneOrFail(UserEntity, {
+      where: { id: user.id },
     });
 
     return new UserDto(updated, session);

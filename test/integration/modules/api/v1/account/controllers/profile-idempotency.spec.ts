@@ -1,3 +1,4 @@
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 import {
   ExecutionContext,
   ForbiddenException,
@@ -27,6 +28,9 @@ describe('profile idempotency HTTP contracts', () => {
   let permitted = true;
   const store = idempotencyTestStore();
   const service = {
+    updateProfile: jest.fn(async () => ({ id: 'user', name: 'updated' })),
+    updateCountry: jest.fn(async () => ({ id: 'user', country: 'updated' })),
+    updateTimezone: jest.fn(async () => ({ id: 'user', timezone: 'updated' })),
     uploadAvatar: jest.fn(async () => ({ id: 'user', avatar: 'new-avatar' })),
     removeAvatar: jest.fn(async () => ({ id: 'user', avatar: null })),
     updatePhone: jest.fn(async () => ({ id: 'user', phone: 'new-phone' })),
@@ -43,6 +47,7 @@ describe('profile idempotency HTTP contracts', () => {
       controllers: [ProfileApiController],
       providers: [
         IdempotencyInterceptor,
+        { provide: RequestTransactionService, useValue: store.transactions },
         { provide: ProfileApiService, useValue: service },
         {
           provide: IdempotencyService,
@@ -114,6 +119,37 @@ describe('profile idempotency HTTP contracts', () => {
     postal_code: 'K1A 0B1',
     country_id: 'country',
   };
+  it.each([
+    [
+      'patch',
+      '',
+      'updateProfile',
+      {
+        first_name: 'Jane',
+        last_name: 'Tester',
+        preferred_name: null,
+        dob: '1991-02-03',
+        gender_id: 'G'.repeat(16),
+        bio: null,
+      },
+    ],
+    ['put', '/country', 'updateCountry', { country_id: 'C'.repeat(16) }],
+    ['put', '/timezone', 'updateTimezone', { timezone_id: 'T'.repeat(16) }],
+  ] as const)(
+    'replays profile setting %s /profile%s once',
+    async (method, suffix, handler, body) => {
+      const send = () =>
+        request(app.getHttpServer())
+          [method](`/profile${suffix}`)
+          .set('Authorization', 'actor')
+          .set('Idempotency-Key', 'settings-key')
+          .send(body);
+      const original = await send().expect(200);
+
+      expect((await send().expect(200)).body).toEqual(original.body);
+      expect(service[handler]).toHaveBeenCalledTimes(1);
+    },
+  );
   it.each([
     ['post', 'avatar', 'uploadAvatar', 201],
     ['delete', 'avatar', 'removeAvatar', 200],

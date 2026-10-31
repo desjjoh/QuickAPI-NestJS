@@ -65,6 +65,7 @@ export class ProfileApiController {
 
   // PATCH /
   @Patch('')
+  @Idempotent('identity.profile.personal_information.update')
   @ApiBody({
     type: UpdateProfileDto,
     description:
@@ -93,6 +94,7 @@ export class ProfileApiController {
 
   // PUT /country
   @Put('country')
+  @Idempotent('identity.profile.country.update')
   @ApiOperation({
     summary: 'Update profile country',
     description:
@@ -121,10 +123,11 @@ export class ProfileApiController {
 
   // PUT /timezone
   @Put('timezone')
+  @Idempotent('identity.profile.timezone.update')
   @ApiOperation({
     summary: 'Update profile timezone',
     description:
-      'Updates the authenticated user’s profile timezone using a time zone reference key.',
+      'Updates the authenticated user’s profile timezone using a time zone reference ID.',
   })
   @ApiBody({
     type: UpdateProfileTimezoneDto,
@@ -233,6 +236,9 @@ export class ProfileApiController {
     description:
       'Complete phone payload used to create or replace the authenticated user’s primary phone number.',
   })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
   public async updatePrimaryPhone(
     @CurrentUser() user: UserEntity,
     @CurrentSession() session: UserSessionEntity,
@@ -253,6 +259,9 @@ export class ProfileApiController {
     description: 'The primary phone number was removed successfully.',
     type: UserDto,
   })
+  @Permissions(
+    PERMISSION_MATRIX[PermissionDomain.ACCOUNT_MANAGEMENT].UPDATE_ACCOUNT,
+  )
   public async removePrimaryPhone(
     @CurrentUser() user: UserEntity,
     @CurrentSession() session: UserSessionEntity,

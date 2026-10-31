@@ -9,13 +9,15 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { firstValueFrom, from, Observable } from 'rxjs';
-import { UserService } from '@/modules/domain/identity/services/user.service';
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 /** No credential response replay; stage cookies until every security write commits. */
 @Injectable()
 export class SecurityTransactionInterceptor implements NestInterceptor {
-  public constructor(private readonly users: UserService) {}
+  public constructor(
+    private readonly transactions: RequestTransactionService,
+  ) {}
 
   public intercept(
     context: ExecutionContext,
@@ -50,7 +52,7 @@ export class SecurityTransactionInterceptor implements NestInterceptor {
         }) as Response['clearCookie'];
 
         try {
-          const result = await this.users.transaction(async (manager) => {
+          const result = await this.transactions.run(async (manager) => {
             const actor = (
               request.user as { userEntity?: UserEntity } | undefined
             )?.userEntity;
