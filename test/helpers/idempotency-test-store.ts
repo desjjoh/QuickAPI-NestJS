@@ -1,5 +1,7 @@
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
 import { IdempotencyRepository } from '@/modules/system/idempotency/repositories/idempotency.repository';
+import type { EntityManager } from 'typeorm';
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 
 /** Transaction-local writes and connection-scoped locks, without a live MySQL server. */
 export function idempotencyTestStore() {
@@ -11,6 +13,19 @@ export function idempotencyTestStore() {
   let failReleaseLock = false;
   const rootManager = {
     connection,
+    transaction: async <T>(
+      work: (manager: EntityManager) => Promise<T>,
+    ): Promise<T> => {
+      const runner = repository.createQueryRunner();
+
+      try {
+        return await (runner.manager as unknown as EntityManager).transaction(
+          work,
+        );
+      } finally {
+        await runner.release();
+      }
+    },
     delete: async () => {
       for (const [key, row] of rows)
         if (row.expires_at.getTime() <= Date.now()) rows.delete(key);
@@ -97,6 +112,9 @@ export function idempotencyTestStore() {
     },
   };
   return {
+    transactions: new RequestTransactionService(
+      rootManager as unknown as EntityManager,
+    ),
     rows,
     locks,
     runners,

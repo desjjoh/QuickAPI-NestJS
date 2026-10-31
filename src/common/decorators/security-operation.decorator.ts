@@ -1,9 +1,13 @@
-import { applyDecorators, UseInterceptors } from '@nestjs/common';
+import { applyDecorators, SetMetadata, UseInterceptors } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiExtension } from '@nestjs/swagger';
 import { SecurityTransactionInterceptor } from '../interceptors/security-transaction.interceptor';
+import { SECURITY_OPERATION } from '../constants/request-operation.constants';
+import { Transactional } from './transactional.decorator';
 
 export const SecurityOperation = () =>
   applyDecorators(
+    SetMetadata(SECURITY_OPERATION, true),
+    Transactional(),
     UseInterceptors(SecurityTransactionInterceptor),
     ApiExtension(
       'x-replay-policy',

@@ -1,3 +1,4 @@
+import * as transactionContext from '@/common/helpers/transaction.helper';
 import {
   BadRequestException,
   NotFoundException,
@@ -15,11 +16,16 @@ import { identityUserSnapshot } from '@/modules/domain/audit/snapshots/identity-
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('UserAdminService', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   const setup = () => {
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(userFixture()),
     };
     const lifecycle = new TransactionLifecycle();
+    jest
+      .spyOn(transactionContext, 'requireApplicationTransaction')
+      .mockReturnValue({ manager: manager as never, lifecycle: lifecycle });
     const audit = { record: jest.fn().mockResolvedValue({}) };
     const userSvc = {
       transaction: jest.fn(async (callback) => callback(manager, lifecycle)),
@@ -350,7 +356,7 @@ describe('UserAdminService', () => {
         reason_code: ADMINISTRATION_REASON_CODES.POLICY_ENFORCEMENT,
       }),
     ).rejects.toThrow('audit unavailable');
-    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).not.toHaveBeenCalled();
   });
 
   it('propagates repository validation errors when updating a user', async () => {

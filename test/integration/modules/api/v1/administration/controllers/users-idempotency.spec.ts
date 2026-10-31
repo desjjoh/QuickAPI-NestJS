@@ -1,3 +1,4 @@
+import { RequestTransactionService } from '@/modules/system/transactions/services/request-transaction.service';
 import {
   ExecutionContext,
   ForbiddenException,
@@ -51,6 +52,7 @@ describe('user administration idempotency HTTP contracts', () => {
       controllers: [UserAdministrationController],
       providers: [
         IdempotencyInterceptor,
+        { provide: RequestTransactionService, useValue: store.transactions },
         { provide: UserAdminService, useValue: service },
         { provide: UserActivityAdminService, useValue: {} },
         {

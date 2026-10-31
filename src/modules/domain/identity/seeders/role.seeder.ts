@@ -1,7 +1,5 @@
 import {
   AccountManagementPermissions,
-  ArticleAdministrationPermissions,
-  ArticleCreatorPermissions,
   AuditPermissions,
   SystemPermissions,
   UserAdministrationPermissions,
@@ -16,7 +14,6 @@ import {
 
 export enum ROLE_KEYS {
   USER = 'user',
-  CREATOR = 'creator',
   ADMINISTRATOR = 'administrator',
   SYSTEM_ADMINISTRATOR = 'system-administrator',
 }
@@ -39,21 +36,12 @@ export const ROLES_SEED: RoleSeed[] = [
   {
     key: ROLE_KEYS.ADMINISTRATOR,
     label: 'Administrator',
-    description:
-      'Administrative access to manage users, article publication, and retained activity.',
+    description: 'Administrative access to manage users and retained activity.',
     permissions: [
       ...Object.values(UserAdministrationPermissions),
-      ...Object.values(ArticleAdministrationPermissions),
       AuditPermissions.SEARCH_AUDIT,
       AuditPermissions.READ_AUDIT_DETAIL,
     ],
-  },
-  {
-    key: ROLE_KEYS.CREATOR,
-    label: 'Creator',
-    description:
-      'Supplemental access to create and manage articles authored by the account.',
-    permissions: [...Object.values(ArticleCreatorPermissions)],
   },
   {
     key: ROLE_KEYS.USER,

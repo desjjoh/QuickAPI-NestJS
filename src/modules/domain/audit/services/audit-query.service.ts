@@ -1,3 +1,4 @@
+import { applicationManager } from '@/common/helpers/transaction.helper';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import type { AuditActorType } from '@/config/audit-events.config';
@@ -40,7 +41,7 @@ export class AuditQueryService {
 
   public async query(
     filters: AuditQuery,
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
     options: { readonly includeActorUsers?: boolean } = {},
   ): Promise<AuditQueryResult> {
     const pageOptions = Object.assign(new PaginationOptions(), {
@@ -81,7 +82,7 @@ export class AuditQueryService {
 
   public async findById(
     id: string,
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
     options: { readonly includeActorUsers?: boolean } = {},
   ): Promise<AuditEvent | null> {
     const entity = await this.repository.findById(manager, id);
@@ -119,7 +120,7 @@ export class AuditQueryService {
     actorType: AuditActorType,
     actorId: string | null,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, actorType, actorId }, manager);
   }
@@ -128,7 +129,7 @@ export class AuditQueryService {
     subjectType: AuditSubjectType,
     subjectId: string,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, subjectType, subjectId }, manager);
   }
@@ -137,7 +138,7 @@ export class AuditQueryService {
     resourceType: AuditResourceType,
     resourceId: string,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, resourceType, resourceId }, manager);
   }
@@ -145,7 +146,7 @@ export class AuditQueryService {
   public byDomain(
     domain: string,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, domain }, manager);
   }
@@ -153,7 +154,7 @@ export class AuditQueryService {
   public byRequest(
     requestId: string,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, requestId }, manager);
   }
@@ -161,7 +162,7 @@ export class AuditQueryService {
   public bySession(
     sessionId: string,
     options: QueryOptions = {},
-    manager: EntityManager = this.repository.manager,
+    manager: EntityManager = applicationManager(this.repository.manager),
   ): Promise<AuditQueryResult> {
     return this.query({ ...options, sessionId }, manager);
   }

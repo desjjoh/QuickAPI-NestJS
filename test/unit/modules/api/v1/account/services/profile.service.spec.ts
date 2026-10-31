@@ -1,3 +1,4 @@
+import * as transactionContext from '@/common/helpers/transaction.helper';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { BadRequestException } from '@nestjs/common';
@@ -14,13 +15,35 @@ import { ProfileApiService } from '@/modules/api/v1/account/services/profile.ser
 import { TransactionLifecycle } from '@/common/helpers/transaction.helper';
 
 describe('ProfileApiService audit mutations', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   const session = sessionFixture();
+
+  it('rejects mutation calls without a route transaction before any writes', async () => {
+    const userSvc = { updateUser: jest.fn(), transaction: jest.fn() };
+    const service = new ProfileApiService(
+      userSvc as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.updateProfile(userFixture(), session, {} as never),
+    ).rejects.toThrow('active application transaction');
+    expect(userSvc.updateUser).not.toHaveBeenCalled();
+    expect(userSvc.transaction).not.toHaveBeenCalled();
+  });
 
   const setup = (current = userFixture(), after = current) => {
     const manager = {
       findOneOrFail: jest.fn().mockResolvedValue(current),
     };
     const lifecycle = new TransactionLifecycle();
+    jest
+      .spyOn(transactionContext, 'requireApplicationTransaction')
+      .mockReturnValue({ manager: manager as never, lifecycle: lifecycle });
     const userSvc = {
       transaction: jest.fn((work) => work(manager, lifecycle)),
       updateUser: jest.fn().mockResolvedValue(after),
@@ -82,7 +105,7 @@ describe('ProfileApiService audit mutations', () => {
       dob: '1991-02-03',
       gender_id: 'gender-2',
     });
-    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).not.toHaveBeenCalled();
     expect(audit.record).toHaveBeenCalledTimes(1);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({

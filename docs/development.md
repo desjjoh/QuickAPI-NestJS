@@ -46,7 +46,7 @@ intentional; old project data is not migrated. Test infrastructure belongs to
 `quickapi-nestjs-test` and never shares these data stores. Tests use the inert
 checked-in `.env.test`, not this development environment.
 
-The API never runs migrations or seeders automatically. Run `npm run db:seed` after migrations to populate required library, authorization, and article-status records. The database-only runner executes Library, Identity, then Articles in one transaction and closes its connection on success or failure. A failed run rolls back every group and returns a nonzero exit code. Group completion logs describe execution; the final committed message confirms persistence.
+The API never runs migrations or seeders automatically. Run `npm run db:seed` after migrations to populate required library and authorization records. The database-only runner executes Library, then Identity in one transaction and closes its connection on success or failure. A failed run rolls back every group and returns a nonzero exit code. Group completion logs describe execution; the final committed message confirms persistence.
 
 Seeding is repeatable: existing reference records are preserved, and the role seeder adds missing baseline permissions without removing custom assignments. Consequently, rerunning seeding can restore deliberately removed baseline permissions; review catalog changes before deployment. Serialize seed jobs per database. Seeders do not replace schema migrations or deliberate updates to existing reference labels.
 
@@ -98,3 +98,9 @@ Application and test code use TypeScript `strict` mode and reject switch fallthr
 
 [package.json](../package.json) defines available commands. Local test-infrastructure
 and E2E launchers are cross-platform Node scripts; see the [testing guide](../test/TESTING.md).
+
+## Database preparation
+
+Migration history starts with a baseline generated from the entity model, followed by forward migrations for subsequent schema changes. It is intended for a fresh database; it is not an upgrade path from the retired migration history. Do not apply it over an older populated schema or mark it as applied without verifying the schema. Reset only explicitly disposable local/test schemas before adopting this baseline.
+
+Prepare a fresh database with `npm run migration:run` followed by `npm run db:seed`. Docker Compose enforces the same migration/seed ordering before the API starts. Existing API behavior and stored reference catalogs are validated against this baseline by the E2E suite. Future schema changes require new forward migrations; do not edit the baseline after it has been deployed to a retained environment.

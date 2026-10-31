@@ -22,6 +22,19 @@ const applicationTransaction = new AsyncLocalStorage<{
 export const hasApplicationTransaction = (): boolean =>
   applicationTransaction.getStore() !== undefined;
 
+/** HTTP orchestration must consume its route boundary, never invent a fallback. */
+export function requireApplicationTransaction() {
+  assertRequestActive();
+  const transaction = applicationTransaction.getStore();
+
+  if (!transaction?.manager.queryRunner?.isTransactionActive)
+    throw new InvalidOperationError(
+      'An active application transaction is required.',
+    );
+
+  return transaction;
+}
+
 /** Defaults used by participating services resolve to the application transaction. */
 export const applicationManager = (fallback: EntityManager): EntityManager =>
   applicationTransaction.getStore()?.manager ?? fallback;

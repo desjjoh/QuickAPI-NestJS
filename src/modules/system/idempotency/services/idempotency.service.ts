@@ -17,13 +17,16 @@ import { logger } from '@/config/logger.config';
 import { withIdempotencyKey } from '@/common/store/idempotency-context.store';
 import { IdempotencyEntity } from '../entities/idempotency.entity';
 import { IdempotencyRepository } from '../repositories/idempotency.repository';
+import { idempotencyActorId } from '../helpers/idempotency-scope.helper';
+import type {
+  IdempotencyScope,
+  IdempotentResponse,
+} from '../types/idempotency.types';
 
-export type IdempotencyScope = {
-  actorId: string;
-  operation: string;
-  route: string;
-};
-export type IdempotentResponse = { status: number; body: unknown };
+export type {
+  IdempotencyScope,
+  IdempotentResponse,
+} from '../types/idempotency.types';
 
 @Injectable()
 export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
@@ -42,7 +45,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
       .set({ state: 'erased', response_body: null })
       .where("state IN ('completed', 'erased')")
       .andWhere(
-        "(actor_id = :userId OR response_identity = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.user.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.author.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.publisher.id')) = :userId)",
+        "(actor_id = :userId OR response_identity = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.user.id')) = :userId)",
         { userId },
       )
       .execute();
@@ -73,6 +76,11 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
     fingerprint: string,
     work: () => Promise<IdempotentResponse>,
   ): Promise<IdempotentResponse> {
+    const actorId = idempotencyActorId(
+      scope.callerScope ?? 'user',
+      scope.actorId,
+    );
+
     if (hasApplicationTransaction())
       throw new InvalidOperationError(
         'Idempotent request transactions cannot be nested.',
@@ -81,7 +89,8 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
       .update(
         JSON.stringify([
           this.repository.namespace,
-          scope.actorId,
+          // Null is reserved for explicit public scope; user hashes stay compatible.
+          actorId,
           scope.operation,
           scope.route,
           key,
@@ -138,7 +147,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
             await manager.delete(IdempotencyEntity, { scope_hash: scopeHash });
           await manager.insert(IdempotencyEntity, {
             scope_hash: scopeHash,
-            actor_id: scope.actorId,
+            actor_id: actorId,
             operation: scope.operation,
             route: scope.route,
             fingerprint,

@@ -15,7 +15,6 @@ import sharp from 'sharp';
 import { uploadTempRoot } from '@/config/storage.config';
 import { ImageUploadValidationPipe } from '@/common/pipes/image-upload.pipe';
 import { ImageFileInterceptor } from '@/common/interceptors/image-file.interceptor';
-import { UpdateArticleHeroDto } from '@/modules/api/v1/articles/models/update-article-hero.model';
 
 class UploadBody {
   @IsString()
@@ -25,12 +24,6 @@ class UploadBody {
 
 @Controller('upload')
 class UploadTestController {
-  @Post('accessibility')
-  @UseInterceptors(ImageFileInterceptor('image', 4096))
-  public accessibility(@Body() body: UpdateArticleHeroDto) {
-    return body;
-  }
-
   @Post()
   @UseInterceptors(ImageFileInterceptor('image', 4096))
   public upload(
@@ -92,35 +85,6 @@ describe('multipart image ownership', () => {
       .expect(201);
   });
 
-  it('accepts multipart decorative choices and keeps the flag in the validated body', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/upload/accessibility')
-      .field('expected_version', '1')
-      .field('hero_decorative', 'true')
-      .attach('image', png, 'image.png')
-      .expect(201);
-    expect(response.body.hero_decorative).toBe(true);
-  });
-
-  it.each([undefined, '', '  '])(
-    'rejects unresolved multipart alt text and cleans up: %s',
-    async (text) => {
-      const pending = request(app.getHttpServer()).post(
-        '/upload/accessibility',
-      );
-      if (text !== undefined) pending.field('hero_alt_text', text);
-      await pending.attach('image', png, 'image.png').expect(400);
-    },
-  );
-
-  it('does not mistake multipart false for a decorative choice', async () => {
-    await request(app.getHttpServer())
-      .post('/upload/accessibility')
-      .field('expected_version', '1')
-      .field('hero_decorative', 'false')
-      .attach('image', png, 'image.png')
-      .expect(400);
-  });
   it('cleans up when body validation fails', async () => {
     await request(app.getHttpServer())
       .post('/upload')

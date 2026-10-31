@@ -7,7 +7,7 @@ describe('StorageUploadService', () => {
     const storage = { putObject: jest.fn().mockResolvedValue({}) };
     const objects = {
       reserve: jest.fn().mockResolvedValue({
-        storage_key: 'heroes/unique.png',
+        storage_key: 'images/unique.png',
         filename: 'unique.png',
       }),
       upload: jest.fn(async (_key, work) => work()),
@@ -23,7 +23,7 @@ describe('StorageUploadService', () => {
   const input = {
     filename: 'unsafe.exe',
     originalName: 'photo.png',
-    folder: 'heroes',
+    folder: 'images',
     buffer: Buffer.from('image'),
     mimeType: 'image/png',
     extension: '.png',
@@ -31,12 +31,12 @@ describe('StorageUploadService', () => {
   it('reserves a unique key before uploading with an abort deadline', async () => {
     const { storage, objects, service } = setup();
     await expect(service.upload(input)).resolves.toEqual({
-      storage_key: 'heroes/unique.png',
+      storage_key: 'images/unique.png',
       filename: 'unique.png',
     });
-    expect(objects.reserve).toHaveBeenCalledWith('heroes', '.png');
+    expect(objects.reserve).toHaveBeenCalledWith('images', '.png');
     expect(storage.putObject).toHaveBeenCalledWith({
-      key: 'heroes/unique.png',
+      key: 'images/unique.png',
       body: input.buffer,
       contentType: 'image/png',
       metadata: { filename: 'unique.png', originalName: 'photo.png' },
@@ -53,7 +53,7 @@ describe('StorageUploadService', () => {
     const failed = service.upload(input);
     await expect(failed).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(failed).rejects.toThrow(STORAGE_UPLOAD_FAILURE);
-    expect(objects.abandon).toHaveBeenCalledWith('heroes/unique.png');
+    expect(objects.abandon).toHaveBeenCalledWith('images/unique.png');
   });
   it('delegates attachment to the ownership service in the caller transaction', async () => {
     const { service, objects } = setup();

@@ -1,6 +1,5 @@
 import { DataSource } from 'typeorm';
 
-import { ArticleStatusSeeder } from '@/modules/domain/articles/seeders/status.seeder';
 import { AccountStatusSeeder } from '@/modules/domain/identity/seeders/accountstatus.seeder';
 import { GenderSeeder } from '@/modules/domain/identity/seeders/gender.seeder';
 import { PermissionSeeder } from '@/modules/domain/identity/seeders/permission.seeder';
@@ -28,7 +27,6 @@ export const SEEDER_GROUPS: SeederGroup[] = [
       new AccountStatusSeeder(),
     ],
   },
-  { name: 'Articles', seeders: [new ArticleStatusSeeder()] },
 ];
 
 export async function seedDatabase(

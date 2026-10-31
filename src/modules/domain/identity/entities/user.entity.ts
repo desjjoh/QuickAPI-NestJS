@@ -1,5 +1,6 @@
 import {
   Entity,
+  Index,
   Column,
   OneToOne,
   JoinTable,
@@ -60,7 +61,7 @@ export const createUserMetadata = (
 });
 
 class Identity {
-  @Column({ type: 'varchar', length: 254, unique: true })
+  @Column({ type: 'varchar', length: 254 })
   public readonly email!: string;
 
   @Exclude()
@@ -69,6 +70,7 @@ class Identity {
 }
 
 @Entity('users')
+@Index('IDX_users_email', ['identity.email'], { unique: true })
 export class UserEntity extends BaseEntity {
   @Column({ type: 'int', unsigned: true, default: 1 })
   public readonly administration_version!: number;

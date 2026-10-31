@@ -97,13 +97,18 @@ export class UpdateProfileCountryDto {
 
 export class UpdateProfileTimezoneDto {
   @ApiProperty({
-    example: 'America/Toronto',
+    example: 'SUwDyXR7iSBnyWmr',
     description:
-      'Stable IANA time zone key selected from the configured time zone reference data.',
-    maxLength: 64,
+      'The database ID of the selected time zone returned by the public library endpoint.',
+    minLength: 16,
+    maxLength: 16,
+    pattern: '^[0-9A-Za-z]{16}$',
   })
   @IsString()
   @IsNotEmpty()
-  @MaxLength(64)
+  @Length(16, 16)
+  @Matches(/^[0-9A-Za-z]{16}$/, {
+    message: 'Timezone ID must contain only letters and numbers.',
+  })
   public readonly timezone_id!: string;
 }

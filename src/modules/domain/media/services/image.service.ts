@@ -16,6 +16,7 @@ import { omitUndefinedDeep } from '@/common/helpers/typing.helper';
 import {
   TransactionLifecycle,
   runInTransaction,
+  applicationManager,
 } from '@/common/helpers/transaction.helper';
 import { InvalidOperationError } from '@/common/errors/operation.error';
 
@@ -54,7 +55,7 @@ export class ImageService {
 
   public async findById(
     id: string,
-    manager: EntityManager = this.imgRepo.manager,
+    manager: EntityManager = applicationManager(this.imgRepo.manager),
   ): Promise<ImageEntity> {
     const image = await this.imgRepo.findById(manager, id);
 
@@ -66,7 +67,7 @@ export class ImageService {
 
   public async create(
     input: CreateImageInput,
-    manager: EntityManager = this.imgRepo.manager,
+    manager: EntityManager = applicationManager(this.imgRepo.manager),
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
     if (!lifecycle)
@@ -101,7 +102,7 @@ export class ImageService {
 
   public async update(
     input: UpdateImageInput,
-    manager: EntityManager = this.imgRepo.manager,
+    manager: EntityManager = applicationManager(this.imgRepo.manager),
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
     if (!lifecycle)
@@ -157,7 +158,7 @@ export class ImageService {
 
   public async remove(
     image: ImageEntity,
-    manager: EntityManager = this.imgRepo.manager,
+    manager: EntityManager = applicationManager(this.imgRepo.manager),
     lifecycle?: TransactionLifecycle,
   ): Promise<ImageEntity> {
     if (!lifecycle)

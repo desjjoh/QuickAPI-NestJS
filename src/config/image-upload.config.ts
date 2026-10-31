@@ -5,7 +5,6 @@ export const imageUploadPolicy = {
   requestTimeoutMs: 90_000,
   maxBytes: 10 * megabyte,
   avatarMaxBytes: megabyte,
-  heroMaxBytes: 5 * megabyte,
   maxWidth: 8192,
   maxHeight: 8192,
   maxPixels: 40_000_000,

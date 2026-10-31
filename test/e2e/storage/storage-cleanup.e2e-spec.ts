@@ -94,7 +94,7 @@ describe('durable storage cleanup (disposable MySQL and Redis)', () => {
       }),
     );
   const uploaded = async () => {
-    const reservation = await objects.reserve('heroes', '.png');
+    const reservation = await objects.reserve('images', '.png');
     await objects.upload(reservation.storage_key, async () => undefined);
     return reservation.storage_key;
   };
@@ -124,7 +124,7 @@ describe('durable storage cleanup (disposable MySQL and Redis)', () => {
     try {
       await expect(
         runInTransaction(main.manager, async () => {
-          key = (await isolated.reserve('heroes', '.png')).storage_key;
+          key = (await isolated.reserve('images', '.png')).storage_key;
           throw new Error('request failed');
         }),
       ).rejects.toThrow('request failed');
@@ -140,7 +140,7 @@ describe('durable storage cleanup (disposable MySQL and Redis)', () => {
   }, 10000);
 
   it('reconciles a PUT accepted before a crash and creates exactly one durable cleanup intent', async () => {
-    const key = (await objects.reserve('heroes', '.png')).storage_key;
+    const key = (await objects.reserve('images', '.png')).storage_key;
     const blobs = new Set<string>();
     await expect(
       objects.upload(key, async () => {
@@ -216,7 +216,7 @@ describe('durable storage cleanup (disposable MySQL and Redis)', () => {
   });
 
   it('skips a paused active PUT even when its reservation deadline has elapsed', async () => {
-    const key = (await objects.reserve('heroes', '.png')).storage_key;
+    const key = (await objects.reserve('images', '.png')).storage_key;
     await expire(key);
     const started = signal();
     const release = signal();

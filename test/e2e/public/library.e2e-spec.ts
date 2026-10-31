@@ -36,7 +36,7 @@ describe('library API after identity reference ownership split', () => {
         expect(response.body).toEqual(
           expect.arrayContaining([
             expect.objectContaining({
-              key: 'creator',
+              key: 'user',
               permissions: expect.any(Array),
             }),
           ]),

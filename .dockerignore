@@ -29,3 +29,5 @@ tmp/\*
 
 public/uploads/\*
 !public/.gitkeep
+
+archive

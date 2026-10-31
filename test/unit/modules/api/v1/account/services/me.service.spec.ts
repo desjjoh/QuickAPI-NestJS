@@ -1,3 +1,4 @@
+import * as transactionContext from '@/common/helpers/transaction.helper';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
@@ -26,6 +27,8 @@ import {
 } from '@/config/audit-events.config';
 
 describe('MeApiService', () => {
+  afterEach(() => jest.restoreAllMocks());
+
   const user = userFixture();
   const session = sessionFixture();
   const res = {
@@ -38,6 +41,12 @@ describe('MeApiService', () => {
       findOneOrFail: jest.fn().mockResolvedValue(user),
     };
     const transactionLifecycle = new TransactionLifecycle();
+    jest
+      .spyOn(transactionContext, 'requireApplicationTransaction')
+      .mockReturnValue({
+        manager: manager as never,
+        lifecycle: transactionLifecycle,
+      });
     const userSvc = {
       transaction: jest.fn((work) => work(manager, transactionLifecycle)),
       updateUser: jest.fn().mockResolvedValue(user),
@@ -133,7 +142,7 @@ describe('MeApiService', () => {
       service.deleteMe(user, { password: 'old' }, res),
     ).rejects.toThrow('audit unavailable');
 
-    expect(userSvc.transaction).toHaveBeenCalledTimes(1);
+    expect(userSvc.transaction).not.toHaveBeenCalled();
     expect(lifecycle.deleteUser).toHaveBeenCalledTimes(1);
     expect(auditSvc.record).toHaveBeenCalledWith(
       expect.objectContaining({
