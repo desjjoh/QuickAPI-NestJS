@@ -47,6 +47,19 @@ const setup = () => {
 };
 
 describe('UserRepository', () => {
+  it('uses the supplied manager for locks and explicitly requested tombstone reloads', async () => {
+    const { repository, persistence, manager } = setup();
+    await repository.findForUpdate(manager, 'user-1');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'user-1' },
+      lock: { mode: 'pessimistic_write' },
+    });
+    await repository.findIncludingDeleted(manager, 'user-1');
+    expect(persistence.findOne).toHaveBeenLastCalledWith({
+      where: { id: 'user-1' },
+    });
+  });
+
   it('builds the complete paginated user query', async () => {
     const { builder, manager, repository } = setup();
 
@@ -120,13 +133,5 @@ describe('UserRepository', () => {
     expect(persistence.findOne).toHaveBeenNthCalledWith(3, {
       where: { id: 'user-1', status: { key: Not('deleted') } },
     });
-  });
-
-  it('does not expose persistence mutation methods', () => {
-    const { repository } = setup();
-
-    expect(repository).not.toHaveProperty('create');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('remove');
   });
 });

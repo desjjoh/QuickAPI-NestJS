@@ -47,12 +47,4 @@ describe('ImageRepository behavior', () => {
       where: { storage_key: 'avatars/image.png' },
     });
   });
-
-  it('does not expose persistence mutation methods', () => {
-    const { repository } = setup();
-
-    expect(repository).not.toHaveProperty('create');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('remove');
-  });
 });

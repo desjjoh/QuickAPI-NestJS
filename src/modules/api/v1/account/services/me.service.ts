@@ -72,10 +72,7 @@ export class MeApiService {
     const userId = user.id;
 
     const { manager, lifecycle } = requireApplicationTransaction();
-    const current = await manager.findOneOrFail(UserEntity, {
-      where: { id: userId },
-      lock: { mode: 'pessimistic_write' },
-    });
+    const current = await this.userSvc.lockByIdOrFail(userId, manager);
 
     await this.credentials.validateUser(
       current.identity.email,
@@ -85,9 +82,10 @@ export class MeApiService {
     const before = identityUserSnapshot(current);
 
     await this.lifecycle.deleteUser(current, manager, lifecycle);
-    const after = await manager.findOneOrFail(UserEntity, {
-      where: { id: userId },
-    });
+    const after = await this.userSvc.findIncludingDeletedOrFail(
+      userId,
+      manager,
+    );
 
     await this.auditSvc.record(
       {

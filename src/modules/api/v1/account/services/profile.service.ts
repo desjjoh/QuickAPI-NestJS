@@ -1,12 +1,7 @@
 import { requireApplicationTransaction } from '@/common/helpers/transaction.helper';
-import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
 import { avatarProcessingPolicy } from '@/modules/domain/media/policies/avatar-processing.policy';
 import { imageUploadPolicy } from '@/config/image-upload.config';
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DeepPartial, EntityManager } from 'typeorm';
 
 import {
@@ -30,7 +25,7 @@ import { UserDto } from '@/modules/domain/identity/models/user.model';
 import { UserService } from '@/modules/domain/identity/services/user.service';
 import { UserProfileService } from '@/modules/domain/identity/services/user-profile.service';
 import { RegionEntity } from '@/modules/domain/library/entities/region.entity';
-import { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
+import { LibraryReferenceService } from '@/modules/domain/library/services/library-reference.service';
 import { ImageEntity } from '@/modules/domain/media/entities/image.entity';
 import {
   CreateImageInput,
@@ -51,7 +46,7 @@ export class ProfileApiService {
     private readonly userSvc: UserService,
     private readonly userProfileSvc: UserProfileService,
     private readonly imgSvc: ImageService,
-    private readonly regionRepo: RegionRepository,
+    private readonly library: LibraryReferenceService,
     private readonly audit: AuditService,
   ) {}
 
@@ -194,9 +189,7 @@ export class ProfileApiService {
       user.id,
       true,
     );
-    const updated = await manager.findOneOrFail(UserEntity, {
-      where: { id: user.id },
-    });
+    const updated = await this.userSvc.findByIdOrFail(user.id, manager);
 
     return new UserDto(updated, session);
   }
@@ -207,12 +200,11 @@ export class ProfileApiService {
     dto: UpdateAddressDto,
   ): Promise<UserDto> {
     const { manager } = requireApplicationTransaction();
-    const region: RegionEntity | null =
-      await this.regionRepo.findByIdAndCountry(
-        manager,
-        dto.region_id,
-        dto.country_id,
-      );
+    const region: RegionEntity | null = await this.library.findByIdAndCountry(
+      manager,
+      dto.region_id,
+      dto.country_id,
+    );
 
     if (!region)
       throw new BadRequestException(
@@ -369,9 +361,7 @@ export class ProfileApiService {
       user.id,
       true,
     );
-    const updated = await manager.findOneOrFail(UserEntity, {
-      where: { id: user.id },
-    });
+    const updated = await this.userSvc.findByIdOrFail(user.id, manager);
 
     return new UserDto(updated, session);
   }
@@ -380,14 +370,7 @@ export class ProfileApiService {
     manager: EntityManager,
     id: string,
   ): Promise<UserEntity> {
-    const user = await manager.findOneOrFail(UserEntity, {
-      where: { id },
-      lock: { mode: 'pessimistic_write' },
-    });
-
-    if (isUserDeleted(user)) throw new NotFoundException('User not found.');
-
-    return user;
+    return this.userSvc.lockByIdOrFail(id, manager);
   }
 
   private record(

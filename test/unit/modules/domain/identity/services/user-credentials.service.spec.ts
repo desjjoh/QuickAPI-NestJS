@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 jest.mock('bcrypt', () => ({ compare: jest.fn(), hash: jest.fn() }));
 
 import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
@@ -28,7 +31,10 @@ describe('UserCredentialsService', () => {
     users.findByEmail.mockResolvedValue(user);
     users.findByIdOrFail.mockResolvedValue(user);
     users.updateUser.mockResolvedValue(user);
-    service = new UserCredentialsService(users as never, repository as never);
+    service = new UserCredentialsService(
+      users as never,
+      repositoryFixture(repository, UserRepository, UserEntity) as never,
+    );
   });
 
   it('validates a password against the stored hash with the selected manager', async () => {

@@ -51,6 +51,29 @@ export class UserService {
     return user;
   }
 
+  public async findIncludingDeletedOrFail(
+    id: string,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
+  ): Promise<UserEntity> {
+    const user = await this.userRepo.findIncludingDeleted(manager, id);
+
+    if (!user) throw new NotFoundException('User not found.');
+
+    return user;
+  }
+
+  public async lockByIdOrFail(
+    id: string,
+    manager: EntityManager = applicationManager(this.userRepo.manager),
+  ): Promise<UserEntity> {
+    const user = await this.userRepo.findForUpdate(manager, id);
+
+    if (!user || isUserDeleted(user))
+      throw new NotFoundException('User not found.');
+
+    return user;
+  }
+
   public async updateUser(
     user: UserEntity,
     dto: DeepPartial<UserEntity>,
@@ -60,7 +83,7 @@ export class UserService {
     return runInTransaction(manager, async (manager) => {
       // Serialize account mutations against soft deletion; stale request objects
       // must never reintroduce credentials or personal data into a tombstone.
-      const current = await manager.findOneOrFail(UserEntity, {
+      const current = await this.userRepo.findOneOrFail(manager, {
         where: { id: user.id },
         lock: { mode: 'pessimistic_write' },
       });
@@ -85,12 +108,12 @@ export class UserService {
           })
         : dtoMetadata;
 
-      const detachedUser = manager.create(
-        UserEntity,
+      const detachedUser = this.userRepo.instantiate(
+        manager,
         current as DeepPartial<UserEntity>,
       );
-      const updatedUser = manager.merge(
-        UserEntity,
+      const updatedUser = this.userRepo.merge(
+        manager,
         detachedUser,
         omitUndefinedDeep({
           ...dto,
@@ -111,17 +134,17 @@ export class UserService {
           Reflect.deleteProperty(updatedUser, field);
       }
 
-      await manager.save(UserEntity, updatedUser);
+      await this.userRepo.save(manager, updatedUser);
       if (dto.status !== undefined || dto.roles !== undefined) {
-        await manager.increment(
-          UserEntity,
+        await this.userRepo.increment(
+          manager,
           { id: user.id },
           'administration_version',
           1,
         );
       }
 
-      return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+      return this.userRepo.findOneOrFail(manager, { where: { id: user.id } });
     });
   }
 }

@@ -14,23 +14,20 @@ export class UserProfileService {
     address: UserAddressEntity,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<void> {
-    await manager.delete(UserAddressEntity, { id: address.id });
+    await this.userRepo.deleteAddress(manager, address.id);
   }
 
   public async deletePhone(
     phone: UserPhoneEntity,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<void> {
-    await manager.delete(UserPhoneEntity, { id: phone.id });
+    await this.userRepo.deletePhone(manager, phone.id);
   }
 
   public async clearAvatar(
     profileId: string,
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<void> {
-    await manager.query(
-      'UPDATE `user_profiles` SET `avatar_id` = NULL WHERE `id` = ?',
-      [profileId],
-    );
+    await this.userRepo.clearAvatar(manager, profileId);
   }
 }

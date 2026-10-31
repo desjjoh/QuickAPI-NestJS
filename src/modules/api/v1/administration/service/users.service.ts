@@ -1,6 +1,5 @@
 import { requireApplicationTransaction } from '@/common/helpers/transaction.helper';
-import { isUserDeleted } from '@/modules/domain/identity/policies/user-deletion.policy';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 
 import {
@@ -67,7 +66,7 @@ export class UserAdminService {
     const beforeSnapshot = this.auditSnapshot(before);
 
     await this.lifecycle.deleteUser(before, manager, lifecycle);
-    const after = await manager.findOneOrFail(UserEntity, { where: { id } });
+    const after = await this.userSvc.findIncludingDeletedOrFail(id, manager);
 
     await this.audit.record(
       this.successInput(
@@ -115,14 +114,7 @@ export class UserAdminService {
     manager: EntityManager,
     id: string,
   ): Promise<UserEntity> {
-    const user = await manager.findOneOrFail(UserEntity, {
-      where: { id },
-      lock: { mode: 'pessimistic_write' },
-    });
-
-    if (isUserDeleted(user)) throw new NotFoundException('User not found.');
-
-    return user;
+    return this.userSvc.lockByIdOrFail(id, manager);
   }
 
   private successInput(

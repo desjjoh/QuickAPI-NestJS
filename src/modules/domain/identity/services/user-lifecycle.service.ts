@@ -19,16 +19,9 @@ import { UserEntity, createUserMetadata } from '../entities/user.entity';
 import { UserRepository } from '../repositories/user.repository';
 import { IdentityReferenceService } from './identity-reference.service';
 import { UserService } from './user.service';
-import { UserSessionEntity } from '../entities/session.entity';
-import { AccountTokenEntity } from '../entities/account-token.entity';
-import { UserMfaSettingsEntity } from '../entities/mfa.entity';
-import { UserPhoneEntity } from '../entities/phone.entity';
-import { UserAddressEntity } from '../entities/address.entity';
-import { RegistrationTokenEntity } from '../entities/registration-token.entity';
 import { EmailOutboxService } from '@/modules/system/email/services/email-outbox.service';
 import { IdempotencyService } from '@/modules/system/idempotency/services/idempotency.service';
 import { isUserDeleted } from '../policies/user-deletion.policy';
-import { UserProfileEntity } from '../entities/profile.entity';
 import { ImageService } from '@/modules/domain/media/services/image.service';
 
 @Injectable()
@@ -60,15 +53,15 @@ export class UserLifecycleService {
       this.references.getAccountStatus(ACCOUNT_STATUS_KEYS.ACTIVE, manager),
       this.references.getRole(ROLE_KEYS.USER, manager),
     ]);
-    const user = manager.create(UserEntity, {
+    const user = this.userRepo.instantiate(manager, {
       ...input,
       status: { id: status.id },
       roles: [role],
       metadata: createUserMetadata(),
     });
-    const created = await manager.save(UserEntity, user);
+    const created = await this.userRepo.save(manager, user);
 
-    return manager.findOneOrFail(UserEntity, { where: { id: created.id } });
+    return this.userRepo.findOneOrFail(manager, { where: { id: created.id } });
   }
 
   public async deleteUser(
@@ -83,7 +76,7 @@ export class UserLifecycleService {
           this.deleteUser(user, transactionManager, transactionLifecycle),
       );
 
-    const current = await manager.findOneOrFail(UserEntity, {
+    const current = await this.userRepo.findOneOrFail(manager, {
       where: { id: user.id },
       lock: { mode: 'pessimistic_write' },
     });
@@ -94,8 +87,8 @@ export class UserLifecycleService {
       manager,
     );
 
-    await manager.update(
-      UserEntity,
+    await this.userRepo.patch(
+      manager,
       { id: current.id },
       {
         // Random, non-deliverable address releases the original email without
@@ -109,23 +102,16 @@ export class UserLifecycleService {
         administration_version: () => '`administration_version` + 1',
       },
     );
-    await manager
-      .createQueryBuilder()
-      .relation(UserEntity, 'roles')
-      .of(current.id)
-      .remove(current.roles ?? []);
-    await manager.delete(UserSessionEntity, { user: { id: current.id } });
-    await manager.delete(AccountTokenEntity, { user: { id: current.id } });
-    await manager.delete(RegistrationTokenEntity, {
-      email: current.identity.email,
-    });
-    await manager.delete(UserMfaSettingsEntity, { user: { id: current.id } });
-    await manager.delete(UserPhoneEntity, {
-      profile: { id: current.profile.id },
-    });
-    await manager.delete(UserAddressEntity, {
-      profile: { id: current.profile.id },
-    });
+    await this.userRepo.removeRoles(manager, current.id, current.roles ?? []);
+    await this.userRepo.deleteSessions(manager, current.id);
+    await this.userRepo.deleteAccountTokens(manager, current.id);
+    await this.userRepo.deleteRegistrationTokens(
+      manager,
+      current.identity.email,
+    );
+    await this.userRepo.deleteMfaSettings(manager, current.id);
+    await this.userRepo.deletePhonesForProfile(manager, current.profile.id);
+    await this.userRepo.deleteAddressesForProfile(manager, current.profile.id);
     await this.emails.cancelForUser(
       current.id,
       current.identity.email,
@@ -135,11 +121,7 @@ export class UserLifecycleService {
     const avatar = current.profile.media.avatar;
 
     if (avatar) {
-      await manager.update(
-        UserProfileEntity,
-        { id: current.profile.id },
-        { media: { avatar: null } },
-      );
+      await this.userRepo.detachAvatar(manager, current.profile.id);
       await this.images.remove(avatar, manager, lifecycle);
     }
   }

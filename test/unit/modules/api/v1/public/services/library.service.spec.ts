@@ -1,3 +1,5 @@
+import { LibraryReferenceService } from '@/modules/domain/library/services/library-reference.service';
+import { IdentityCatalogService } from '@/modules/domain/identity/services/identity-catalog.service';
 import { LibraryService } from '@/modules/api/v1/public/services/library.service';
 
 describe('LibraryService', () => {
@@ -8,11 +10,16 @@ describe('LibraryService', () => {
   const statusRepo = { findAll: jest.fn(), manager };
   const timezoneRepo = { findAll: jest.fn(), manager };
   const service = new LibraryService(
-    countryRepo as never,
-    genderRepo as never,
-    roleRepo as never,
-    statusRepo as never,
-    timezoneRepo as never,
+    new LibraryReferenceService(
+      countryRepo as never,
+      timezoneRepo as never,
+      {} as never,
+    ),
+    new IdentityCatalogService(
+      genderRepo as never,
+      roleRepo as never,
+      statusRepo as never,
+    ),
   );
 
   beforeEach(() => jest.clearAllMocks());

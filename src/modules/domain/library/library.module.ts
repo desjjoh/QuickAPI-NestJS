@@ -10,11 +10,23 @@ import { RegionRepository } from './repositories/region.repository';
 import { TimezoneEntity } from './entities/time-zone.entity';
 import { TimezoneRepository } from './repositories/time-zone.repository';
 
+import { LibraryReferenceService } from './services/library-reference.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([CountryEntity, RegionEntity, TimezoneEntity]),
   ],
-  providers: [CountryRepository, RegionRepository, TimezoneRepository],
-  exports: [CountryRepository, RegionRepository, TimezoneRepository],
+  providers: [
+    LibraryReferenceService,
+    CountryRepository,
+    RegionRepository,
+    TimezoneRepository,
+  ],
+  exports: [
+    LibraryReferenceService,
+    CountryRepository,
+    RegionRepository,
+    TimezoneRepository,
+  ],
 })
 export class LibraryModule {}

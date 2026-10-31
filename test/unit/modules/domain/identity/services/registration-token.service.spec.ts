@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { RegistrationTokenRepository } from '@/modules/domain/identity/repositories/registration-token.repository';
+import { RegistrationTokenEntity } from '@/modules/domain/identity/entities/registration-token.entity';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { createHash } from 'crypto';
@@ -68,7 +71,13 @@ describe('RegistrationTokenService', () => {
       ...x,
     }));
     manager.update.mockResolvedValue({ affected: 1 });
-    service = new RegistrationTokenService(repo as never);
+    service = new RegistrationTokenService(
+      repositoryFixture(
+        repo,
+        RegistrationTokenRepository,
+        RegistrationTokenEntity,
+      ) as never,
+    );
   });
 
   it('revokes prior tokens and stores only a hash of a new registration token', async () => {

@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { AccountTokenRepository } from '@/modules/domain/identity/repositories/account-token.repository';
+import { AccountTokenEntity } from '@/modules/domain/identity/entities/account-token.entity';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { createHash } from 'crypto';
@@ -50,7 +53,13 @@ describe('AccountTokenService', () => {
       ...value,
     }));
     manager.update.mockResolvedValue({ affected: 1 });
-    service = new AccountTokenService(repo as never);
+    service = new AccountTokenService(
+      repositoryFixture(
+        repo,
+        AccountTokenRepository,
+        AccountTokenEntity,
+      ) as never,
+    );
   });
 
   const entity = (overrides = {}) => ({

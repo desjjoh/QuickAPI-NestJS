@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { DomainRepository } from '@/common/repositories/domain.repository';
+import { MutableDomainRepository } from '@/common/repositories/domain.repository';
 
 import { UserMfaSettingsEntity } from '../entities/mfa.entity';
 
 @Injectable()
-export class MfaSettingsRepository extends DomainRepository<UserMfaSettingsEntity> {
+export class MfaSettingsRepository extends MutableDomainRepository<UserMfaSettingsEntity> {
   public constructor(dataSource: DataSource) {
     super(dataSource.getRepository(UserMfaSettingsEntity));
   }

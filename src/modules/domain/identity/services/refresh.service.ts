@@ -42,7 +42,7 @@ export class RefreshService {
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<JWTDto> {
     if (manager.queryRunner?.isTransactionActive) {
-      const current = await manager.findOne(UserEntity, {
+      const current = await this.sessionRepo.findUser(manager, {
         where: { id: user.id },
         lock: { mode: 'pessimistic_write' },
       });
@@ -52,7 +52,7 @@ export class RefreshService {
     }
 
     if (manager.queryRunner?.isTransactionActive && existingSession?.refresh) {
-      const current = await manager.findOne(UserSessionEntity, {
+      const current = await this.sessionRepo.findOne(manager, {
         where: { id: existingSession.id, user: { id: user.id }, active: true },
         lock: { mode: 'pessimistic_write' },
       });
@@ -115,7 +115,7 @@ export class RefreshService {
     session: UserSessionEntity,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
-    await manager.update(UserSessionEntity, session.id, {
+    await this.sessionRepo.patch(manager, session.id, {
       active: false,
       refresh: null,
     });
@@ -126,12 +126,7 @@ export class RefreshService {
     res?: Response,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
-    await manager
-      .createQueryBuilder()
-      .update(UserSessionEntity)
-      .set({ active: false, refresh: null })
-      .where('userId = :userId AND active = true', { userId })
-      .execute();
+    await this.sessionRepo.revokeAll(manager, userId);
 
     res?.clearCookie(getRefreshCookieName(), getClearRefreshCookieOptions());
   }
@@ -141,27 +136,14 @@ export class RefreshService {
     currentSessionId: string,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
-    await manager
-      .createQueryBuilder()
-      .update(UserSessionEntity)
-      .set({ active: false, refresh: null })
-      .where('userId = :userId AND id != :currentSessionId AND active = true', {
-        userId,
-        currentSessionId,
-      })
-      .execute();
+    await this.sessionRepo.revokeOthers(manager, userId, currentSessionId);
   }
 
   public async incrementTokenVersion(
     userId: string,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<void> {
-    await manager
-      .createQueryBuilder()
-      .update(UserSessionEntity)
-      .set({ token_version: () => '`token_version` + 1' })
-      .where('userId = :userId AND active = true', { userId })
-      .execute();
+    await this.sessionRepo.advanceTokenVersion(manager, userId);
   }
 
   public findSessions(
@@ -209,7 +191,7 @@ export class RefreshService {
     id: string,
     manager: EntityManager = applicationManager(this.sessionRepo.manager),
   ): Promise<UserSessionEntity | null> {
-    return manager.findOne(UserSessionEntity, {
+    return this.sessionRepo.findOne(manager, {
       where: { id, user: { id: userId } },
       ...(manager.queryRunner?.isTransactionActive
         ? { lock: { mode: 'pessimistic_write' as const } }
@@ -224,7 +206,7 @@ export class RefreshService {
   ): Promise<UserSessionEntity> {
     const info = createSessionInfoFromRequest(req);
     const location = req ? await this.ipLocation.resolve(req) : null;
-    const session = manager.create(UserSessionEntity, {
+    const session = this.sessionRepo.instantiate(manager, {
       user,
       refresh: null,
       token_version: 0,
@@ -252,14 +234,14 @@ export class RefreshService {
         : {}),
     });
 
-    return manager.save(UserSessionEntity, session);
+    return this.sessionRepo.save(manager, session);
   }
 
   private rotateSession(
     session: UserSessionEntity,
     manager: EntityManager,
   ): Promise<UserSessionEntity> {
-    return manager.save(UserSessionEntity, {
+    return this.sessionRepo.save(manager, {
       ...session,
       token_version: session.token_version + 1,
     });
@@ -270,6 +252,6 @@ export class RefreshService {
     refresh: string,
     manager: EntityManager,
   ): Promise<UserSessionEntity> {
-    return manager.save(UserSessionEntity, { ...session, refresh });
+    return this.sessionRepo.save(manager, { ...session, refresh });
   }
 }

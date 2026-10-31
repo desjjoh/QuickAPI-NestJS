@@ -48,6 +48,20 @@ describe('MeApiService', () => {
         lifecycle: transactionLifecycle,
       });
     const userSvc = {
+      lockByIdOrFail: jest.fn(async (id, mgr) => {
+        const user = await mgr.findOneOrFail(Object, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (user.status?.key === 'deleted')
+          throw new (await import('@nestjs/common')).NotFoundException(
+            'User not found.',
+          );
+        return user;
+      }),
+      findIncludingDeletedOrFail: jest.fn((id, mgr) =>
+        mgr.findOneOrFail(Object, { where: { id } }),
+      ),
       transaction: jest.fn((work) => work(manager, transactionLifecycle)),
       updateUser: jest.fn().mockResolvedValue(user),
       findByIdOrFail: jest.fn().mockResolvedValue(user),

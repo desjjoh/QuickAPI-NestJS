@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { MfaSettingsRepository } from '@/modules/domain/identity/repositories/mfa-settings.repository';
+import { UserMfaSettingsEntity } from '@/modules/domain/identity/entities/mfa.entity';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { BadRequestException } from '@nestjs/common';
@@ -36,7 +39,11 @@ describe('MfaService', () => {
       expires_at: new Date(),
     });
     service = new MfaService(
-      settingsRepo as never,
+      repositoryFixture(
+        settingsRepo,
+        MfaSettingsRepository,
+        UserMfaSettingsEntity,
+      ) as never,
       tokenSvc as never,
       emailSvc as never,
     );

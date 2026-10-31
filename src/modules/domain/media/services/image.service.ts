@@ -94,10 +94,10 @@ export class ImageService {
       decorative: input.decorative ?? false,
     };
 
-    const image = manager.create(ImageEntity, payload);
-    const created = await manager.save(ImageEntity, image);
+    const image = this.imgRepo.instantiate(manager, payload);
+    const created = await this.imgRepo.save(manager, image);
 
-    return await manager.findOneByOrFail(ImageEntity, { id: created.id });
+    return await this.imgRepo.findOneByOrFail(manager, { id: created.id });
   }
 
   public async update(
@@ -140,16 +140,16 @@ export class ImageService {
       decorative: input.decorative,
     };
 
-    const detachedImage = manager.create(
-      ImageEntity,
+    const detachedImage = this.imgRepo.instantiate(
+      manager,
       input.image as DeepPartial<ImageEntity>,
     );
-    const updatedImage = manager.merge(
-      ImageEntity,
+    const updatedImage = this.imgRepo.merge(
+      manager,
       detachedImage,
       omitUndefinedDeep(payload),
     );
-    const savedImage = await manager.save(ImageEntity, updatedImage);
+    const savedImage = await this.imgRepo.save(manager, updatedImage);
 
     await this.cleanup.schedule(manager, previousStorageKey, 'image_replaced');
 
@@ -166,7 +166,7 @@ export class ImageService {
         this.remove(image, manager, lifecycle),
       );
     this.assertTransactionLifecycle(manager, lifecycle);
-    await manager.delete(ImageEntity, { id: image.id });
+    await this.imgRepo.deleteWhere(manager, { id: image.id });
     await this.cleanup.schedule(manager, image.storage_key, 'image_removed');
 
     return image;

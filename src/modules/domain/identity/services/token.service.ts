@@ -66,7 +66,7 @@ export class AccountTokenService {
     const tokenHash = hashIdentityToken(token);
     const expiresAt = new Date(Date.now() + expiresInMs);
 
-    const entity = manager.create(AccountTokenEntity, {
+    const entity = this.tokenRepo.instantiate(manager, {
       user: { id: user.id },
       type,
       token_hash: tokenHash,
@@ -78,7 +78,7 @@ export class AccountTokenService {
       metadata,
     });
 
-    const saved = await manager.save(AccountTokenEntity, entity);
+    const saved = await this.tokenRepo.save(manager, entity);
 
     return {
       id: saved.id,
@@ -129,8 +129,8 @@ export class AccountTokenService {
 
     const consumedAt = new Date();
     const metadata = consumedMetadata ?? entity.metadata;
-    const result = await manager.update(
-      AccountTokenEntity,
+    const result = await this.tokenRepo.patch(
+      manager,
       {
         id: entity.id,
         type,
@@ -187,22 +187,13 @@ export class AccountTokenService {
     }
 
     const consumedAt = new Date();
-    const result = await manager
-      .createQueryBuilder()
-      .update(AccountTokenEntity)
-      .set({ consumed_at: consumedAt })
-      .where('id = :id', { id: entity.id })
-      .andWhere('type = :type', { type })
-      .andWhere('consumed_at IS NULL')
-      .andWhere('locked_at IS NULL')
-      .andWhere('failed_attempts < :maxAttempts', {
-        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-      })
-      .andWhere('expires_at > :now', { now: consumedAt })
-      .andWhere('mfa_code_hash = :codeHash', {
-        codeHash: entity.mfa_code_hash,
-      })
-      .execute();
+    const result = await this.tokenRepo.consumeCode(
+      manager,
+      entity,
+      type,
+      consumedAt,
+      MAX_VERIFICATION_CODE_ATTEMPTS,
+    );
 
     if (result.affected !== 1)
       throw new UnauthorizedException('Invalid or expired token.');
@@ -214,29 +205,11 @@ export class AccountTokenService {
     // Security accounting must commit even when the enclosing mutation rolls back.
     await afterApplicationTransaction(() =>
       this.tokenRepo.manager.transaction(async (transactionManager) => {
-        await transactionManager
-          .createQueryBuilder()
-          .update(AccountTokenEntity)
-          .set({ failed_attempts: () => '`failed_attempts` + 1' })
-          .where('id = :id', { id })
-          .andWhere('consumed_at IS NULL')
-          .andWhere('locked_at IS NULL')
-          .andWhere('failed_attempts < :maxAttempts', {
-            maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-          })
-          .execute();
-
-        await transactionManager
-          .createQueryBuilder()
-          .update(AccountTokenEntity)
-          .set({ locked_at: () => 'CURRENT_TIMESTAMP' })
-          .where('id = :id', { id })
-          .andWhere('consumed_at IS NULL')
-          .andWhere('locked_at IS NULL')
-          .andWhere('failed_attempts >= :maxAttempts', {
-            maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-          })
-          .execute();
+        await this.tokenRepo.recordFailedAttempt(
+          transactionManager,
+          id,
+          MAX_VERIFICATION_CODE_ATTEMPTS,
+        );
       }),
     );
   }
@@ -287,8 +260,8 @@ export class AccountTokenService {
     const token = generateIdentityToken();
     const expiresAt = new Date(Date.now() + expiresInMs);
     const tokenHash = hashIdentityToken(token);
-    const result = await manager.update(
-      AccountTokenEntity,
+    const result = await this.tokenRepo.patch(
+      manager,
       {
         id: entity.id,
         consumed_at: IsNull(),
@@ -316,8 +289,8 @@ export class AccountTokenService {
     type: AccountTokenType,
     manager: EntityManager = applicationManager(this.tokenRepo.manager),
   ): Promise<void> {
-    await manager.update(
-      AccountTokenEntity,
+    await this.tokenRepo.patch(
+      manager,
       {
         user: { id: userId },
         type,

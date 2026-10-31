@@ -19,7 +19,6 @@ import {
 } from '@/config/audit-events.config';
 import { generateOperationId } from '@/common/helpers/nanoid.helper';
 import { AuditRepository } from '../repositories/audit.repository';
-import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 
 export interface RecordAuditInput {
   /** Domain which owns and defines this event. */
@@ -162,11 +161,11 @@ export class AuditService {
       actorId &&
       (actorType === AuditActorType.USER ||
         actorType === AuditActorType.ADMIN) &&
-      (await manager.exists(UserEntity, { where: { id: actorId } }))
+      (await this.repository.actorExists(manager, actorId))
         ? actorId
         : null;
 
-    const entity = manager.create(AuditEventEntity, {
+    const entity = this.repository.instantiate(manager, {
       ...data,
       event: input.event,
       actor_type: actorType,
@@ -214,7 +213,7 @@ export class AuditService {
       metadata,
     });
 
-    await manager.insert(AuditEventEntity, entity as never);
+    await this.repository.insert(manager, entity as never);
 
     return entity;
   }

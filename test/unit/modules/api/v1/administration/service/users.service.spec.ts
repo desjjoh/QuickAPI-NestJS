@@ -28,6 +28,20 @@ describe('UserAdminService', () => {
       .mockReturnValue({ manager: manager as never, lifecycle: lifecycle });
     const audit = { record: jest.fn().mockResolvedValue({}) };
     const userSvc = {
+      lockByIdOrFail: jest.fn(async (id, mgr) => {
+        const user = await mgr.findOneOrFail(Object, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (user.status?.key === 'deleted')
+          throw new (await import('@nestjs/common')).NotFoundException(
+            'User not found.',
+          );
+        return user;
+      }),
+      findIncludingDeletedOrFail: jest.fn((id, mgr) =>
+        mgr.findOneOrFail(Object, { where: { id } }),
+      ),
       transaction: jest.fn(async (callback) => callback(manager, lifecycle)),
       paginate: jest.fn(),
       findByIdOrFail: jest.fn(),

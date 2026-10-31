@@ -29,7 +29,7 @@ export class UserCredentialsService {
     let user = await this.users.findByEmail(email, manager);
 
     if (user && manager.queryRunner?.isTransactionActive) {
-      user = await manager.findOne(UserEntity, {
+      user = await this.userRepo.findOne(manager, {
         where: { id: user.id },
         lock: { mode: 'pessimistic_write' },
       });
@@ -57,7 +57,7 @@ export class UserCredentialsService {
     manager: EntityManager = applicationManager(this.userRepo.manager),
   ): Promise<UserEntity> {
     const current = manager.queryRunner?.isTransactionActive
-      ? await manager.findOneOrFail(UserEntity, {
+      ? await this.userRepo.findOneOrFail(manager, {
           where: { id: user.id },
           lock: { mode: 'pessimistic_write' },
         })

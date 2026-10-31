@@ -9,14 +9,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EntityManager, In } from 'typeorm';
+import { EntityManager } from 'typeorm';
 
 import {
   ACCOUNT_STATUS_KEYS,
   AccountStatusKey,
 } from '@/config/statuses.config';
-import { AccountStatusEntity } from '@/modules/domain/identity/entities/accountstatus.entity';
-import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 import { ROLE_KEYS } from '@/modules/domain/identity/seeders/role.seeder';
 
 import { UserEntity } from '../entities/user.entity';
@@ -90,7 +88,7 @@ export class UserAdministrationService {
       if (isUserDeleted(user)) throw new NotFoundException('User not found.');
       assertUserAdministrationVersion(user, input.expected_version);
       const status = input.status_id
-        ? await manager.findOneBy(AccountStatusEntity, { id: input.status_id })
+        ? await this.references.findStatusById(input.status_id, manager)
         : null;
 
       if (input.status_id && !status)
@@ -101,7 +99,7 @@ export class UserAdministrationService {
         );
 
       const roles = input.role_ids
-        ? await manager.findBy(RoleEntity, { id: In(input.role_ids) })
+        ? await this.references.findRolesByIds(input.role_ids, manager)
         : null;
 
       if (roles && roles.length !== new Set(input.role_ids).size)
@@ -109,8 +107,8 @@ export class UserAdministrationService {
 
       // Claim the expected revision before changing relations. A competing
       // administrator must fail without partially replacing roles or status.
-      const revision = await manager.increment(
-        UserEntity,
+      const revision = await this.userRepo.increment(
+        manager,
         {
           id: user.id,
           administration_version: input.expected_version,
@@ -123,21 +121,17 @@ export class UserAdministrationService {
         throw new ConflictException(
           'User administration state has changed. Reload the user before retrying.',
         );
-      if (status)
-        await manager
-          .createQueryBuilder()
-          .relation(UserEntity, 'status')
-          .of(user.id)
-          .set(status.id);
+      if (status) await this.userRepo.setStatus(manager, user.id, status.id);
 
       if (roles)
-        await manager
-          .createQueryBuilder()
-          .relation(UserEntity, 'roles')
-          .of(user.id)
-          .addAndRemove(roles, user.roles ?? []);
+        await this.userRepo.replaceRoles(
+          manager,
+          user.id,
+          roles,
+          user.roles ?? [],
+        );
 
-      return manager.findOneOrFail(UserEntity, { where: { id: user.id } });
+      return this.userRepo.findOneOrFail(manager, { where: { id: user.id } });
     });
   }
 }
