@@ -384,7 +384,7 @@ describe('ImageService', () => {
 
   it('persists decorative metadata and clears descriptive text on a detached replacement', async () => {
     const image = {
-      id: 'hero-1',
+      id: 'image-1',
       storage_key: 'old.png',
       alt_text: 'Old description',
       decorative: false,
@@ -393,7 +393,7 @@ describe('ImageService', () => {
     const updated = await service().update({
       image,
       file,
-      folder: 'heroes',
+      folder: 'images',
       alt_text: null,
       decorative: true,
     });
@@ -408,7 +408,7 @@ describe('ImageService', () => {
     const file = await fixture();
     await service().create({
       file,
-      folder: 'heroes',
+      folder: 'images',
       alt_text: null,
       decorative: true,
     });

@@ -15,7 +15,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { IsString } from 'class-validator';
+import { IsInt, IsString, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { mkdir, readdir } from 'node:fs/promises';
 import request from 'supertest';
 import sharp from 'sharp';
@@ -25,9 +26,17 @@ import { ImageFileInterceptor } from '@/common/interceptors/image-file.intercept
 import { IdempotencyService } from '@/modules/system/idempotency/services/idempotency.service';
 import { idempotencyTestStore } from '../../../helpers/idempotency-test-store';
 import { uploadTempRoot } from '@/config/storage.config';
-import { ArticleVersionDto } from '@/modules/domain/articles/models/article-version.model';
 import { canonicalJson } from '@/common/helpers/request-fingerprint.helper';
 import { sanitizeHeadersMiddleware } from '@/common/middleware/header-sanitization.middleware';
+
+class VersionBody {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value,
+  )
+  @IsInt()
+  @Min(1)
+  public expected_version!: number;
+}
 
 class UploadBody {
   @IsString() public title!: string;
@@ -54,7 +63,7 @@ class RetryController {
   }
   @Post('create')
   @Idempotent('create')
-  @UseInterceptors(ImageFileInterceptor('hero', 4096))
+  @UseInterceptors(ImageFileInterceptor('image', 4096))
   public create(
     @Body() body: UploadBody,
     @UploadedFile() file: Express.Multer.File,
@@ -62,31 +71,31 @@ class RetryController {
     if (this.fail) throw new Error('simulated failure');
     this.calls++;
     return {
-      id: `article-${this.calls}`,
+      id: `item-${this.calls}`,
       title: body.title,
       originalName: file.originalname,
       version: 1,
     };
   }
-  @Put(':id/hero')
+  @Put(':id/image')
   @Idempotent('replace')
-  @UseInterceptors(ImageFileInterceptor('hero', 4096))
+  @UseInterceptors(ImageFileInterceptor('image', 4096))
   public replace(
-    @Body() body: ArticleVersionDto,
+    @Body() body: VersionBody,
     @UploadedFile() file: Express.Multer.File,
   ) {
     this.calls++;
     return {
-      id: 'article-1',
+      id: 'item-1',
       version: body.expected_version + 1,
       originalName: file.originalname,
     };
   }
-  @Post(':id/publish')
-  @Idempotent('publish')
-  public publish(@Body() body: ArticleVersionDto) {
+  @Post(':id/activate')
+  @Idempotent('activate')
+  public activate(@Body() body: VersionBody) {
     this.calls++;
-    return { id: 'article-1', version: body.expected_version + 1 };
+    return { id: 'item-1', version: body.expected_version + 1 };
   }
 }
 
@@ -156,7 +165,7 @@ describe('idempotency HTTP and multipart integration', () => {
       .set('Authorization', actor)
       .set('Idempotency-Key', key)
       .field('title', body)
-      .attach('hero', bytes ?? png, 'hero.png');
+      .attach('image', bytes ?? png, 'image.png');
 
   it('parses multipart before fingerprinting and replays the original 201 without leaking retry files', async () => {
     const first = await create().expect(201);
@@ -190,21 +199,21 @@ describe('idempotency HTTP and multipart integration', () => {
     await create('key', 'Title', png, 'actor-2').expect(201);
     for (const id of ['one', 'two'])
       await request(app.getHttpServer())
-        .post(`/idempotency/${id}/publish`)
+        .post(`/idempotency/${id}/activate`)
         .set('Authorization', 'actor-1')
         .set('Idempotency-Key', 'key')
         .send({ expected_version: 1 })
         .expect(201);
     expect(controller.calls).toBe(4);
   });
-  it('replays hero replacement using the original expected_version without incrementing again', async () => {
+  it('replays image replacement using the original expected_version without incrementing again', async () => {
     const replace = () =>
       request(app.getHttpServer())
-        .put('/idempotency/one/hero')
+        .put('/idempotency/one/image')
         .set('Authorization', 'actor-1')
         .set('Idempotency-Key', 'key')
         .field('expected_version', '1')
-        .attach('hero', png, 'hero.png');
+        .attach('image', png, 'image.png');
     expect((await replace().expect(200)).body.version).toBe(2);
     expect((await replace().expect(200)).body.version).toBe(2);
     expect(controller.calls).toBe(1);
@@ -217,7 +226,7 @@ describe('idempotency HTTP and multipart integration', () => {
     await create().expect(201);
     expect(controller.calls).toBe(1);
     await request(app.getHttpServer())
-      .post('/idempotency/one/publish')
+      .post('/idempotency/one/activate')
       .set('Authorization', 'actor-1')
       .set('Idempotency-Key', 'invalid')
       .send({})
@@ -243,7 +252,7 @@ describe('idempotency HTTP and multipart integration', () => {
   it('leaves requests without a key unchanged', async () => {
     for (let count = 0; count < 2; count++)
       await request(app.getHttpServer())
-        .post('/idempotency/one/publish')
+        .post('/idempotency/one/activate')
         .set('Authorization', 'actor-1')
         .send({ expected_version: 1 })
         .expect(201);

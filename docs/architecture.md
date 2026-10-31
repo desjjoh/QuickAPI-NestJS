@@ -12,13 +12,12 @@ src/
   modules/
     api/            HTTP controllers and audience-specific orchestration
       v1/
-        articles/   Authenticated article authoring controllers/services
         administration/
         authentication/
         account/
         security/
-        public/     Library startup/reference controller and public articles
-    domain/         Articles, identity, media, audit, and library
+        public/     Library startup/reference controller
+    domain/         Identity, media, audit, and library
     system/         Storage, cleanup, email, queues, idempotency, context,
                     geolocation, database, and other infrastructure concerns
 test/
@@ -30,14 +29,14 @@ test/
 
 - **Repositories** are the domain's datasource boundary. Keep queries focused and read-only; do not add application mutations or orchestration here.
 - **Domain services** own writes, cross-repository access, and application rules. Resolve or receive the transaction manager consistently, including audit writes.
-- **Policies** own business rules such as allowed article status transitions; persistence remains in services.
+- **Policies** own business rules such as account deletion eligibility; persistence remains in services.
 - **API services/controllers** handle audience authorization, request/response models, and orchestration through domain services.
 - **System services** own queue, storage, cleanup, delivery, and reusable request infrastructure. Media imports these capabilities; it does not implement provider or queue mechanics.
 
 The standalone [image processor](image-processing.md) owns raster transforms and
 WebP encoding. Feature presets belong to their consumers; persistence, upload
 tracking, and cleanup remain outside the processor. New avatar uploads use the
-media domain's static 256×256 policy; article uploads remain unprocessed.
+media domain's static 256×256 policy.
 
 Identity capabilities are split into lifecycle, credentials, and administration services, with a shared user service where appropriate. Prefer a coherent capability over another service that duplicates persistence logic.
 
@@ -55,14 +54,6 @@ Application context allows opted-in services to join the request transaction. Re
 Success audit events must commit with the mutation. Idempotency records must commit with the protected operation. Security-operation handling stages cookies until commit; OTP failure accounting deliberately persists outside the rolled-back request transaction.
 
 Remote storage/email cannot participate in MySQL rollback. Durable SQL intents and independently committed upload reservations bridge that boundary. Queue delivery is at least once, and worker reference checks protect current data. See [reliability contracts](reliability.md) before changing these paths.
-
-## Article reads and writes
-
-Creator is a supplemental role. Site administrators currently own publication permissions; there is no separate publisher role. Permission checks and ownership/visibility remain separate concerns.
-
-Shared article query/outbound models belong to the articles domain, including minimal author display data and list representations. List queries count/page the lean article scope before loading display relations. Details use their own representation rather than widening every listing.
-
-Article lifecycle transitions go through the dedicated policy. Optimistic versions protect stale requests, while row locks serialize active lifecycle transactions. Neither request IDs nor idempotency keys replace expected versions.
 
 ## Adding a capability
 

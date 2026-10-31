@@ -32,9 +32,6 @@ import { StorageObjectEntity } from '@/modules/system/storage/entities/storage-o
 // AUDIT EVENTS
 import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 
-// ARTICLES
-import { ArticleEntity } from '@/modules/domain/articles/entities/article.entity';
-import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 import { IdempotencyEntity } from '@/modules/system/idempotency/entities/idempotency.entity';
 import { EmailIntentEntity } from '@/modules/system/email/entities/email-intent.entity';
 
@@ -81,9 +78,6 @@ const dataSourceOptions: DataSourceOptions = {
     RegistrationTokenEntity,
     // AUDIT MODULE
     AuditEventEntity,
-    // ARTICLE MODULE
-    ArticleEntity,
-    ArticleStatusEntity,
     IdempotencyEntity,
     EmailIntentEntity,
   ],

@@ -42,7 +42,7 @@ export class IdempotencyService implements OnModuleInit, OnModuleDestroy {
       .set({ state: 'erased', response_body: null })
       .where("state IN ('completed', 'erased')")
       .andWhere(
-        "(actor_id = :userId OR response_identity = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.user.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.author.id')) = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.publisher.id')) = :userId)",
+        "(actor_id = :userId OR response_identity = :userId OR JSON_UNQUOTE(JSON_EXTRACT(response_body, '$.user.id')) = :userId)",
         { userId },
       )
       .execute();

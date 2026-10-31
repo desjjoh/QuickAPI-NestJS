@@ -158,6 +158,9 @@
       "ts"
     ],
     "rootDir": ".",
+    "testPathIgnorePatterns": [
+      "<rootDir>/archive/"
+    ],
     "roots": [
       "<rootDir>/src",
       "<rootDir>/test/unit",

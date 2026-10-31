@@ -62,8 +62,7 @@ mandatory transformation, avoiding a separate full corruption-check decode.
 Request fingerprinting and the image service reuse the cached input buffer.
 The processor checks dimensions and pixel limits and rejects corrupt image data
 before storage. Only the resulting WebP is uploaded, with actual output metadata.
-Routes without processing retain the default full-validation decode, including
-article uploads. The flag must only be used when downstream processing is required.
+Routes without processing retain the default full-validation decode, for unprocessed images. The flag must only be used when downstream processing is required.
 
 ## Resource and failure policy
 
@@ -84,7 +83,7 @@ HTTP/worker error mapping, retries, transaction deadlines, and storage lifecycle
 ## Rollout boundary
 
 New avatar uploads and replacements use the policy; existing avatars remain
-untouched. Hero/article uploads remain unprocessed. No request/response shape,
+untouched. No request/response shape,
 database schema, or accepted upload format changes are required. Existing avatar
 audits, transactions, idempotency, and durable storage cleanup remain in place;
 processing itself does not emit a separate audit. Existing-image backfill is a
@@ -99,7 +98,6 @@ Media-service tests cover WebP metadata, temporary-file removal, attachment and
 database failures, and rollback compensation. Profile E2E tests exercise corrupt
 and failed processing, capacity rejection, uncertain storage PUTs, audit and
 cleanup-intent rollback, duplicate/concurrent keys, and exhausted cleanup retries.
-Article E2E coverage verifies that hero bytes and metadata remain original.
 
 Processing failures must not upload an object or alter the current avatar/audit.
 A full processor returns `503`; invalid/corrupt/unsupported images return `400`.

@@ -9,7 +9,7 @@ describe('durable request idempotency', () => {
   const scope = {
     actorId: 'actor-1',
     operation: 'create',
-    route: 'POST /articles',
+    route: 'POST /items',
   };
   let store: ReturnType<typeof idempotencyTestStore>;
   let service: IdempotencyService;
@@ -54,7 +54,7 @@ describe('durable request idempotency', () => {
 
   it('stores completion and identity and replays the original JSON response', async () => {
     const original = {
-      id: 'article-1',
+      id: 'item-1',
       version: 1,
       createdAt: new Date('2026-10-01'),
     };
@@ -68,7 +68,7 @@ describe('durable request idempotency', () => {
     expect([...store.rows.values()][0]).toEqual(
       expect.objectContaining({
         state: 'completed',
-        response_identity: 'article-1',
+        response_identity: 'item-1',
         response_status: 201,
       }),
     );
@@ -78,7 +78,7 @@ describe('durable request idempotency', () => {
   it('rejects changed payloads without executing again', async () => {
     const work = jest.fn(async () => ({
       status: 200,
-      body: { id: 'article-1' },
+      body: { id: 'item-1' },
     }));
     await service.execute(scope, 'key', 'original', work);
     await expect(
@@ -123,7 +123,7 @@ describe('durable request idempotency', () => {
     const work = jest.fn(async () => {
       started();
       await wait;
-      return { status: 201, body: { id: 'article-1' } };
+      return { status: 201, body: { id: 'item-1' } };
     });
     const first = service.execute(scope, 'key', 'fingerprint', work);
     await entered;
@@ -171,14 +171,14 @@ describe('durable request idempotency', () => {
           return undefined;
         },
       );
-      return { status: 201, body: { id: 'article-1' } };
+      return { status: 201, body: { id: 'item-1' } };
     });
     await expect(service.execute(scope, 'key', 'fp', work)).rejects.toThrow(
       'storage cleanup failed',
     );
     expect(await service.execute(scope, 'key', 'fp', work)).toEqual({
       status: 201,
-      body: { id: 'article-1' },
+      body: { id: 'item-1' },
     });
     expect(work).toHaveBeenCalledTimes(1);
   });

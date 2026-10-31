@@ -1,6 +1,6 @@
 # QuickAPI-NestJS
 
-A production-minded NestJS backend with layered domain services, account security, article publishing, and durable background work.
+A production-minded NestJS backend with layered domain services, account security and durable background work.
 
 This repository is more than a CRUD starter: it includes transaction-aware auditing, optimistic concurrency, database-backed request idempotency, and recovery paths for email and object storage. Automated checks validate these boundaries; production readiness still depends on the deployment environment and operational ownership.
 
@@ -32,32 +32,28 @@ The default local API is `http://localhost:4000`. Swagger at `/docs` is opt-in t
 
 ## Documentation
 
-| Guide                                           | Contents                                                                           |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [Development](docs/development.md)              | Setup, configuration, migrations, seeding, GeoIP, and local infrastructure         |
-| [Architecture](docs/architecture.md)            | Layer boundaries, modules, transactions, and extension rules                       |
-| [Image processing](docs/image-processing.md)    | WebP transforms, avatar policy, validation, limits, and rollout                    |
-| [API contracts](docs/api-contracts.md)          | Audience routes, article pagination/search, concurrency, idempotency, and security |
-| [Reliability and recovery](docs/reliability.md) | Durable email/storage, retries, DLQ boundaries, privacy, and recovery procedures   |
-| [Testing](test/TESTING.md)                      | Test coverage, disposable databases, PowerShell commands, and CI                   |
-| [Deployment and operations](docs/deployment.md) | Staging topology, immutable releases, diagnostics, backups, and rollback           |
-| [Technical backlog](docs/backlog.md)            | Verified gaps and intentionally deferred work                                      |
+| Guide                                           | Contents                                                                         |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| [Development](docs/development.md)              | Setup, configuration, migrations, seeding, GeoIP, and local infrastructure       |
+| [Architecture](docs/architecture.md)            | Layer boundaries, modules, transactions, and extension rules                     |
+| [Image processing](docs/image-processing.md)    | WebP transforms, avatar policy, validation, limits, and rollout                  |
+| [API contracts](docs/api-contracts.md)          | API routes, concurrency, idempotency, and security                               |
+| [Reliability and recovery](docs/reliability.md) | Durable email/storage, retries, DLQ boundaries, privacy, and recovery procedures |
+| [Testing](test/TESTING.md)                      | Test coverage, disposable databases, PowerShell commands, and CI                 |
+| [Deployment and operations](docs/deployment.md) | Staging topology, immutable releases, diagnostics, backups, and rollback         |
+| [Technical backlog](docs/backlog.md)            | Verified gaps and intentionally deferred work                                    |
 
 Configuration keys live in [.env.example](.env.example) and [.env.staging.example](.env.staging.example); validation lives in [src/config](src/config). Commands are defined in [package.json](package.json). These are the source of truth rather than a second environment-variable dump in this README.
 
 ## API overview
 
-| Audience                          | Route                     |
-| --------------------------------- | ------------------------- |
-| Public articles                   | `/api/v1/public/articles` |
-| My articles (creator permissions) | `/api/v1/articles`        |
-| Administration                    | `/api/v1/administration`  |
-| Authentication and registration   | `/api/v1/authentication`  |
-| Current account/profile/sessions  | `/api/v1/account`         |
-| Account security                  | `/api/v1/security`        |
-| Public startup/reference data     | `/api/v1/public/library`  |
-
-There are no aliases for retired article routes. See [API contracts](docs/api-contracts.md) before integrating retries, lifecycle actions, or versioned updates. Enabled Swagger provides the detailed endpoint schemas.
+| Audience                         | Route                    |
+| -------------------------------- | ------------------------ |
+| Administration                   | `/api/v1/administration` |
+| Authentication and registration  | `/api/v1/authentication` |
+| Current account/profile/sessions | `/api/v1/account`        |
+| Account security                 | `/api/v1/security`       |
+| Public startup/reference data    | `/api/v1/public/library` |
 
 ## Quality checks
 
@@ -78,3 +74,5 @@ disposable test stack, runs E2E, and cleans it up on completion.
 ## License
 
 [MIT](LICENSE).
+
+Database setup uses a single clean baseline for disposable databases. See [database preparation](docs/development.md#database-preparation).

@@ -149,6 +149,17 @@ expect_status 401 /info
 expect_status 401 /metrics --header 'X-Operations-Key: invalid-key'
 expect_status 200 /metrics --header 'X-Operations-Key: ci-operations-key-not-a-production-secret'
 
+echo "::endgroup::"
+
+echo "::group::Smoke: graceful API shutdown"
+# A baseline revert drops every application table. Complete real API cleanup
+# before testing rollback so workers cannot query a schema being dismantled.
+api_id="$("${compose[@]}" ps --quiet api)"
+docker kill --signal TERM "$api_id" >/dev/null
+timeout 25 sh -c 'while docker inspect --format="{{.State.Running}}" "$1" 2>/dev/null | grep -q true; do sleep 1; done' _ "$api_id"
+[[ "$(docker inspect --format '{{.State.ExitCode}}' "$api_id")" == 0 ]]
+echo "::endgroup::"
+
 echo "::group::Smoke: compiled migration revert / forward"
 run_migration_cli node ./node_modules/typeorm/cli.js migration:revert -d dist/database/typeorm.datasource.js
 run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/database/typeorm.datasource.js \
@@ -165,6 +176,7 @@ run_migration_cli node ./node_modules/typeorm/cli.js migration:show -d dist/data
   exit 1
 }
 echo "::endgroup::"
+run_one_shot seed
 
 # A failed one-shot migration must preserve its non-zero status. The staging
 # topology's service_completed_successfully dependency then blocks a new API
@@ -230,9 +242,3 @@ staging_api_condition="$(node -e 'const model=JSON.parse(require("fs").readFileS
   echo 'staging API is not blocked by seeding failure' >&2
   exit 1
 }
-
-api_id="$("${compose[@]}" ps --quiet api)"
-docker kill --signal TERM "$api_id" >/dev/null
-timeout 25 sh -c 'while docker inspect --format="{{.State.Running}}" "$1" 2>/dev/null | grep -q true; do sleep 1; done' _ "$api_id"
-[[ "$(docker inspect --format '{{.State.ExitCode}}' "$api_id")" == 0 ]]
-echo "::endgroup::"

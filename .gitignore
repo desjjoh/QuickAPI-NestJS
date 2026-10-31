@@ -145,3 +145,5 @@ data/geoip/
 # Generated smoke evidence can contain a rendered local deployment configuration.
 migration-artifacts/
 smoke-logs/
+# Local archived features
+/archive/

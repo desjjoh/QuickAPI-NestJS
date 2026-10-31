@@ -31,8 +31,8 @@ describe('StorageObjectService', () => {
       new TransactionLifecycle(),
       () =>
         Promise.all([
-          service.reserve('heroes', '.png'),
-          service.reserve('heroes', '.png'),
+          service.reserve('images', '.png'),
+          service.reserve('images', '.png'),
         ]),
     );
     expect(keys[0].storage_key).not.toBe(keys[1].storage_key);

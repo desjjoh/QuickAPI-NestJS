@@ -4,6 +4,8 @@
 
 The checked-in staging topology and release workflows define the deployment contract. Hosting, ingress, secrets and backup ownership remain environment-specific.
 
+The current migration chain initializes a fresh schema from a single baseline. It replaces the former development migration history and cannot be applied over an older schema. Use a new database, or explicitly reset a disposable environment; retained environments require a separately reviewed migration path.
+
 Recommended deployment contract:
 
 - Build the Docker image from the repository.

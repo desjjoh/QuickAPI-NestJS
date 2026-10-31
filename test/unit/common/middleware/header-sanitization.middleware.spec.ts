@@ -27,11 +27,11 @@ describe('sanitizeHeadersMiddleware', () => {
   describe('successful requests', () => {
     it('preserves the idempotency key for the request interceptor', () => {
       const req = createRequest({
-        headers: { 'Idempotency-Key': 'article-create-123' },
+        headers: { 'Idempotency-Key': 'item-create-123' },
       });
       const next = createNext();
       sanitizeHeadersMiddleware()(req, createResponse(), next);
-      expect(req.headers).toEqual({ 'idempotency-key': 'article-create-123' });
+      expect(req.headers).toEqual({ 'idempotency-key': 'item-create-123' });
       expect(next).toHaveBeenCalledTimes(1);
     });
 

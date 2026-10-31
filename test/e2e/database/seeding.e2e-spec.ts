@@ -5,7 +5,6 @@ import { seedDatabase } from '@/database/seeders';
 import { CountryEntity } from '@/modules/domain/library/entities/country.entity';
 import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
-import { ArticleStatusEntity } from '@/modules/domain/articles/entities/articleStatus.entity';
 import {
   initializeTestDataSource,
   closeTestDataSource,
@@ -28,7 +27,6 @@ describe('explicit database seeding', () => {
         .getRepository(RoleEntity)
         .find({ order: { key: 'ASC' } }),
       permissions: await source.getRepository(PermissionEntity).count(),
-      statuses: await source.getRepository(ArticleStatusEntity).count(),
     });
     const before = await snapshot();
     expect(before.countries).toBeGreaterThan(0);

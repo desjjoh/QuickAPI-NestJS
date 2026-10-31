@@ -25,7 +25,7 @@ The local production-image smoke test (`.github/scripts/ci-smoke.sh`) intermitte
 
 Migration, explicit seeding, repeated seeding, seed-failure exit codes, and API readiness checks passed before the timeout. A separate uninstrumented smoke run and a diagnostic run tracing Nest shutdown hooks completed successfully. The full E2E suite also passed. These passing runs do not resolve the intermittent failure, and there is no confirmed link to the seeding changes or to the separate Windows launcher termination issue.
 
-Follow up by reproducing the timeout while retaining per-hook shutdown timings, container state, and database/Redis connectivity evidence. Identify the pending operation and verify cleanup completion before changing shutdown behavior or the deadline. Keep the existing timeout and failure check intact; do not treat receipt of a shutdown signal as successful cleanup.
+Follow up by reproducing the timeout while retaining per-hook shutdown timings, container state, and database/Redis connectivity evidence. Identify the pending operation and verify cleanup completion before changing shutdown behavior or the deadline. Keep the existing timeout and failure check intact; do not treat receipt of a shutdown signal as successful cleanup. The smoke test checks shutdown before reverting the database baseline, so workers are stopped before schema teardown. That ordering change alone does not establish the cause of the earlier intermittent timeout.
 
 ## Deliberately deferred
 
@@ -33,8 +33,7 @@ Follow up by reproducing the timeout while retaining per-hook shutdown timings, 
 - Operational backlog/expiry/failure/contention checks and alert delivery. The decision was to skip new automated monitoring actions; existing logs and opt-in HTTP/Node metrics remain.
 - Standardized DLQ events, support-ticket creation/linkage, and authorized operator retry workflows. Current terminal cleanup failures cannot be revived by simply retrying a Bull job.
 - Provider/bucket-wide reconciliation for old or externally created objects outside the tracked upload registry. Current reconciliation covers tracked uploads and late writes to never-reused keys.
-- User pagination optimization. Article list hydration is lean; review user queries separately with representative data before changing them.
-- Full-text/dedicated article search once measured volume warrants it. Preserve authoritative visibility restrictions independently of the search engine.
+- User pagination optimization. Review user queries with representative data before changing them.
 - Retention/purge policy for storage tombstones and terminal failure records. Do not remove ownership fences without proving late-write/reference safety.
 
 ## Environment-owned release evidence

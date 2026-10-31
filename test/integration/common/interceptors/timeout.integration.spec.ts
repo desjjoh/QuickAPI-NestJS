@@ -38,7 +38,7 @@ describe('HTTP timeout transaction and upload lifecycle', () => {
     }
 
     @Post('upload')
-    @UseInterceptors(ImageFileInterceptor('hero', 1024))
+    @UseInterceptors(ImageFileInterceptor('image', 1024))
     public async upload(@UploadedFile() file: Express.Multer.File) {
       uploadPath = file.path;
       return this.mutate();
@@ -120,7 +120,7 @@ describe('HTTP timeout transaction and upload lifecycle', () => {
         route === 'upload'
           ? request(app.getHttpServer())
               .post('/upload')
-              .attach('hero', Buffer.from('fixture'), 'hero.png')
+              .attach('image', Buffer.from('fixture'), 'image.png')
           : request(app.getHttpServer()).get('/slow');
       await call.expect(408);
       expect(events).toEqual(['started']);

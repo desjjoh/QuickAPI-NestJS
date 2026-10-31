@@ -13,7 +13,6 @@ export const MUTABLE_TABLE_DELETE_ORDER = [
   'email_intents',
   'request_idempotency',
   'activity_audits',
-  'articles',
   'user_mfa_settings',
   'user_sessions',
   'account_tokens',
