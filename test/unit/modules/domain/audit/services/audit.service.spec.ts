@@ -1,3 +1,5 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { AuditRepository } from '@/modules/domain/audit/repositories/audit.repository';
 import {
   AuditEventDomain,
   AuditResourceType,
@@ -46,7 +48,11 @@ describe(AuditService.name, () => {
     redaction = new AuditRedactionService();
     context = new RequestContext();
     service = new AuditService(
-      { manager: repository } as never,
+      repositoryFixture(
+        { manager: repository },
+        AuditRepository,
+        AuditEventEntity,
+      ) as never,
       redaction,
       context,
     );

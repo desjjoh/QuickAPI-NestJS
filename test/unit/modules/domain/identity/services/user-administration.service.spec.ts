@@ -1,3 +1,6 @@
+import { In } from 'typeorm';
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 import {
   BadRequestException,
   ConflictException,
@@ -35,6 +38,10 @@ describe('UserAdministrationService', () => {
   const repository = { manager };
   const users = { updateUser: jest.fn() };
   const references = {
+    findStatusById: (id: string, mgr: typeof manager) =>
+      mgr.findOneBy(AccountStatusEntity, { id }),
+    findRolesByIds: (ids: string[], mgr: typeof manager) =>
+      mgr.findBy(RoleEntity, { id: In(ids) }),
     getAccountStatus: jest.fn(),
     getRole: jest.fn(),
   };
@@ -61,7 +68,7 @@ describe('UserAdministrationService', () => {
     manager.createQueryBuilder.mockReturnValue(query);
     service = new UserAdministrationService(
       users as never,
-      repository as never,
+      repositoryFixture(repository, UserRepository, UserEntity) as never,
       references as never,
       sessions as never,
     );

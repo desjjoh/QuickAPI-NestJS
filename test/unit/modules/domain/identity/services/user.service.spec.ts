@@ -1,3 +1,5 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import { NotFoundException } from '@nestjs/common';
@@ -38,6 +40,8 @@ describe('UserService', () => {
     paginate: jest.fn(),
     findByEmail: jest.fn(),
     findById: jest.fn(),
+    findForUpdate: jest.fn(),
+    findIncludingDeleted: jest.fn(),
   };
   let service: UserService;
 
@@ -55,7 +59,40 @@ describe('UserService', () => {
     repository.paginate.mockResolvedValue([[user], 1]);
     repository.findByEmail.mockResolvedValue(user);
     repository.findById.mockResolvedValue(user);
-    service = new UserService(repository as never);
+    service = new UserService(
+      repositoryFixture(repository, UserRepository, UserEntity) as never,
+    );
+  });
+
+  it('passes the explicit manager to locked and historical reads', async () => {
+    const selected = {} as never;
+    repository.findForUpdate.mockResolvedValue(user);
+    repository.findIncludingDeleted.mockResolvedValue({
+      ...user,
+      status: { key: 'deleted' },
+    });
+    await expect(service.lockByIdOrFail(user.id, selected)).resolves.toBe(user);
+    await expect(
+      service.findIncludingDeletedOrFail(user.id, selected),
+    ).resolves.toMatchObject({ status: { key: 'deleted' } });
+    expect(repository.findForUpdate).toHaveBeenCalledWith(selected, user.id);
+    expect(repository.findIncludingDeleted).toHaveBeenCalledWith(
+      selected,
+      user.id,
+    );
+  });
+
+  it('rejects missing or deleted users on normal locked reads', async () => {
+    for (const value of [null, { ...user, status: { key: 'deleted' } }]) {
+      repository.findForUpdate.mockResolvedValue(value);
+      await expect(service.lockByIdOrFail(user.id)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    }
+    repository.findIncludingDeleted.mockResolvedValue(null);
+    await expect(
+      service.findIncludingDeletedOrFail(user.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('owns the transaction boundary', async () => {

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
-import { DomainRepository } from '@/common/repositories/domain.repository';
+import { MutableDomainRepository } from '@/common/repositories/domain.repository';
 
 import { ImageEntity } from '../entities/image.entity';
 
 @Injectable()
-export class ImageRepository extends DomainRepository<ImageEntity> {
+export class ImageRepository extends MutableDomainRepository<ImageEntity> {
   public constructor(dataSource: DataSource) {
     super(dataSource.getRepository(ImageEntity));
   }

@@ -45,7 +45,7 @@ export class RegistrationTokenService {
     const tokenHash = hashIdentityToken(token);
     const expiresAt = new Date(Date.now() + expiresInMs);
 
-    const entity = manager.create(RegistrationTokenEntity, {
+    const entity = this.tokenRepo.instantiate(manager, {
       email,
       token_hash: tokenHash,
       expires_at: expiresAt,
@@ -54,7 +54,7 @@ export class RegistrationTokenService {
       metadata,
     });
 
-    const saved = await manager.save(RegistrationTokenEntity, entity);
+    const saved = await this.tokenRepo.save(manager, entity);
 
     return {
       id: saved.id,
@@ -99,8 +99,8 @@ export class RegistrationTokenService {
     const entity = await this.validateToken(tokenId, token, manager);
 
     const consumedAt = new Date();
-    const result = await manager.update(
-      RegistrationTokenEntity,
+    const result = await this.tokenRepo.patch(
+      manager,
       { id: entity.id, consumed_at: IsNull() },
       { consumed_at: consumedAt },
     );
@@ -140,19 +140,13 @@ export class RegistrationTokenService {
     }
 
     const consumedAt = new Date();
-    const result = await manager
-      .createQueryBuilder()
-      .update(RegistrationTokenEntity)
-      .set({ consumed_at: consumedAt })
-      .where('id = :id', { id: entity.id })
-      .andWhere('consumed_at IS NULL')
-      .andWhere('locked_at IS NULL')
-      .andWhere('failed_attempts < :maxAttempts', {
-        maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-      })
-      .andWhere('expires_at > :now', { now: consumedAt })
-      .andWhere('mfa_code_hash = :codeHash', { codeHash })
-      .execute();
+    const result = await this.tokenRepo.consumeCode(
+      manager,
+      entity,
+      codeHash,
+      consumedAt,
+      MAX_VERIFICATION_CODE_ATTEMPTS,
+    );
 
     if (result.affected !== 1)
       throw new UnauthorizedException('Invalid or expired challenge.');
@@ -163,22 +157,11 @@ export class RegistrationTokenService {
   private async recordFailedAttempt(id: string): Promise<void> {
     // Use an independent autocommit statement, not the failed request transaction.
     await afterApplicationTransaction(() =>
-      this.tokenRepo.manager
-        .createQueryBuilder()
-        .update(RegistrationTokenEntity)
-        .set({
-          locked_at: () =>
-            `CASE WHEN \`failed_attempts\` + 1 >= ${MAX_VERIFICATION_CODE_ATTEMPTS} THEN CURRENT_TIMESTAMP ELSE \`locked_at\` END`,
-          failed_attempts: () => '`failed_attempts` + 1',
-        })
-        .where('id = :id', { id })
-        .andWhere('consumed_at IS NULL')
-        .andWhere('locked_at IS NULL')
-        .andWhere('failed_attempts < :maxAttempts', {
-          maxAttempts: MAX_VERIFICATION_CODE_ATTEMPTS,
-        })
-        .execute()
-        .then(() => undefined),
+      this.tokenRepo.recordFailedAttempt(
+        this.tokenRepo.manager,
+        id,
+        MAX_VERIFICATION_CODE_ATTEMPTS,
+      ),
     );
   }
 
@@ -186,8 +169,8 @@ export class RegistrationTokenService {
     email: string,
     manager: EntityManager,
   ): Promise<void> {
-    await manager.update(
-      RegistrationTokenEntity,
+    await this.tokenRepo.patch(
+      manager,
       {
         email,
         consumed_at: IsNull(),

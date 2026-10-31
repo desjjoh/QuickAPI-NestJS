@@ -1,3 +1,4 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
 import { mkdtemp, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,7 +84,7 @@ describe('ImageService', () => {
   });
   const service = () =>
     new ImageService(
-      repo as unknown as ImageRepository,
+      repositoryFixture(repo, ImageRepository, ImageEntity),
       new StorageUploadService(
         storage as unknown as StorageService,
         objects as never,

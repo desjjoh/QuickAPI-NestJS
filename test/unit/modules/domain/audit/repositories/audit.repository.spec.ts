@@ -59,6 +59,15 @@ function setup(rows: AuditEventEntity[] = [], itemCount = rows.length) {
 }
 
 describe('AuditRepository', () => {
+  it('keeps audit persistence append-only', () => {
+    const repository = Object.create(
+      AuditRepository.prototype,
+    ) as AuditRepository;
+    expect(repository.insert).toEqual(expect.any(Function));
+    for (const method of ['save', 'update', 'patch', 'remove', 'deleteWhere']) {
+      expect(repository).not.toHaveProperty(method);
+    }
+  });
   it.each([
     [AuditSort.DOMAIN, 'CAST(audit.domain AS CHAR)'],
     [AuditSort.ACTOR_TYPE, 'CAST(audit.actor_type AS CHAR)'],
@@ -190,15 +199,5 @@ describe('AuditRepository', () => {
     expect(persistence.findOne).toHaveBeenCalledWith({
       where: { id: row.id },
     });
-  });
-
-  it('does not expose mutation methods', () => {
-    const { repository } = setup();
-    expect(repository).not.toHaveProperty('create');
-    expect(repository).not.toHaveProperty('save');
-    expect(repository).not.toHaveProperty('insert');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('delete');
-    expect(repository).not.toHaveProperty('remove');
   });
 });

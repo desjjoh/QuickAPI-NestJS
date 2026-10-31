@@ -1,3 +1,5 @@
+import { DeepPartial } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity.js';
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, SelectQueryBuilder } from 'typeorm';
 
@@ -108,5 +110,23 @@ export class AuditRepository extends DomainRepository<AuditEventEntity> {
       builder.andWhere('audit.occurred_at <= :occurredTo', {
         occurredTo: query.occurredTo,
       });
+  }
+
+  public actorExists(manager: EntityManager, id: string) {
+    return manager.exists(UserEntity, { where: { id } });
+  }
+
+  public instantiate(
+    manager: EntityManager,
+    payload: DeepPartial<AuditEventEntity>,
+  ) {
+    return manager.create(AuditEventEntity, payload);
+  }
+
+  public insert(
+    manager: EntityManager,
+    entity: QueryDeepPartialEntity<AuditEventEntity>,
+  ) {
+    return manager.insert(AuditEventEntity, entity);
   }
 }

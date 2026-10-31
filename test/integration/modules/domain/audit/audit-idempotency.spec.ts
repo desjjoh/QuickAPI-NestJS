@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { AuditRepository } from '@/modules/domain/audit/repositories/audit.repository';
+import { AuditEventEntity } from '@/modules/domain/audit/entities/audit-event.entity';
 import { AuditService } from '@/modules/domain/audit/services/audit.service';
 import { AuditRedactionService } from '@/modules/domain/audit/services/audit-redaction.service';
 import { RequestContext } from '@/common/store/request-context.store';
@@ -15,7 +18,11 @@ describe('audit correlation with idempotent execution', () => {
       insert: jest.fn().mockResolvedValue({}),
     };
     const audit = new AuditService(
-      { manager } as never,
+      repositoryFixture(
+        { manager },
+        AuditRepository,
+        AuditEventEntity,
+      ) as never,
       new AuditRedactionService(),
       new RequestContext(),
     );

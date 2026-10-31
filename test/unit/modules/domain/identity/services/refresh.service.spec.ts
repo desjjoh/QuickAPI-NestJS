@@ -1,3 +1,5 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { SessionRepository } from '@/modules/domain/identity/repositories/session.repository';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 jest.mock('@/modules/domain/identity/models/jwt.model', () => ({
   JWTDto: class {
@@ -127,7 +129,11 @@ describe('RefreshService', () => {
     );
     service = new RefreshService(
       tokenSvc as never,
-      sessionRepo as never,
+      repositoryFixture(
+        sessionRepo,
+        SessionRepository,
+        UserSessionEntity,
+      ) as never,
       requestContext as never,
       ipLocation as never,
     );

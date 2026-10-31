@@ -41,4 +41,12 @@ export class IdentityReferenceService {
 
     return role;
   }
+
+  public findStatusById(id: string, manager: EntityManager) {
+    return this.statusRepo.findById(manager, id);
+  }
+
+  public findRolesByIds(ids: string[], manager: EntityManager) {
+    return this.roleRepo.findByIds(manager, ids);
+  }
 }

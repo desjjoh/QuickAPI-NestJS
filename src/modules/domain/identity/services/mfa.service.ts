@@ -91,8 +91,8 @@ export class MfaService {
     if (current?.enabled)
       throw new BadRequestException('MFA is already enabled.');
 
-    await manager.save(
-      UserMfaSettingsEntity,
+    await this.settingsRepo.save(
+      manager,
       current
         ? {
             ...current,
@@ -102,7 +102,7 @@ export class MfaService {
             disabled_at: null,
             last_verified_at: now,
           }
-        : manager.create(UserMfaSettingsEntity, {
+        : this.settingsRepo.instantiate(manager, {
             user: { id: user.id },
             enabled: true,
             primary_method: MfaMethod.EMAIL_OTP,
@@ -122,7 +122,7 @@ export class MfaService {
     if (!current?.enabled)
       throw new BadRequestException('MFA is already disabled.');
 
-    await manager.save(UserMfaSettingsEntity, {
+    await this.settingsRepo.save(manager, {
       ...current,
       enabled: false,
       disabled_at: new Date(),

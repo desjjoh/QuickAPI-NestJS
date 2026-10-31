@@ -1,3 +1,5 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
 jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 
 import {
@@ -71,7 +73,7 @@ describe('UserLifecycleService', () => {
     manager.createQueryBuilder.mockReturnValue(relations);
     service = new UserLifecycleService(
       users as never,
-      repository as never,
+      repositoryFixture(repository, UserRepository, UserEntity) as never,
       references as never,
       emails as never,
       idempotency as never,

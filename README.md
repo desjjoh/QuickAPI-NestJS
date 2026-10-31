@@ -7,7 +7,7 @@ This repository is more than a CRUD starter: it includes transaction-aware audit
 ## What's included
 
 - Identity: registration, sign-in, refresh/session management, MFA, password reset, email verification, profiles, and user administration.
-- Shared reference data, permissions, and lean repositories with service-owned mutations.
+- Shared reference data, permissions, and lean repositories with service-owned mutation workflows.
 - MySQL/TypeORM migrations, Redis/BullMQ workers, email outbox, and durable storage deletion/upload tracking.
 - OpenAPI documentation, structured logging, health/readiness endpoints, opt-in metrics, and production-image CI checks.
 

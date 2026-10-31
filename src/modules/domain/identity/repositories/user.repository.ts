@@ -1,14 +1,22 @@
+import { UserProfileEntity } from '../entities/profile.entity';
+import { RoleEntity } from '../entities/role.entity';
+import { UserSessionEntity } from '../entities/session.entity';
+import { AccountTokenEntity } from '../entities/account-token.entity';
+import { RegistrationTokenEntity } from '../entities/registration-token.entity';
+import { UserMfaSettingsEntity } from '../entities/mfa.entity';
+import { UserPhoneEntity } from '../entities/phone.entity';
+import { UserAddressEntity } from '../entities/address.entity';
 import { Injectable } from '@nestjs/common';
 import { Brackets, DataSource, EntityManager, Not } from 'typeorm';
 import { ACCOUNT_STATUS_KEYS } from '@/config/statuses.config';
 
-import { DomainRepository } from '@/common/repositories/domain.repository';
+import { MutableDomainRepository } from '@/common/repositories/domain.repository';
 
 import { UserEntity } from '../entities/user.entity';
 import { UserPaginationOptions } from '../models/user.model';
 
 @Injectable()
-export class UserRepository extends DomainRepository<UserEntity> {
+export class UserRepository extends MutableDomainRepository<UserEntity> {
   public constructor(dataSource: DataSource) {
     super(dataSource.getRepository(UserEntity));
   }
@@ -62,6 +70,24 @@ export class UserRepository extends DomainRepository<UserEntity> {
     });
   }
 
+  /** Includes tombstones only when explicitly requested for historical snapshots. */
+  public findIncludingDeleted(
+    manager: EntityManager,
+    id: string,
+  ): Promise<UserEntity | null> {
+    return this.getRepository(manager).findOne({ where: { id } });
+  }
+
+  public findForUpdate(
+    manager: EntityManager,
+    id: string,
+  ): Promise<UserEntity | null> {
+    return this.getRepository(manager).findOne({
+      where: { id },
+      lock: { mode: 'pessimistic_write' },
+    });
+  }
+
   public findByEmail(
     manager: EntityManager,
     email: string,
@@ -91,5 +117,81 @@ export class UserRepository extends DomainRepository<UserEntity> {
     return this.getRepository(manager).findOne({
       where: { id, status: { key: Not(ACCOUNT_STATUS_KEYS.DELETED) } },
     });
+  }
+
+  public setStatus(manager: EntityManager, id: string, statusId: string) {
+    return manager
+      .createQueryBuilder()
+      .relation(UserEntity, 'status')
+      .of(id)
+      .set(statusId);
+  }
+
+  public replaceRoles(
+    manager: EntityManager,
+    id: string,
+    added: RoleEntity[],
+    removed: RoleEntity[],
+  ) {
+    return manager
+      .createQueryBuilder()
+      .relation(UserEntity, 'roles')
+      .of(id)
+      .addAndRemove(added, removed);
+  }
+
+  public removeRoles(manager: EntityManager, id: string, roles: RoleEntity[]) {
+    return manager
+      .createQueryBuilder()
+      .relation(UserEntity, 'roles')
+      .of(id)
+      .remove(roles);
+  }
+
+  public deleteSessions(manager: EntityManager, id: string) {
+    return manager.delete(UserSessionEntity, { user: { id } });
+  }
+
+  public deleteAccountTokens(manager: EntityManager, id: string) {
+    return manager.delete(AccountTokenEntity, { user: { id } });
+  }
+
+  public deleteRegistrationTokens(manager: EntityManager, email: string) {
+    return manager.delete(RegistrationTokenEntity, { email });
+  }
+
+  public deleteMfaSettings(manager: EntityManager, id: string) {
+    return manager.delete(UserMfaSettingsEntity, { user: { id } });
+  }
+
+  public deletePhonesForProfile(manager: EntityManager, id: string) {
+    return manager.delete(UserPhoneEntity, { profile: { id } });
+  }
+
+  public deleteAddressesForProfile(manager: EntityManager, id: string) {
+    return manager.delete(UserAddressEntity, { profile: { id } });
+  }
+
+  public deletePhone(manager: EntityManager, id: string) {
+    return manager.delete(UserPhoneEntity, { id });
+  }
+
+  public deleteAddress(manager: EntityManager, id: string) {
+    return manager.delete(UserAddressEntity, { id });
+  }
+
+  public clearAvatar(manager: EntityManager, profileId: string) {
+    return manager.query(
+      'UPDATE `user_profiles` SET `avatar_id` = NULL WHERE `id` = ?',
+      [profileId],
+    );
+  }
+
+  public detachAvatar(manager: EntityManager, profileId: string) {
+    return manager.update(
+      UserProfileEntity,
+      { id: profileId },
+      { media: { avatar: null } },
+    );
   }
 }

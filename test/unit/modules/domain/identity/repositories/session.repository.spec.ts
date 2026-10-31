@@ -57,11 +57,4 @@ describe('SessionRepository', () => {
       order: { createdAt: 'DESC' },
     });
   });
-
-  it('exposes reads but no persistence mutation API', () => {
-    expect(repository).not.toHaveProperty('save');
-    expect(repository).not.toHaveProperty('update');
-    expect(repository).not.toHaveProperty('delete');
-    expect(repository).not.toHaveProperty('remove');
-  });
 });

@@ -27,10 +27,10 @@ test/
   helpers/          Shared test infrastructure and fixtures
 ```
 
-- **Repositories** are the domain's datasource boundary. Keep queries focused and read-only; do not add application mutations or orchestration here.
-- **Domain services** own writes, cross-repository access, and application rules. Resolve or receive the transaction manager consistently, including audit writes.
-- **Policies** own business rules such as account deletion eligibility; persistence remains in services.
-- **API services/controllers** handle audience authorization, request/response models, and orchestration through domain services.
+- **Repositories** are the domain's datasource boundary. Execute focused, reusable reads and writes with the supplied manager. Keep application decisions and orchestration in domain services.
+- **Domain services** own mutation decisions, cross-repository orchestration, and application rules. Repositories execute reusable database reads and writes using the supplied manager. Resolve or receive the transaction manager consistently, including audit writes.
+- **Policies** own business rules such as account deletion eligibility; persistence remains in repositories.
+- **API services/controllers** handle audience authorization, request/response models, and orchestration through domain services. They pass transaction managers to domain services; they never query an EntityManager or import repositories. Domain services pass managers to repository reads, including locked reads and explicit tombstone reloads for audit snapshots.
 - **System services** own queue, storage, cleanup, delivery, and reusable request infrastructure. Media imports these capabilities; it does not implement provider or queue mechanics.
 
 The standalone [image processor](image-processing.md) owns raster transforms and
@@ -41,7 +41,7 @@ media domain's static 256×256 policy.
 Identity capabilities are split into lifecycle, credentials, and administration services, with a shared user service where appropriate. Prefer a coherent capability over another service that duplicates persistence logic.
 
 Identity owns account statuses, genders, roles, and permissions, including their
-entities, read repositories, response models, and seeders. The library domain owns
+entities, repositories, response models, and seeders. The library domain owns
 shared country, region, and time-zone reference data and does not depend on
 identity. The public API module's library controller composes both domains at
 `/api/v1/public/library`; lookup response contracts remain independent of domain

@@ -1,3 +1,6 @@
+import { repositoryFixture } from '@/../test/helpers/repository.fixture';
+import { UserRepository } from '@/modules/domain/identity/repositories/user.repository';
+import { UserEntity } from '@/modules/domain/identity/entities/user.entity';
 import { UserAddressEntity } from '@/modules/domain/identity/entities/address.entity';
 import { UserPhoneEntity } from '@/modules/domain/identity/entities/phone.entity';
 import { UserProfileService } from '@/modules/domain/identity/services/user-profile.service';
@@ -9,7 +12,9 @@ describe('UserProfileService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new UserProfileService(repository as never);
+    service = new UserProfileService(
+      repositoryFixture(repository, UserRepository, UserEntity) as never,
+    );
   });
 
   it('deletes an address by id through the selected manager', async () => {

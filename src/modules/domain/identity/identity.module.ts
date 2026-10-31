@@ -41,6 +41,8 @@ import { UserLifecycleService } from './services/user-lifecycle.service';
 import { UserProfileService } from './services/user-profile.service';
 import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.module';
 
+import { IdentityCatalogService } from './services/identity-catalog.service';
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -64,6 +66,7 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
     IdempotencyModule,
   ],
   providers: [
+    IdentityCatalogService,
     AccountStatusRepository,
     GenderRepository,
     PermissionRepository,
@@ -86,6 +89,7 @@ import { IdempotencyModule } from '@/modules/system/idempotency/idempotency.modu
     EmailVerificationService,
   ],
   exports: [
+    IdentityCatalogService,
     AccountStatusRepository,
     GenderRepository,
     PermissionRepository,

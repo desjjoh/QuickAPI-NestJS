@@ -4,7 +4,7 @@ jest.mock('nanoid', () => ({ customAlphabet: () => () => 'test-id' }));
 import { BadRequestException } from '@nestjs/common';
 import type { AuditService } from '@/modules/domain/audit/services/audit.service';
 import type { ImageService } from '@/modules/domain/media/services/image.service';
-import type { RegionRepository } from '@/modules/domain/library/repositories/region.repository';
+import type { LibraryReferenceService } from '@/modules/domain/library/services/library-reference.service';
 import type { UserService } from '@/modules/domain/identity/services/user.service';
 import { IdentityAuditEvents } from '@/config/audit-events.config';
 import {
@@ -45,8 +45,25 @@ describe('ProfileApiService audit mutations', () => {
       .spyOn(transactionContext, 'requireApplicationTransaction')
       .mockReturnValue({ manager: manager as never, lifecycle: lifecycle });
     const userSvc = {
+      lockByIdOrFail: jest.fn(async (id, mgr) => {
+        const user = await mgr.findOneOrFail(Object, {
+          where: { id },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (user.status?.key === 'deleted')
+          throw new (await import('@nestjs/common')).NotFoundException(
+            'User not found.',
+          );
+        return user;
+      }),
+      findIncludingDeletedOrFail: jest.fn((id, mgr) =>
+        mgr.findOneOrFail(Object, { where: { id } }),
+      ),
       transaction: jest.fn((work) => work(manager, lifecycle)),
       updateUser: jest.fn().mockResolvedValue(after),
+      findByIdOrFail: jest.fn((id, mgr) =>
+        mgr.findOneOrFail(Object, { where: { id } }),
+      ),
     };
     const userProfileSvc = {
       clearAvatar: jest.fn(),
@@ -64,7 +81,7 @@ describe('ProfileApiService audit mutations', () => {
         userSvc as unknown as UserService,
         userProfileSvc as never,
         imgSvc as unknown as ImageService,
-        regionRepo as unknown as RegionRepository,
+        regionRepo as unknown as LibraryReferenceService,
         audit as unknown as AuditService,
       ),
       manager,
