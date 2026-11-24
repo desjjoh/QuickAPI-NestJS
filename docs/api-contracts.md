@@ -125,6 +125,6 @@ does not guarantee immediate resource reclamation.
 
 ## Reference data
 
-Public startup/form reference endpoints use `/api/v1/public/library/{countries,timezones,genders,statuses,roles}`. The public API module owns the library controller, which composes the library and identity domains without changing lookup response shapes. Countries include region and phone/address validation metadata. Time zones have a generated record ID and a separate unique IANA `key`, plus display fields; the IANA key is not the database ID.
+Portal startup uses `GET /api/v1/public/library/startup`. It returns `countries`, `genders`, and `timezones` as arrays in one response, with the same records and ordering as the individual endpoints. The request fails if any collection cannot be loaded.
 
-Role listings are display/reference data, not authorization grants. Never derive allowed actions from a client-selected role label.
+Public form reference endpoints use `/api/v1/public/library/{countries,timezones,genders}`. The public API module owns the library controller, which composes the library and identity domains. Countries include region and phone/address validation metadata. Time zones have a generated record ID and a separate unique IANA `key`, plus display fields; the IANA key is not the database ID.
