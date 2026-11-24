@@ -1,19 +1,31 @@
 import { BaseCountryDto } from '@/modules/domain/library/models/country.model';
 import { BaseGenderDto } from '@/modules/domain/identity/models/gender.model';
-import { BaseRoleDto } from '@/modules/domain/identity/models/role.model';
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse } from '@nestjs/swagger';
 import { LibraryService } from '../services/library.service';
-import { BaseAccountStatusDto } from '@/modules/domain/identity/models/status.model';
 import { BaseTimezoneDto } from '@/modules/domain/library/models/time-zone.model';
 import { throttlePolicies } from '@/config/throttle-policy.config';
 import { Throttle } from '@nestjs/throttler';
+import { LibraryStartupDto } from '../models/library-startup.model';
 
 @ApiTags('Public Library')
 @Controller('library')
 @Throttle({ default: throttlePolicies.publicRead })
 export class LibraryController {
   public constructor(private readonly svc: LibraryService) {}
+
+  @Get('startup')
+  @ApiOperation({
+    summary: 'Get portal startup reference data',
+    description: 'Returns countries, genders, and time zones in one response.',
+  })
+  @ApiOkResponse({
+    description: 'Portal startup reference data returned successfully.',
+    type: LibraryStartupDto,
+  })
+  public async getStartup(): Promise<LibraryStartupDto> {
+    return this.svc.getStartup();
+  }
 
   // GET /countries
   @Get('countries')
@@ -43,36 +55,6 @@ export class LibraryController {
   })
   public async getGenders(): Promise<BaseGenderDto[]> {
     return this.svc.getGenders();
-  }
-
-  // GET /roles
-  @Get('roles')
-  @ApiOperation({
-    summary: 'List roles',
-    description:
-      'Returns role reference data used by administration screens and access-management forms.',
-  })
-  @ApiOkResponse({
-    description: 'Role reference data returned successfully.',
-    type: [BaseRoleDto],
-  })
-  public async getRoles(): Promise<BaseRoleDto[]> {
-    return this.svc.getRoles();
-  }
-
-  // GET /statuses
-  @Get('statuses')
-  @ApiOperation({
-    summary: 'List account statuses',
-    description:
-      'Returns account status reference data used by administration screens and account lifecycle management views.',
-  })
-  @ApiOkResponse({
-    description: 'Account status reference data returned successfully.',
-    type: [BaseAccountStatusDto],
-  })
-  public async getStatuses(): Promise<BaseAccountStatusDto[]> {
-    return this.svc.getAccountStatuses();
   }
 
   // GET /timezones

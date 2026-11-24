@@ -1,11 +1,6 @@
-import {
-  ApiProperty,
-  ApiPropertyOptional,
-  IntersectionType,
-} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoleEntity } from '@/modules/domain/identity/entities/role.entity';
 import { PermissionEntity } from '@/modules/domain/identity/entities/permission.entity';
-import { BaseModel } from '@/common/models/base.model';
 
 export class RoleDto {
   @ApiProperty({
@@ -43,13 +38,5 @@ export class RoleDto {
     this.permissions =
       role.permissions?.map((permission: PermissionEntity) => permission.key) ??
       [];
-  }
-}
-
-export class BaseRoleDto extends IntersectionType(BaseModel, RoleDto) {
-  public constructor(role: RoleEntity) {
-    super();
-
-    Object.assign(this, new BaseModel(role), new RoleDto(role));
   }
 }

@@ -6,8 +6,6 @@ describe('LibraryService', () => {
   const manager = {};
   const countryRepo = { findAll: jest.fn(), manager };
   const genderRepo = { findAll: jest.fn(), manager };
-  const roleRepo = { findAll: jest.fn(), manager };
-  const statusRepo = { findAll: jest.fn(), manager };
   const timezoneRepo = { findAll: jest.fn(), manager };
   const service = new LibraryService(
     new LibraryReferenceService(
@@ -15,33 +13,13 @@ describe('LibraryService', () => {
       timezoneRepo as never,
       {} as never,
     ),
-    new IdentityCatalogService(
-      genderRepo as never,
-      roleRepo as never,
-      statusRepo as never,
-    ),
+    new IdentityCatalogService(genderRepo as never),
   );
 
   beforeEach(() => jest.clearAllMocks());
 
   it.each([
     ['getGenders', genderRepo, { id: '1', key: 'female', label: 'Female' }],
-    [
-      'getRoles',
-      roleRepo,
-      {
-        id: '1',
-        key: 'admin',
-        label: 'Admin',
-        description: null,
-        permissions: [],
-      },
-    ],
-    [
-      'getAccountStatuses',
-      statusRepo,
-      { id: '1', key: 'active', label: 'Active', description: null },
-    ],
     [
       'getTimezones',
       timezoneRepo,
@@ -115,9 +93,12 @@ describe('LibraryService', () => {
     await expect(service.getGenders()).resolves.toEqual([]);
   });
 
-  it('propagates repository connection errors', async () => {
+  it('rejects the startup response when a collection fails to load', async () => {
     const error = new Error('mysql unavailable');
-    roleRepo.findAll.mockRejectedValue(error);
-    await expect(service.getRoles()).rejects.toBe(error);
+    countryRepo.findAll.mockResolvedValue([]);
+    genderRepo.findAll.mockRejectedValue(error);
+    timezoneRepo.findAll.mockResolvedValue([]);
+
+    await expect(service.getStartup()).rejects.toBe(error);
   });
 });
